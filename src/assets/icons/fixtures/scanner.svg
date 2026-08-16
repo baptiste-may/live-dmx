@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-fixture-scanner">
+  <!-- Slim Scanner Main Box Body -->
+  <rect x="6" y="11" width="6" height="10" rx="1.5" />
+  <!-- Top Mirror Support Bracket -->
+  <path d="M9 11V6" />
+  <!-- Top Angled Scanning Mirror -->
+  <line x1="6" y1="6" x2="12" y2="3" stroke-width="2.5" />
+  <!-- Single Reflected Scanning Light Beam -->
+  <line x1="9" y1="4.5" x2="20" y2="10" stroke-width="2" />
+</svg>

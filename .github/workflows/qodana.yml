@@ -1,0 +1,49 @@
+name: Qodana
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  qodana-frontend:
+    name: Qodana Frontend (TypeScript / Vue)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Qodana Scan (JS/TS)
+        uses: JetBrains/qodana-action@v2024.3
+        with:
+          args: --linter,jetbrains/qodana-js:latest
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+
+  qodana-backend:
+    name: Qodana Backend (Rust)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Qodana Scan (Rust)
+        uses: JetBrains/qodana-action@v2024.3
+        with:
+          args: --linter,jetbrains/qodana-rust:latest,--project-dir,src-tauri
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_RUST_TOKEN || secrets.QODANA_TOKEN }}
