@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { PatchBatchRequest } from "@/types/patch";
 
-import { mockPatchNode } from "./__mocks__/show-patch";
+import { mockFixtureType, mockMode, mockPatchNode } from "./__mocks__/show-patch";
 import { useShowPatch } from "./show-patch";
 
 describe("show-patch store", () => {
@@ -32,14 +32,13 @@ describe("show-patch store", () => {
   it("should invoke backend command when patchBatch is called", async () => {
     const store = useShowPatch();
     const batchRequest: PatchBatchRequest = {
-      baseName: "Spot",
-      count: 4,
-      startUniverse: 1,
+      name: "Spot 1",
+      fixtureType: mockFixtureType,
+      mode: mockMode,
+      universe: 1,
       startAddress: 1,
-      fixtureKey: "spot-key",
-      manufacturerKey: "mfr-key",
-      modeIndex: 0,
-      groupId: 1,
+      count: 4,
+      channelCount: 2,
     };
 
     await store.patchBatch(batchRequest);

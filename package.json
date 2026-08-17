@@ -24,19 +24,8 @@
     "test:coverage": "vitest run --coverage",
     "test:back": "cd src-tauri && cargo test",
     "test": "bun run test:front && bun run test:back",
+    "check": "bun run typecheck && bun run lint && bun run format && bun run test && bun run build",
     "prepare": "husky"
-  },
-  "lint-staged": {
-    "src/**/*.{ts,vue}": [
-      "prettier --write",
-      "eslint --fix"
-    ],
-    "src-tauri/**/*.rs": [
-      "rustfmt --edition 2021"
-    ],
-    "*.{json,md,html}": [
-      "prettier --write"
-    ]
   },
   "dependencies": {
     "@number-flow/vue": "^0.5.2",
