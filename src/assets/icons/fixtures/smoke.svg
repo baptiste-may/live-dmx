@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-fixture-smoke">
+  <!-- Smoke Machine Unit Box -->
+  <rect x="2" y="11" width="10" height="9" rx="1.5" />
+  <!-- Front Nozzle -->
+  <rect x="12" y="14" width="2" height="3" rx="0.5" fill="currentColor" />
+  <!-- Non-colliding Haze Waves starting after gap (x=16) -->
+  <path d="M16 13c1.5-1 3 0 4-1" />
+  <path d="M16.5 16c2-1.5 4 0 5.5-1" />
+  <path d="M16 19c1.5-1 3 0 4-1" />
+</svg>

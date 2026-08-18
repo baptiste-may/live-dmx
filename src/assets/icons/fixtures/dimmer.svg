@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-fixture-dimmer">
+  <!-- Conventional Bulb Outline -->
+  <path d="M9 18h6m-5 3h4m-5-6c-1.8-1.2-3-3.2-3-5.5a6 6 0 1 1 12 0c0 2.3-1.2 4.3-3 5.5v3H9v-3z" />
+  <!-- Inner Filament -->
+  <path d="M10 11l2-3 2 3" />
+</svg>

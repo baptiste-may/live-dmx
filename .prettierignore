@@ -1,0 +1,25 @@
+# Dependencies
+node_modules
+dist
+dist-tauri
+target
+src-tauri/target
+src-tauri/gen
+
+# Binary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.bin
+*.a
+*.so
+*.dll
+*.exe
+
+# Lock files
+bun.lock
+package-lock.json
+Cargo.lock

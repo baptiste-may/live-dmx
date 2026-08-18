@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-fixture-matrix">
+  <!-- Outer Matrix Frame -->
+  <rect x="2" y="2" width="20" height="20" rx="3" />
+  <!-- 3x3 LED Modules with wide gaps -->
+  <rect x="4.5" y="4.5" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+  <rect x="10.25" y="4.5" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+  <rect x="16" y="4.5" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+
+  <rect x="4.5" y="10.25" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+  <rect x="10.25" y="10.25" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+  <rect x="16" y="10.25" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+
+  <rect x="4.5" y="16" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+  <rect x="10.25" y="16" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+  <rect x="16" y="16" width="3.5" height="3.5" rx="0.5" fill="currentColor" />
+</svg>
