@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mockFixture1, mockFixture2 } from "@/stores/show/__mocks__/show-patch";
 import { useShowPatch } from "@/stores/show/show-patch";
@@ -10,6 +10,7 @@ import { usePatchGroups } from "./patch-groups";
 describe("patch-groups store", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    vi.clearAllMocks();
   });
 
   it("should open modal and populate fixture name", () => {
@@ -86,5 +87,17 @@ describe("patch-groups store", () => {
 
     patchGroups.table.selectedFixtures = [1];
     expect(patchGroups.isGroupSelected(2)).toBe(true);
+  });
+
+  it("should select group and clear selected fixtures", () => {
+    const patchGroups = usePatchGroups();
+    patchGroups.table.selectedFixtures = [1, 2];
+    patchGroups.selectedGroup = 0;
+
+    patchGroups.select(2);
+
+    expect(patchGroups.selectedGroup).toBe(2);
+    expect(patchGroups.table.selectedFixtures).toEqual([]);
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

@@ -1,63 +1,49 @@
-import { invoke } from "@tauri-apps/api/core";
 import { defineStore } from "pinia";
 
+import type { FixtureGroup } from "../show/show-groups";
 import { useShowPatch } from "../show/show-patch";
 
-export type FixtureGroup = {
-  id: number;
-  name: string;
+export type { FixtureGroup };
+
+export type PatchGroupsState = {
+  selectedGroup: number;
+  table: {
+    selectedFixtures: number[];
+    modal: {
+      isOpen: boolean;
+      nameInput: string;
+      startAddress: number;
+      startUniverse: number;
+    };
+  };
+};
+
+export const defaultPatchGroupsState: PatchGroupsState = {
+  selectedGroup: 0,
+  table: {
+    selectedFixtures: [],
+    modal: {
+      isOpen: false,
+      nameInput: "",
+      startAddress: 1,
+      startUniverse: 1,
+    },
+  },
 };
 
 export const usePatchGroups = defineStore("patch-groups", {
-  state: (): {
-    groups: FixtureGroup[];
-    selectedGroup: number;
+  state: (): PatchGroupsState => ({
+    ...defaultPatchGroupsState,
     table: {
-      selectedFixtures: number[];
-      modal: {
-        isOpen: boolean;
-        nameInput: string;
-        startAddress: number;
-        startUniverse: number;
-      };
-    };
-  } => ({
-    groups: [
-      {
-        id: 0,
-        name: "All Fixtures",
-      },
-    ],
-    selectedGroup: 0,
-    table: {
-      selectedFixtures: [],
-      modal: {
-        isOpen: false,
-        nameInput: "",
-        startAddress: 1,
-        startUniverse: 1,
-      },
+      ...defaultPatchGroupsState.table,
+      selectedFixtures: [...defaultPatchGroupsState.table.selectedFixtures],
+      modal: { ...defaultPatchGroupsState.table.modal },
     },
   }),
   actions: {
-    async create(name: string) {
-      return await invoke<number>("show_group_create", { name });
-    },
-    async remove(id: number) {
-      if (id === 0) return;
-      await invoke("show_group_remove", { id });
-    },
-    async rename(id: number, newName: string) {
-      if (id === 0) return;
-      await invoke("show_group_rename", { id, newName });
-    },
-    async select(id: number) {
+    select(id: number) {
       this.table.selectedFixtures = [];
-      await invoke("show_group_select", { id });
       this.selectedGroup = id;
-    },
-    get(id: number) {
-      return this.groups.find((g) => g.id === id);
     },
     openModal(selectedFixturesId: number[]) {
       if (selectedFixturesId.length === 0) return;

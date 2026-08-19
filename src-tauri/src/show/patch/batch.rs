@@ -68,7 +68,6 @@ pub fn show_patch_batch(
             id: group_id,
             name: base_name.clone(),
         });
-        show.groups.selected_group = group_id;
 
         let mut created_fixtures = Vec::new();
         let mut current_abs_address = u64::from(request.universe.saturating_sub(1)) * 512

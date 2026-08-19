@@ -38,12 +38,14 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
+      groups: { groups: [{ id: 0, name: "All Fixtures" }] },
     });
 
     expect(show.state).toBe(ShowStatus.LOADED);
     expect(show.isLoaded).toBe(true);
     expect(show.identity.displayName).toBe("Loaded Show");
     expect(show.file.path).toBe("/shows/test.json");
+    expect(show.groups.groups).toEqual([{ id: 0, name: "All Fixtures" }]);
     expect(show.hasUnsavedChanges).toBe(false);
     expect(show.canSave).toBe(false);
     expect(show.canUndo).toBe(true);
@@ -67,6 +69,7 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
+      groups: { groups: [{ id: 0, name: "All Fixtures" }] },
     });
 
     expect(show.isLoaded).toBe(true);
@@ -91,6 +94,7 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
+      groups: { groups: [{ id: 0, name: "All Fixtures" }] },
     });
 
     expect(show.hasUnsavedChanges).toBe(true);

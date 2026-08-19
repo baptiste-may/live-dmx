@@ -12,7 +12,6 @@ pub fn show_group_create(
         let max_id = show.groups.groups.iter().map(|g| g.id).max().unwrap_or(0);
         let new_id = max_id + 1;
         show.groups.groups.push(FixtureGroup { id: new_id, name });
-        show.groups.selected_group = new_id;
         Ok(new_id)
     })
 }
@@ -28,9 +27,6 @@ pub fn show_group_remove(
     }
     state.apply_mutation(&app, |show| {
         show.groups.groups.retain(|g| g.id != id);
-        if show.groups.selected_group == id {
-            show.groups.selected_group = 0;
-        }
         for f in &mut show.patch.fixtures {
             f.groups.retain(|&gid| gid != id);
         }
@@ -52,21 +48,6 @@ pub fn show_group_rename(
         if let Some(group) = show.groups.groups.iter_mut().find(|g| g.id == id) {
             group.name = new_name;
         }
-        Ok(())
-    })
-}
-
-#[tauri::command]
-pub fn show_group_select(
-    state: State<'_, AppState>,
-    app: AppHandle,
-    id: u32,
-) -> Result<(), String> {
-    state.apply_mutation(&app, |show| {
-        if id != 0 && !show.groups.groups.iter().any(|g| g.id == id) {
-            return Err(format!("Group {} does not exist", id));
-        }
-        show.groups.selected_group = id;
         Ok(())
     })
 }

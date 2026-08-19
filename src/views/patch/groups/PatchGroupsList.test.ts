@@ -2,7 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/vue";
 import { describe, expect, it } from "vitest";
 
-import { usePatchGroups } from "@/stores/patch/patch-groups.ts";
+import { useShowGroups } from "@/stores/show/show-groups.ts";
 
 import PatchGroupsList from "./PatchGroupsList.vue";
 
@@ -11,8 +11,8 @@ describe("PatchGroupsList.vue", () => {
     const user = userEvent.setup();
     render(PatchGroupsList);
 
-    const groupsStore = usePatchGroups();
-    groupsStore.create = async () => 2;
+    const showGroups = useShowGroups();
+    showGroups.create = async () => 2;
 
     const input = screen.getByPlaceholderText("New group name...");
     await user.type(input, "Front Lights");

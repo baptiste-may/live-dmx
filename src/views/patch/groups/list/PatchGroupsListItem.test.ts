@@ -16,7 +16,7 @@ describe("PatchGroupsListItem.vue", () => {
     });
 
     const groupsStore = usePatchGroups();
-    const groupButton = screen.getByRole("button", { name: "Stage Left" });
+    const groupButton = screen.getByRole("button", { name: "1 - Stage Left" });
     expect(groupButton).toBeInTheDocument();
 
     await user.click(groupButton);

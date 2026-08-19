@@ -35,7 +35,6 @@ fn test_show_file_serialization_round_trip() {
                     name: "Front Truss".to_string(),
                 },
             ],
-            selected_group: 1,
         },
     };
 
@@ -50,7 +49,6 @@ fn test_show_file_serialization_round_trip() {
     assert_eq!(loaded.patch.fixtures.len(), 1);
     assert_eq!(loaded.patch.fixtures[0].name, "Lead Spot");
     assert_eq!(loaded.groups.groups.len(), 2);
-    assert_eq!(loaded.groups.selected_group, 1);
 }
 
 #[test]
@@ -58,7 +56,7 @@ fn test_show_file_default_version_handling() {
     let json_without_version = r#"{
         "identity": { "displayName": "Default Version Show" },
         "patch": { "fixtures": [] },
-        "groups": { "groups": [{ "id": 0, "name": "All Fixtures" }], "selectedGroup": 0 }
+        "groups": { "groups": [{ "id": 0, "name": "All Fixtures" }] }
     }"#;
 
     let loaded: ShowFileContent = serde_json::from_str(json_without_version).unwrap();

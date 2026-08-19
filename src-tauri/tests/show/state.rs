@@ -37,7 +37,6 @@ fn test_show_changes_state_defaults() {
 #[test]
 fn test_patch_groups_state_defaults() {
     let groups = PatchGroupsState::default();
-    assert_eq!(groups.selected_group, 0);
     assert_eq!(groups.groups.len(), 1);
     assert_eq!(groups.groups[0].id, 0);
     assert_eq!(groups.groups[0].name, "All Fixtures");
@@ -109,7 +108,6 @@ fn test_show_data_snapshot_and_restore() {
                     name: "Front".to_string(),
                 },
             ],
-            selected_group: 1,
         },
     };
 

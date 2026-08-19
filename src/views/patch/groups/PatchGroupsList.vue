@@ -4,16 +4,23 @@ import { FolderPlusIcon } from "lucide-vue-next";
 import { ref } from "vue";
 
 import { usePatchGroups } from "@/stores/patch/patch-groups.ts";
+import { useShowGroups } from "@/stores/show/show-groups.ts";
+import { ToastType, useToastStore } from "@/stores/toast";
 import PatchGroupsListItem from "@/views/patch/groups/list/PatchGroupsListItem.vue";
 
-const groups = usePatchGroups();
+const showGroups = useShowGroups();
+const patchGroups = usePatchGroups();
 
 const newGroupName = ref("");
 
 async function handleNewGroup() {
-  const groupId = await groups.create(newGroupName.value);
-  await groups.select(groupId);
-  newGroupName.value = "";
+  try {
+    const groupId = await showGroups.create(newGroupName.value);
+    patchGroups.select(groupId);
+    newGroupName.value = "";
+  } catch (error: unknown) {
+    useToastStore().addToast(`Failed to create group: ${String(error)}`, ToastType.ERROR);
+  }
 }
 </script>
 
@@ -28,11 +35,11 @@ async function handleNewGroup() {
     </Join>
 
     <h2 class="text-base-content/60 text-xs font-semibold tracking-wider uppercase">
-      Groups ({{ groups.groups.length }})
+      Groups ({{ showGroups.groups.length }})
     </h2>
 
     <div class="flex flex-wrap gap-2">
-      <PatchGroupsListItem v-for="group in groups.groups" :key="group.id" :group="group" />
+      <PatchGroupsListItem v-for="group in showGroups.groups" :key="group.id" :group="group" />
     </div>
   </div>
 </template>

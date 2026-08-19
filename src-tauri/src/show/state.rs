@@ -97,7 +97,6 @@ pub struct ShowPatchState {
 #[serde(rename_all = "camelCase")]
 pub struct PatchGroupsState {
     pub groups: Vec<FixtureGroup>,
-    pub selected_group: u32,
 }
 
 impl Default for PatchGroupsState {
@@ -107,7 +106,6 @@ impl Default for PatchGroupsState {
                 id: 0,
                 name: "All Fixtures".to_string(),
             }],
-            selected_group: 0,
         }
     }
 }

@@ -1,7 +1,7 @@
 use live_dmx_lib::show::{FixtureGroup, PatchGroupsState, PatchedFixture};
 
 #[test]
-fn test_group_create_auto_increment_and_select() {
+fn test_group_create_auto_increment() {
     let mut groups = PatchGroupsState::default();
     assert_eq!(groups.groups.len(), 1);
     assert_eq!(groups.groups[0].id, 0);
@@ -13,12 +13,10 @@ fn test_group_create_auto_increment_and_select() {
         id: new_id,
         name: "Truss Left".to_string(),
     });
-    groups.selected_group = new_id;
 
     assert_eq!(groups.groups.len(), 2);
     assert_eq!(groups.groups[1].id, 1);
     assert_eq!(groups.groups[1].name, "Truss Left");
-    assert_eq!(groups.selected_group, 1);
 
     // Create Group 2
     let max_id_2 = groups.groups.iter().map(|g| g.id).max().unwrap_or(0);
@@ -27,11 +25,9 @@ fn test_group_create_auto_increment_and_select() {
         id: new_id_2,
         name: "Truss Right".to_string(),
     });
-    groups.selected_group = new_id_2;
 
     assert_eq!(groups.groups.len(), 3);
     assert_eq!(groups.groups[2].id, 2);
-    assert_eq!(groups.selected_group, 2);
 }
 
 #[test]
@@ -49,7 +45,7 @@ fn test_group_remove_group_zero_protection() {
 }
 
 #[test]
-fn test_group_remove_custom_group_resets_selection_and_cleans_fixtures() {
+fn test_group_remove_custom_group_cleans_fixtures() {
     let mut groups = PatchGroupsState {
         groups: vec![
             FixtureGroup {
@@ -65,7 +61,6 @@ fn test_group_remove_custom_group_resets_selection_and_cleans_fixtures() {
                 name: "Truss Right".to_string(),
             },
         ],
-        selected_group: 1,
     };
 
     let mut fixtures = vec![
@@ -91,15 +86,11 @@ fn test_group_remove_custom_group_resets_selection_and_cleans_fixtures() {
 
     let remove_id = 1;
     groups.groups.retain(|g| g.id != remove_id);
-    if groups.selected_group == remove_id {
-        groups.selected_group = 0;
-    }
     for f in &mut fixtures {
         f.groups.retain(|&gid| gid != remove_id);
     }
 
     assert_eq!(groups.groups.len(), 2);
-    assert_eq!(groups.selected_group, 0);
     assert_eq!(fixtures[0].groups, vec![0, 2]);
     assert_eq!(fixtures[1].groups, vec![0]);
 }
@@ -131,7 +122,6 @@ fn test_group_rename_custom_group() {
                 name: "Old Name".to_string(),
             },
         ],
-        selected_group: 0,
     };
 
     let rename_id = 1;

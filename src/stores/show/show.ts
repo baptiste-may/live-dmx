@@ -2,9 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 
-import { type FixtureGroup, usePatchGroups } from "../patch/patch-groups.ts";
+import { usePatchGroups } from "../patch/patch-groups.ts";
 import { ToastType, useToastStore } from "../toast.ts";
 import { defaultShowChangesState, useShowChanges } from "./show-changes.ts";
+import { defaultShowGroupsState, type FixtureGroup, useShowGroups } from "./show-groups.ts";
 import { defaultShowIdentityState, useShowIdentity } from "./show-identity.ts";
 import { defaultShowPatchState, useShowPatch } from "./show-patch.ts";
 
@@ -12,12 +13,14 @@ export type ShowData = {
   identity: ReturnType<typeof useShowIdentity>["$state"];
   file: ReturnType<typeof useShowChanges>["$state"];
   patch: ReturnType<typeof useShowPatch>["$state"];
+  groups: ReturnType<typeof useShowGroups>["$state"];
 };
 
 export const defaultShow: ShowData = {
   identity: defaultShowIdentityState,
   file: defaultShowChangesState,
   patch: defaultShowPatchState,
+  groups: defaultShowGroupsState,
 };
 
 export enum ShowStatus {
@@ -36,6 +39,7 @@ export const useShow = defineStore("show", {
     identity: useShowIdentity(),
     file: useShowChanges(),
     patch: useShowPatch(),
+    groups: useShowGroups(),
   }),
   getters: {
     hasUnsavedChanges: (state) => state.state === ShowStatus.LOADED && state.file.isDirty,
@@ -89,16 +93,16 @@ export const useShow = defineStore("show", {
                 }
               }
               if (event.payload.groups) {
-                const groupsStore = usePatchGroups();
+                const showGroups = useShowGroups();
                 const groupsPayload = event.payload.groups as {
                   groups?: FixtureGroup[];
-                  selectedGroup?: number;
                 };
                 if (groupsPayload.groups) {
-                  groupsStore.groups = groupsPayload.groups;
-                }
-                if (typeof groupsPayload.selectedGroup === "number") {
-                  groupsStore.selectedGroup = groupsPayload.selectedGroup;
+                  showGroups.groups = groupsPayload.groups;
+                  const patchGroups = usePatchGroups();
+                  if (!showGroups.groups.some((g) => g.id === patchGroups.selectedGroup)) {
+                    patchGroups.selectedGroup = 0;
+                  }
                 }
               }
               if (
@@ -123,6 +127,9 @@ export const useShow = defineStore("show", {
       this.file.canUndo = data.file.canUndo ?? false;
       this.file.canRedo = data.file.canRedo ?? false;
       this.patch.fixtures = data.patch.fixtures;
+      if (data.groups?.groups) {
+        this.groups.groups = data.groups.groups;
+      }
       this.state = ShowStatus.LOADED;
       invoke("show_create").catch((error: unknown) => {
         useToastStore().addToast(`Failed to create show: ${String(error)}`, ToastType.ERROR);
@@ -132,6 +139,8 @@ export const useShow = defineStore("show", {
       this.identity.$reset();
       this.file.$reset();
       this.patch.$reset();
+      this.groups.$reset();
+      usePatchGroups().$reset();
       this.state = ShowStatus.NOT_LOADED;
       invoke("show_unload").catch((error: unknown) => {
         useToastStore().addToast(`Failed to unload show: ${String(error)}`, ToastType.ERROR);

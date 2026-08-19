@@ -4,11 +4,10 @@ pub mod show;
 use fixtures::get_fixtures;
 use show::{
     get_recent_shows, remove_recent_show, save_recent_show, show_create, show_get_data,
-    show_group_create, show_group_remove, show_group_rename, show_group_select,
-    show_identity_update, show_load, show_patch_batch, show_patch_fixture,
-    show_patch_remove_fixtures, show_patch_toggle_group, show_patch_update_address,
-    show_patch_update_name, show_patch_update_universe, show_redo, show_save, show_undo,
-    show_unload, AppState,
+    show_group_create, show_group_remove, show_group_rename, show_identity_update, show_load,
+    show_patch_batch, show_patch_fixture, show_patch_remove_fixtures, show_patch_toggle_group,
+    show_patch_update_address, show_patch_update_name, show_patch_update_universe, show_redo,
+    show_save, show_undo, show_unload, AppState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -43,7 +42,6 @@ pub fn run() {
             show_group_create,
             show_group_remove,
             show_group_rename,
-            show_group_select,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

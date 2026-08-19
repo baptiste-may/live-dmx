@@ -2,7 +2,7 @@
 import { Badge, Checkbox } from "daisy-ui-kit";
 import { computed } from "vue";
 
-import { usePatchGroups } from "@/stores/patch/patch-groups";
+import { useShowGroups } from "@/stores/show/show-groups";
 import type { PatchedFixture } from "@/types/patch";
 import PatchGroupsTableForm from "@/views/patch/groups/table/PatchGroupsTableForm.vue";
 
@@ -19,9 +19,9 @@ const emit = defineEmits<{
   (e: "update-selection", fixtureId: number, checked: boolean): void;
 }>();
 
-const groups = usePatchGroups();
+const showGroups = useShowGroups();
 
-const groupsData = computed(() => patch.groups.map((groupId) => groups.get(groupId)));
+const groupsData = computed(() => patch.groups.map((groupId) => showGroups.get(groupId)));
 </script>
 
 <template>

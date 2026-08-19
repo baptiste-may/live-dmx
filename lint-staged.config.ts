@@ -10,6 +10,9 @@ export default {
     `vitest related --run ${filenames.join(" ")}`,
     "vue-tsc --noEmit",
   ],
-  "src-tauri/**/*.rs": ["rustfmt --edition 2021", () => "cd src-tauri && cargo test"],
+  "src-tauri/**/*.rs": [
+    "rustfmt --edition 2021",
+    () => "cargo test --manifest-path src-tauri/Cargo.toml",
+  ],
   "*.{json,md,html}": ["prettier --write"],
 };

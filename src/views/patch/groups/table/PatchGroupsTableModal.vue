@@ -5,8 +5,10 @@ import { computed } from "vue";
 
 import NumberStepper from "@/components/inputs/NumberStepper.vue";
 import { usePatchGroups } from "@/stores/patch/patch-groups";
+import { useShowGroups } from "@/stores/show/show-groups";
 
 const patchGroups = usePatchGroups();
+const showGroups = useShowGroups();
 
 const fixturesS = computed(() => (patchGroups.table.selectedFixtures.length > 1 ? "s" : ""));
 </script>
@@ -36,14 +38,14 @@ const fixturesS = computed(() => (patchGroups.table.selectedFixtures.length > 1 
       <Fieldset :legend="`Fixture${fixturesS} groups`">
         <div class="flex flex-wrap gap-2">
           <Button
-            v-for="group in patchGroups.groups.filter((g) => g.id !== 0)"
+            v-for="group in showGroups.groups.filter((g) => g.id !== 0)"
             :key="group.id"
             primary
             :outline="!patchGroups.isGroupSelected(group.id)"
             class="w-min whitespace-nowrap"
             @click="patchGroups.toggleFixtureGroup(group.id)"
           >
-            {{ group.name }}
+            {{ group.id }} - {{ group.name }}
           </Button>
         </div>
       </Fieldset>
