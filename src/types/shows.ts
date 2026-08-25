@@ -1,5 +1,5 @@
 export type RecentShow = {
   displayName: string;
   path: string;
-  updatedAt: Date;
+  updatedAt: string | number | Date;
 };

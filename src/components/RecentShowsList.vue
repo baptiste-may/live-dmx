@@ -3,6 +3,7 @@ import { Button, Flex, Menu, MenuItem, Skeleton, Text } from "daisy-ui-kit";
 import { FileIcon, RotateCwIcon } from "lucide-vue-next";
 import { onMounted, ref } from "vue";
 
+import { formatDate } from "@/libs/date";
 import { useApp } from "@/stores/app";
 import { useRecentShows } from "@/stores/recent-shows";
 
@@ -49,12 +50,7 @@ onMounted(refresh);
             {{ show.path }}
           </Text>
           <Text xs class="opacity-50">
-            {{
-              new Date(show.updatedAt).toLocaleString(undefined, {
-                dateStyle: "short",
-                timeStyle: "short",
-              })
-            }}
+            {{ formatDate(show.updatedAt) }}
           </Text>
         </Flex>
       </button>

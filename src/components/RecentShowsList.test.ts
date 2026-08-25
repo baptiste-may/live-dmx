@@ -52,4 +52,21 @@ describe("RecentShowsList.vue", () => {
 
     expect(appStore.loadShow).toHaveBeenCalledWith("/shows/concert.ldmx");
   });
+
+  it("should render formatted date without 'Invalid date' when updatedAt is a timestamp string", () => {
+    const recentShowsStore = useRecentShows();
+
+    recentShowsStore.shows = [
+      {
+        displayName: "Festival 2026",
+        path: "/shows/festival.ldmx",
+        updatedAt: "1740501255000",
+      },
+    ];
+
+    render(RecentShowsList);
+
+    expect(screen.getByText("Festival 2026")).toBeInTheDocument();
+    expect(screen.queryByText(/invalid/i)).not.toBeInTheDocument();
+  });
 });
