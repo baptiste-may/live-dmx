@@ -22,6 +22,6 @@ describe("PatchFormBrowser.vue", () => {
     await user.click(clearButton);
 
     expect(browser.clearSearch).toHaveBeenCalled();
-    expect(patchForm.$reset).toHaveBeenCalled();
+    expect(patchForm.reset).toHaveBeenCalled();
   });
 });

@@ -1,4 +1,6 @@
-use live_dmx_lib::show::patch::{extract_standard_name, get_fixture_channel_count};
+use live_dmx_lib::show::patch::{
+    check_batch_patch_collision, extract_standard_name, get_fixture_channel_count,
+};
 use live_dmx_lib::show::{BatchPatchRequest, PatchedFixture, ShowPatchState};
 
 #[test]
@@ -236,4 +238,132 @@ fn test_patch_fixtures_removal() {
 
     assert_eq!(patch.fixtures.len(), 1);
     assert_eq!(patch.fixtures[0].id, 2);
+}
+
+#[test]
+fn test_check_batch_patch_collision_no_overlap() {
+    let existing = vec![PatchedFixture {
+        id: 1,
+        groups: vec![],
+        name: "Spot 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["dimmer", "pan", "tilt"] }),
+        universe: 1,
+        address: 1,
+    }];
+
+    let req = BatchPatchRequest {
+        name: "Spot 2".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["dimmer", "pan", "tilt"] }),
+        universe: 1,
+        start_address: 4,
+        count: 2,
+        channel_count: 3,
+    };
+
+    let result = check_batch_patch_collision(&existing, &req);
+    assert!(result.is_ok());
+    let planned = result.unwrap();
+    assert_eq!(planned, vec![(1, 4), (1, 7)]);
+}
+
+#[test]
+fn test_check_batch_patch_collision_direct_overlap() {
+    let existing = vec![PatchedFixture {
+        id: 1,
+        groups: vec![],
+        name: "Spot 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["ch1", "ch2", "ch3", "ch4"] }),
+        universe: 1,
+        address: 10,
+    }];
+
+    let req = BatchPatchRequest {
+        name: "Colliding Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["ch1", "ch2"] }),
+        universe: 1,
+        start_address: 12,
+        count: 1,
+        channel_count: 2,
+    };
+
+    let result = check_batch_patch_collision(&existing, &req);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Address collision"));
+}
+
+#[test]
+fn test_check_batch_patch_collision_multi_count_second_fixture_overlaps() {
+    let existing = vec![PatchedFixture {
+        id: 1,
+        groups: vec![],
+        name: "Existing Fixture".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["ch1", "ch2", "ch3"] }),
+        universe: 1,
+        address: 20,
+    }];
+
+    // Batch starts at 15 with 3 channels each -> Fixture 1 is 15..17 (no collision), Fixture 2 is 18..20 (overlaps at 20!)
+    let req = BatchPatchRequest {
+        name: "Batch Fixture".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["ch1", "ch2", "ch3"] }),
+        universe: 1,
+        start_address: 15,
+        count: 2,
+        channel_count: 3,
+    };
+
+    let result = check_batch_patch_collision(&existing, &req);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Address collision"));
+}
+
+#[test]
+fn test_check_batch_patch_collision_different_universe_no_overlap() {
+    let existing = vec![PatchedFixture {
+        id: 1,
+        groups: vec![],
+        name: "Spot U1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["ch1", "ch2"] }),
+        universe: 1,
+        address: 10,
+    }];
+
+    let req = BatchPatchRequest {
+        name: "Spot U2".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["ch1", "ch2"] }),
+        universe: 2,
+        start_address: 10,
+        count: 1,
+        channel_count: 2,
+    };
+
+    let result = check_batch_patch_collision(&existing, &req);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_check_batch_patch_collision_universe_limit_exceeded() {
+    let existing = vec![];
+
+    let req = BatchPatchRequest {
+        name: "Overflow Fixture".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({ "channels": ["ch1"] }),
+        universe: 513,
+        start_address: 1,
+        count: 1,
+        channel_count: 1,
+    };
+
+    let result = check_batch_patch_collision(&existing, &req);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("exceeds universe bounds"));
 }

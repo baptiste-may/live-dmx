@@ -81,7 +81,7 @@ export const useApp = defineStore("app", {
       return changes.confirmWithSaveGuard(() => {
         this.show.unload();
         this.navigation.$reset();
-        this.patchForm.$reset();
+        this.patchForm.reset();
         this.fixtureBrowser.clearSearch();
       });
     },

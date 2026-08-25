@@ -1,16 +1,28 @@
 <script setup lang="ts">
 import { Badge, Button, Card, CardBody, Input } from "daisy-ui-kit";
 import { PlusIcon, SlidersIcon } from "lucide-vue-next";
-import { computed } from "vue";
+import { computed, watch } from "vue";
 
 import { FixtureIcon } from "@/components/icons";
 import NumberStepper from "@/components/inputs/NumberStepper.vue";
 import { formatChannelName } from "@/libs/fixture.ts";
 import { useFixtureBrowser } from "@/stores/fixture-browser.ts";
 import { usePatchForm } from "@/stores/patch/patch-form.ts";
+import { useShowPatch } from "@/stores/show/show-patch.ts";
 
 const form = usePatchForm();
 const fixtureBrowser = useFixtureBrowser();
+const showPatch = useShowPatch();
+
+watch(
+  () => showPatch.fixtures,
+  () => {
+    if (!form.isFixtureSelected()) {
+      form.setDefaultLocation();
+    }
+  },
+  { immediate: true },
+);
 
 const manufacturerName = computed(() => {
   const manufacturerKey = form.selectedFixture?.manufacturerKey;

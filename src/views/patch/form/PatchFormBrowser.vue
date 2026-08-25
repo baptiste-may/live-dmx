@@ -37,7 +37,7 @@ const openFixtureKeys = ref<Record<string, boolean>>({});
 
 function handleCleanButton() {
   browser.clearSearch();
-  patchForm.$reset();
+  patchForm.reset();
 }
 
 function toggleFixture(key: string, event: Event) {

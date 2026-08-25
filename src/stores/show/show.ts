@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 
+import { usePatchForm } from "../patch/patch-form.ts";
 import { usePatchGroups } from "../patch/patch-groups.ts";
 import { ToastType, useToastStore } from "../toast.ts";
 import { defaultShowChangesState, useShowChanges } from "./show-changes.ts";
@@ -90,6 +91,10 @@ export const useShow = defineStore("show", {
                 const patch = event.payload.patch as ShowData["patch"];
                 if (patch.fixtures) {
                   this.patch.fixtures = patch.fixtures;
+                  const patchForm = usePatchForm();
+                  if (!patchForm.isFixtureSelected()) {
+                    patchForm.setDefaultLocation();
+                  }
                 }
               }
               if (event.payload.groups) {
@@ -127,6 +132,10 @@ export const useShow = defineStore("show", {
       this.file.canUndo = data.file.canUndo ?? false;
       this.file.canRedo = data.file.canRedo ?? false;
       this.patch.fixtures = data.patch.fixtures;
+      const patchForm = usePatchForm();
+      if (!patchForm.isFixtureSelected()) {
+        patchForm.setDefaultLocation();
+      }
       if (data.groups?.groups) {
         this.groups.groups = data.groups.groups;
       }

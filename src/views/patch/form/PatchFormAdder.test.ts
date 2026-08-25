@@ -31,4 +31,11 @@ describe("PatchFormAdder.vue", () => {
     await user.click(patchButton);
     expect(formStore.patch).toHaveBeenCalledTimes(1);
   });
+
+  it("should initialize default location at the beginning when no fixture is selected", () => {
+    const formStore = usePatchForm();
+    render(PatchFormAdder);
+
+    expect(formStore.setDefaultLocation).toHaveBeenCalled();
+  });
 });
