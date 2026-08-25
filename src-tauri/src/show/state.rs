@@ -56,8 +56,11 @@ impl AppState {
             if prev_snapshot.patch != current_snapshot.patch
                 || prev_snapshot.groups != current_snapshot.groups
             {
-                if let Ok(mut live) = self.output.engine.lock() {
-                    live.reset_all();
+                match self.output.engine.lock() {
+                    Ok(mut live) => live.reset_all(),
+                    Err(err) => {
+                        return Err(format!("failed to reset live engine: {err}"));
+                    }
                 }
             }
             history.push_mutation(prev_snapshot);

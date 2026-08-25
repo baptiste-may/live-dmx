@@ -110,16 +110,16 @@ const strokeDashoffset = computed(() => {
   return arcLength * (1 - ratio.value);
 });
 
-function clampAndStep(val: number): number {
-  let rounded = Math.round((val - props.min) / props.step) * props.step + props.min;
-  const precision = (props.step.toString().split(".")[1] || "").length;
+function clampAndStep(val: number, step = props.step): number {
+  let rounded = Math.round((val - props.min) / step) * step + props.min;
+  const precision = (step.toString().split(".")[1] || "").length;
   rounded = Number(rounded.toFixed(precision));
   return Math.min(Math.max(rounded, props.min), props.max);
 }
 
-function updateValue(newValue: number) {
+function updateValue(newValue: number, step = props.step) {
   if (props.disabled || props.readonly) return;
-  const clamped = clampAndStep(newValue);
+  const clamped = clampAndStep(newValue, step);
   if (clamped !== props.modelValue) {
     emit("update:modelValue", clamped);
     emit("change", clamped);
@@ -145,9 +145,10 @@ function onPointerMove(e: PointerEvent) {
   const range = props.max - props.min;
   const dragSens = 150;
   const scale = e.shiftKey ? 0.1 : 1;
+  const effectiveStep = props.step * scale;
 
   const deltaValue = (deltaY / dragSens) * range * scale;
-  updateValue(startValue + deltaValue);
+  updateValue(startValue + deltaValue, effectiveStep);
 }
 
 function onPointerUp(e: PointerEvent) {
@@ -170,26 +171,32 @@ function onWheel(e: WheelEvent) {
 
   const direction = e.deltaY < 0 ? 1 : -1;
   let multiplier = props.step;
-  if (e.shiftKey) multiplier *= 0.1;
-  else if (e.ctrlKey || e.metaKey) multiplier *= 10;
+  let effectiveStep = props.step;
+  if (e.shiftKey) {
+    multiplier *= 0.1;
+    effectiveStep *= 0.1;
+  } else if (e.ctrlKey || e.metaKey) {
+    multiplier *= 10;
+    effectiveStep *= 10;
+  }
 
-  updateValue(props.modelValue + direction * multiplier);
+  updateValue(props.modelValue + direction * multiplier, effectiveStep);
 }
 
 function onKeyDown(e: KeyboardEvent) {
   if (props.disabled || props.readonly) return;
 
   let delta = 0;
-  const stepSize = e.shiftKey ? props.step * 0.1 : props.step;
+  const effectiveStep = e.shiftKey ? props.step * 0.1 : props.step;
 
   switch (e.key) {
     case "ArrowUp":
     case "ArrowRight":
-      delta = stepSize;
+      delta = effectiveStep;
       break;
     case "ArrowDown":
     case "ArrowLeft":
-      delta = -stepSize;
+      delta = -effectiveStep;
       break;
     case "PageUp":
       delta = props.step * 10;
@@ -210,7 +217,7 @@ function onKeyDown(e: KeyboardEvent) {
   }
 
   e.preventDefault();
-  updateValue(props.modelValue + delta);
+  updateValue(props.modelValue + delta, effectiveStep);
 }
 
 function onDblClick() {

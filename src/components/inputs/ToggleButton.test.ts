@@ -38,11 +38,44 @@ describe("ToggleButton.vue", () => {
         cell: true,
         color: "#FF0000",
         modelValue: true,
+        label: "Red Cell",
       },
     });
 
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("button", { name: "Red Cell" });
     expect(button).toBeInTheDocument();
+    expect(button).toHaveAttribute("aria-pressed", "true");
     expect(button).toHaveStyle({ backgroundColor: "rgb(255, 0, 0)" });
+  });
+
+  it("provides accessible name and aria-pressed in inactive cell mode", () => {
+    render(ToggleButton, {
+      props: {
+        cell: true,
+        color: "#00FF00",
+        modelValue: false,
+        label: "Green Cell",
+      },
+    });
+
+    const button = screen.getByRole("button", { name: "Green Cell" });
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("applies bg-warning and uses slot content as accessible name when color is not provided", () => {
+    render(ToggleButton, {
+      props: {
+        cell: true,
+        modelValue: false,
+      },
+      slots: {
+        default: "Fallback Cell",
+      },
+    });
+
+    const button = screen.getByRole("button", { name: "Fallback Cell" });
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveClass("bg-warning");
   });
 });

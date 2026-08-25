@@ -20,6 +20,14 @@ pub fn get_fixture_channel_name(fixture: &PatchedFixture, ch_index: usize) -> Op
 
 pub fn classify_channel(name: &str) -> ChannelType {
     let lower = name.to_lowercase();
+    if lower.contains("fine")
+        || lower.contains("lsb")
+        || lower.contains("16 bit")
+        || lower.contains("16bit")
+        || lower.contains("16-bit")
+    {
+        return ChannelType::Other;
+    }
     if lower.contains("dimmer") || lower.contains("intensity") {
         ChannelType::Dimmer
     } else if lower.contains("red") || lower == "r" {

@@ -17,7 +17,7 @@ Welcome to the `live-dmx` project. This document provides essential information 
   - [Vue 3](https://vuejs.org/) (Composition API, `<script setup>`)
   - [Vite](https://vitejs.dev/)
   - [TypeScript](https://www.typescriptlang.org/)
-  - [Tailwind CSS](https://tailwindcss.com/) & [DaisyUI](https://daisyui.com/) for styling.
+  - [Tailwind CSS](https://tailwindcss.com/) & [DaisyUI](https://daisyui.com/) with [daisy-ui-kit](https://github.com/alexandre-fernandez/daisy-ui-kit) for UI components and styling.
   - [Lucide Vue Next](https://lucide.dev/icons) for iconography.
 - **Backend:**
   - [Tauri v2](https://v2.tauri.app/) (Rust)
@@ -38,7 +38,7 @@ Welcome to the `live-dmx` project. This document provides essential information 
   - `src/lib.rs`: Tauri application setup and command handlers.
   - `src/fixtures/`: Rust logic for handling fixture data and caching (`commands.rs`, `loader.rs`, `types.rs`).
   - `src/show/`: Show management, patch batching, history tracking, and show serialization (`types.rs`, `state.rs`, `history.rs`, `commands.rs`, `identity.rs`, `recent.rs`, `patch/`).
-  - `src/output/`: DMX output engine and command handlers (`engine.rs`, `compute.rs`, `effects.rs`, `channels.rs`, `colors.rs`, `runner.rs`, `commands.rs`, `types.rs`).
+  - `src/output/`: DMX output engine and command handlers (`engine.rs`, `effects.rs`, `channels.rs`, `colors.rs`, `runner.rs`, `commands.rs`, `types.rs`).
 - `fixtures/`: JSON data files for lighting fixtures (cached in OS AppData directory, or downloaded for development via `download-fixtures.ts`).
 - `download-fixtures.ts`: Script to download fixtures from the Open Fixture Library.
 
@@ -58,7 +58,7 @@ Welcome to the `live-dmx` project. This document provides essential information 
 
 - **Composition API:** Use `<script setup>` in SFCs.
 - **Inline Handlers:** When an event handler (such as `@click`) in a Vue component only executes a simple single-line statement or method call, it can be placed directly inline in the template (e.g., `@click="isOpen = false"`) instead of defining a dedicated single-line handler in `<script>`.
-- **Styling:** Prefer Tailwind CSS utility classes. Use DaisyUI components where appropriate.
+- **Styling & UI Components:** Prefer Tailwind CSS utility classes. For DaisyUI, if possible, prefer using `daisy-ui-kit` components (`Button`, `Card`, `CardTitle`, `Modal`, `Table`, `Badge`, `Divider`, etc.) instead of directly using DaisyUI class names.
 - **Tauri Commands:** Invoke backend commands using `@tauri-apps/api/core`.
 - **State Management:** The application state is primarily managed within the Pinia store (`src/stores/show/show.ts`). Components should use `useShow()` to access and update the current show state instead of direct prop mutations. Avoid mutating props directly to satisfy Vue linting rules.
 - **Notifications:** Use `useToastStore()` from `src/stores/toast.ts` to display non-blocking alerts (toasts) in the bottom-right corner. Prefer this over native `alert()` or Tauri `message()` for a consistent UI experience.

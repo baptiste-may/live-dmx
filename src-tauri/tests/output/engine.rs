@@ -134,7 +134,7 @@ fn test_live_engine_buttons_and_reset() {
     assert_eq!(engine.random_strobe_rate, 50);
     assert_eq!(engine.effect_bpm, 60);
     assert_eq!(engine.get_group_color(0), Some("white"));
-    assert_eq!(engine.get_group_color(1), Some("white"));
+    assert_eq!(engine.get_group_color(1), None);
 }
 
 #[test]

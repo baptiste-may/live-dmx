@@ -14,7 +14,7 @@ fn test_live_engine_white_flash_calculation() {
         groups: vec![1],
         name: "Test Spot".to_string(),
         fixture_type: serde_json::json!({}),
-        mode: serde_json::json!({"channels": ["Dimmer", "Red", "Green", "Blue", "White"]}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Red", "Green", "Blue", "White", "Pan", "Tilt"]}),
         universe: 1,
         address: 1,
     });
@@ -28,6 +28,8 @@ fn test_live_engine_white_flash_calculation() {
     for i in 0..5 {
         assert_eq!(buf_flash[i], 255);
     }
+    assert_eq!(buf_flash[5], 0); // Pan stays 0
+    assert_eq!(buf_flash[6], 0); // Tilt stays 0
 
     // Release White Flash
     engine.set_flash(1, "master".to_string(), false);

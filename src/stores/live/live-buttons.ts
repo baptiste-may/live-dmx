@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { defineStore } from "pinia";
 
+import { ToastType, useToastStore } from "@/stores/toast.ts";
 import type {
   AlignmentType,
   ColorEffectType,
@@ -46,6 +47,10 @@ export const getDefaultLiveButtonsState = (): LiveButtonsState => ({
 });
 
 export const defaultLiveButtonsState: LiveButtonsState = getDefaultLiveButtonsState();
+
+function handleActionError(error: unknown) {
+  useToastStore().addToast(`Live control failed: ${String(error)}`, ToastType.ERROR);
+}
 
 export const useLiveButtons = defineStore("live-buttons", {
   state: (): LiveButtonsState => getDefaultLiveButtonsState(),
@@ -95,12 +100,28 @@ export const useLiveButtons = defineStore("live-buttons", {
           randomStrobe: false,
         };
       }
+      const prev = this.flashStates[groupId][flashType];
       this.flashStates[groupId][flashType] = active;
-      await invoke("live_set_flash", { groupId, flashType, active }).catch(() => {});
+      try {
+        await invoke("live_set_flash", { groupId, flashType, active });
+      } catch (error) {
+        this.flashStates[groupId][flashType] = prev;
+        handleActionError(error);
+      }
     },
     async setButtonState(buttonId: string, active: boolean) {
+      const prev = this.buttonStates[buttonId];
       this.buttonStates[buttonId] = active;
-      await invoke("live_set_button", { buttonId, active }).catch(() => {});
+      try {
+        await invoke("live_set_button", { buttonId, active });
+      } catch (error) {
+        if (prev !== undefined) {
+          this.buttonStates[buttonId] = prev;
+        } else {
+          delete this.buttonStates[buttonId];
+        }
+        handleActionError(error);
+      }
     },
     async toggleButton(buttonId: string) {
       const currentState = this.isButtonActive(buttonId);
@@ -114,62 +135,114 @@ export const useLiveButtons = defineStore("live-buttons", {
     },
     async setGroupEffectType(groupId: number, effect: IntensityEffectType | null) {
       const current = this.ensureGroupEffect(groupId);
+      const prev = current.effect;
       current.effect = effect;
-      await invoke("live_set_group_effect", {
-        groupId,
-        effect: current.effect,
-        alignment: current.alignment,
-        bounce: current.bounce,
-      }).catch(() => {});
+      try {
+        await invoke("live_set_group_effect", {
+          groupId,
+          effect: current.effect,
+          alignment: current.alignment,
+          bounce: current.bounce,
+        });
+      } catch (error) {
+        current.effect = prev;
+        handleActionError(error);
+      }
     },
     async setGroupEffectAlignment(groupId: number, alignment: AlignmentType | null) {
       const current = this.ensureGroupEffect(groupId);
+      const prev = current.alignment;
       current.alignment = alignment;
-      await invoke("live_set_group_effect", {
-        groupId,
-        effect: current.effect,
-        alignment: current.alignment,
-        bounce: current.bounce,
-      }).catch(() => {});
+      try {
+        await invoke("live_set_group_effect", {
+          groupId,
+          effect: current.effect,
+          alignment: current.alignment,
+          bounce: current.bounce,
+        });
+      } catch (error) {
+        current.alignment = prev;
+        handleActionError(error);
+      }
     },
     async setGroupEffectBounce(groupId: number, bounce: boolean) {
       const current = this.ensureGroupEffect(groupId);
+      const prev = current.bounce;
       current.bounce = bounce;
-      await invoke("live_set_group_effect", {
-        groupId,
-        effect: current.effect,
-        alignment: current.alignment,
-        bounce: current.bounce,
-      }).catch(() => {});
+      try {
+        await invoke("live_set_group_effect", {
+          groupId,
+          effect: current.effect,
+          alignment: current.alignment,
+          bounce: current.bounce,
+        });
+      } catch (error) {
+        current.bounce = prev;
+        handleActionError(error);
+      }
     },
     async setGroupMaster(groupId: number, level: number) {
+      const prev = this.groupMasters[groupId];
       this.groupMasters[groupId] = level;
-      await invoke("live_set_group_master", { groupId, level }).catch(() => {});
+      try {
+        await invoke("live_set_group_master", { groupId, level });
+      } catch (error) {
+        if (prev !== undefined) {
+          this.groupMasters[groupId] = prev;
+        } else {
+          delete this.groupMasters[groupId];
+        }
+        handleActionError(error);
+      }
     },
     async setGroupColor(groupId: number, color: string | null) {
+      const prev = this.groupColors[groupId];
       this.groupColors[groupId] = color;
-      await invoke("live_set_group_color", { groupId, color }).catch(() => {});
+      try {
+        await invoke("live_set_group_color", { groupId, color });
+      } catch (error) {
+        if (prev !== undefined) {
+          this.groupColors[groupId] = prev;
+        } else {
+          delete this.groupColors[groupId];
+        }
+        handleActionError(error);
+      }
     },
     async setGroupSecondaryColor(groupId: number, color: string | null) {
+      const prev = this.groupSecondaryColors[groupId];
       this.groupSecondaryColors[groupId] = color;
-      await invoke("live_set_group_secondary_color", { groupId, color }).catch(() => {});
+      try {
+        await invoke("live_set_group_secondary_color", { groupId, color });
+      } catch (error) {
+        if (prev !== undefined) {
+          this.groupSecondaryColors[groupId] = prev;
+        } else {
+          delete this.groupSecondaryColors[groupId];
+        }
+        handleActionError(error);
+      }
     },
     async setAllGroupsColor(color: string | null, groupIds?: number[]) {
+      const prevColors = { ...this.groupColors };
       if (groupIds && groupIds.length > 0) {
         for (const id of groupIds) {
           this.groupColors[id] = color;
         }
       }
       this.groupColors[0] = color;
-      await invoke("live_set_all_groups_color", { color }).catch(() => {});
+      try {
+        await invoke("live_set_all_groups_color", { color });
+      } catch (error) {
+        this.groupColors = prevColors;
+        handleActionError(error);
+      }
     },
     async resetGroupColor(groupId: number) {
-      this.groupColors[groupId] = null;
-      await invoke("live_set_group_color", { groupId, color: null }).catch(() => {});
+      await this.setGroupColor(groupId, null);
     },
     async resetGroupSecondaryColor(groupId: number) {
-      this.groupSecondaryColors[groupId] = null;
-      await invoke("live_set_group_secondary_color", { groupId, color: null }).catch(() => {});
+      await this.setGroupSecondaryColor(groupId, null);
     },
     ensureGroupColorEffect(groupId: number): GroupColorEffectState {
       if (!this.groupColorEffects[groupId]) {
@@ -179,69 +252,177 @@ export const useLiveButtons = defineStore("live-buttons", {
     },
     async setGroupColorEffectType(groupId: number, effect: ColorEffectType | null) {
       const current = this.ensureGroupColorEffect(groupId);
+      const prev = current.effect;
       current.effect = effect;
-      await invoke("live_set_group_color_effect", {
-        groupId,
-        effect: current.effect,
-        alignment: current.alignment,
-        bounce: current.bounce,
-      }).catch(() => {});
+      try {
+        await invoke("live_set_group_color_effect", {
+          groupId,
+          effect: current.effect,
+          alignment: current.alignment,
+          bounce: current.bounce,
+        });
+      } catch (error) {
+        current.effect = prev;
+        handleActionError(error);
+      }
     },
     async setGroupColorEffectAlignment(groupId: number, alignment: AlignmentType | null) {
       const current = this.ensureGroupColorEffect(groupId);
+      const prev = current.alignment;
       current.alignment = alignment;
-      await invoke("live_set_group_color_effect", {
-        groupId,
-        effect: current.effect,
-        alignment: current.alignment,
-        bounce: current.bounce,
-      }).catch(() => {});
+      try {
+        await invoke("live_set_group_color_effect", {
+          groupId,
+          effect: current.effect,
+          alignment: current.alignment,
+          bounce: current.bounce,
+        });
+      } catch (error) {
+        current.alignment = prev;
+        handleActionError(error);
+      }
     },
     async setGroupColorEffectBounce(groupId: number, bounce: boolean) {
       const current = this.ensureGroupColorEffect(groupId);
+      const prev = current.bounce;
       current.bounce = bounce;
-      await invoke("live_set_group_color_effect", {
-        groupId,
-        effect: current.effect,
-        alignment: current.alignment,
-        bounce: current.bounce,
-      }).catch(() => {});
+      try {
+        await invoke("live_set_group_color_effect", {
+          groupId,
+          effect: current.effect,
+          alignment: current.alignment,
+          bounce: current.bounce,
+        });
+      } catch (error) {
+        current.bounce = prev;
+        handleActionError(error);
+      }
     },
     async resetGroupColorEffect(groupId: number) {
+      const prev = this.groupColorEffects[groupId]
+        ? { ...this.groupColorEffects[groupId] }
+        : undefined;
       this.groupColorEffects[groupId] = { ...defaultGroupColorEffectState };
-      await invoke("live_reset_group_color_effect", { groupId }).catch(() => {});
+      try {
+        await invoke("live_reset_group_color_effect", { groupId });
+      } catch (error) {
+        if (prev) {
+          this.groupColorEffects[groupId] = prev;
+        } else {
+          delete this.groupColorEffects[groupId];
+        }
+        handleActionError(error);
+      }
     },
     async setStrobeRate(rate: number) {
+      const prev = this.strobeRate;
       this.strobeRate = rate;
-      await invoke("live_set_strobe_rate", { rate }).catch(() => {});
+      try {
+        await invoke("live_set_strobe_rate", { rate });
+      } catch (error) {
+        this.strobeRate = prev;
+        handleActionError(error);
+      }
     },
     async setRandomStrobeRate(rate: number) {
+      const prev = this.randomStrobeRate;
       this.randomStrobeRate = rate;
-      await invoke("live_set_random_strobe_rate", { rate }).catch(() => {});
+      try {
+        await invoke("live_set_random_strobe_rate", { rate });
+      } catch (error) {
+        this.randomStrobeRate = prev;
+        handleActionError(error);
+      }
     },
     async setEffectBpm(bpm: number) {
+      const prev = this.effectBpm;
       this.effectBpm = bpm;
-      await invoke("live_set_effect_bpm", { bpm }).catch(() => {});
+      try {
+        await invoke("live_set_effect_bpm", { bpm });
+      } catch (error) {
+        this.effectBpm = prev;
+        handleActionError(error);
+      }
     },
     async setColorEffectBpm(bpm: number) {
+      const prev = this.colorEffectBpm;
       this.colorEffectBpm = bpm;
-      await invoke("live_set_color_effect_bpm", { bpm }).catch(() => {});
+      try {
+        await invoke("live_set_color_effect_bpm", { bpm });
+      } catch (error) {
+        this.colorEffectBpm = prev;
+        handleActionError(error);
+      }
     },
     async setColorFadeSpeed(speed: number) {
+      const prev = this.colorFadeSpeed;
       this.colorFadeSpeed = speed;
-      await invoke("live_set_color_fade_speed", { speed }).catch(() => {});
+      try {
+        await invoke("live_set_color_fade_speed", { speed });
+      } catch (error) {
+        this.colorFadeSpeed = prev;
+        handleActionError(error);
+      }
     },
     async setColorFadeOrder(order: ColorFadeOrder | null) {
+      const prev = this.colorFadeOrder;
       this.colorFadeOrder = order;
-      await invoke("live_set_color_fade_order", { order }).catch(() => {});
+      try {
+        await invoke("live_set_color_fade_order", { order });
+      } catch (error) {
+        this.colorFadeOrder = prev;
+        handleActionError(error);
+      }
     },
     async resetGroupEffect(groupId: number) {
+      const prev = this.groupEffects[groupId] ? { ...this.groupEffects[groupId] } : undefined;
       this.groupEffects[groupId] = { ...defaultGroupEffectState };
-      await invoke("live_reset_group_effect", { groupId }).catch(() => {});
+      try {
+        await invoke("live_reset_group_effect", { groupId });
+      } catch (error) {
+        if (prev) {
+          this.groupEffects[groupId] = prev;
+        } else {
+          delete this.groupEffects[groupId];
+        }
+        handleActionError(error);
+      }
     },
     async resetAll() {
+      const prev = {
+        flashStates: { ...this.flashStates },
+        buttonStates: { ...this.buttonStates },
+        groupEffects: { ...this.groupEffects },
+        groupColorEffects: { ...this.groupColorEffects },
+        groupMasters: { ...this.groupMasters },
+        groupColors: { ...this.groupColors },
+        groupSecondaryColors: { ...this.groupSecondaryColors },
+        strobeRate: this.strobeRate,
+        randomStrobeRate: this.randomStrobeRate,
+        effectBpm: this.effectBpm,
+        colorEffectBpm: this.colorEffectBpm,
+        colorFadeSpeed: this.colorFadeSpeed,
+        colorFadeOrder: this.colorFadeOrder,
+      };
       this.$reset();
-      await invoke("live_reset_all_buttons").catch(() => {});
+      try {
+        await invoke("live_reset_all_buttons");
+      } catch (error) {
+        this.flashStates = prev.flashStates;
+        this.buttonStates = prev.buttonStates;
+        this.groupEffects = prev.groupEffects;
+        this.groupColorEffects = prev.groupColorEffects;
+        this.groupMasters = prev.groupMasters;
+        this.groupColors = prev.groupColors;
+        this.groupSecondaryColors = prev.groupSecondaryColors;
+        this.strobeRate = prev.strobeRate;
+        this.randomStrobeRate = prev.randomStrobeRate;
+        this.effectBpm = prev.effectBpm;
+        this.colorEffectBpm = prev.colorEffectBpm;
+        this.colorFadeSpeed = prev.colorFadeSpeed;
+        this.colorFadeOrder = prev.colorFadeOrder;
+        handleActionError(error);
+      }
     },
   },
 });

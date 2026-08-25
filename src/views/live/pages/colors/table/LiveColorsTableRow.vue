@@ -28,6 +28,7 @@ function handleSecondaryColorSelect(colorKey: string, active: boolean) {
           cell
           :color="color"
           class="h-12 w-12"
+          :label="`${group.name} primary ${key}`"
           :model-value="liveButtons.getGroupColor(group.id) === key"
           @update:model-value="handleColorSelect(key as string, $event)"
         />
@@ -35,6 +36,7 @@ function handleSecondaryColorSelect(colorKey: string, active: boolean) {
           cell
           :color="color"
           class="h-8 w-8"
+          :label="`${group.name} secondary ${key}`"
           :model-value="liveButtons.getGroupSecondaryColor(group.id) === key"
           @update:model-value="handleSecondaryColorSelect(key as string, $event)"
         />

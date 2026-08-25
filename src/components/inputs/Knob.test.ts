@@ -67,6 +67,27 @@ describe("Knob.vue", () => {
     await fireEvent.wheel(slider, { deltaY: -100 });
 
     expect(emitted("update:modelValue")).toContainEqual([51]);
+
+    await fireEvent.wheel(slider, { deltaY: -100, shiftKey: true });
+    expect(emitted("update:modelValue")).toContainEqual([50.1]);
+  });
+
+  it("emits fine-adjustment update:modelValue on Shift+keyboard navigation", async () => {
+    const user = userEvent.setup();
+    const { emitted } = render(Knob, {
+      props: {
+        modelValue: 50,
+        min: 0,
+        max: 100,
+        step: 1,
+      },
+    });
+
+    const slider = screen.getByRole("slider");
+    slider.focus();
+
+    await user.keyboard("{Shift>}{ArrowUp}{/Shift}");
+    expect(emitted("update:modelValue")).toContainEqual([50.1]);
   });
 
   it("emits update:modelValue on pointer drag", async () => {

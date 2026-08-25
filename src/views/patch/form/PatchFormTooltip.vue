@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Badge, Card, CardBody, CardTitle } from "daisy-ui-kit";
+import { Badge, Card, CardBody, CardTitle, Divider } from "daisy-ui-kit";
 import { computed } from "vue";
 
 import { FixtureIcon } from "@/components/icons";
@@ -40,11 +40,11 @@ const channels = computed(() => modeData.value?.channels ?? []);
           </h2>
         </div>
       </CardTitle>
-      <div
-        class="divider text-base-content/70 before:bg-base-content/20 after:bg-base-content/20 my-1 text-xs"
+      <Divider
+        class="text-base-content/70 before:bg-base-content/20 after:bg-base-content/20 my-1 text-xs"
       >
         {{ channels.length }} channels
-      </div>
+      </Divider>
       <div class="flex max-h-72 flex-col gap-1 overflow-y-auto">
         <div
           v-for="(ch, idx) in channels"

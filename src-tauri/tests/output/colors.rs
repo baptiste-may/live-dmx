@@ -91,6 +91,8 @@ fn test_resolve_color_rgb_named_and_hex() {
     assert_eq!(resolve_color_rgb("#ff0000"), (255, 0, 0));
     assert_eq!(resolve_color_rgb("#00FF00"), (0, 255, 0));
     assert_eq!(resolve_color_rgb("#0000ff"), (0, 0, 255));
+    assert_eq!(resolve_color_rgb("#€abc"), (255, 255, 255));
+    assert_eq!(resolve_color_rgb("#12345z"), (255, 255, 255));
     assert_eq!(resolve_color_rgb("red"), (255, 0, 0));
     assert_eq!(resolve_color_rgb("green"), (0, 255, 0));
     assert_eq!(resolve_color_rgb("blue"), (0, 0, 255));
