@@ -39,7 +39,7 @@ fn test_patch_groups_state_defaults() {
     let groups = PatchGroupsState::default();
     assert_eq!(groups.groups.len(), 1);
     assert_eq!(groups.groups[0].id, 0);
-    assert_eq!(groups.groups[0].name, "All Fixtures");
+    assert_eq!(groups.groups[0].name, "All");
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn test_show_data_snapshot_and_restore() {
             groups: vec![
                 FixtureGroup {
                     id: 0,
-                    name: "All Fixtures".to_string(),
+                    name: "All".to_string(),
                 },
                 FixtureGroup {
                     id: 1,
@@ -143,4 +143,85 @@ fn test_app_state_default() {
     let history = app_state.history.lock().unwrap();
     assert!(!history.can_undo());
     assert!(!history.can_redo());
+}
+
+#[test]
+fn test_app_state_mutate_show_resets_live_engine_on_patch_change() {
+    let app_state = AppState::default();
+
+    // Set some live engine state
+    {
+        let mut live = app_state.output.engine.lock().unwrap();
+        live.set_group_master(1, 50);
+        live.set_button("btn_1".to_string(), true);
+    }
+
+    // Mutate patch
+    let res = app_state.mutate_show(|show| {
+        show.patch.fixtures.push(PatchedFixture {
+            id: 1,
+            groups: vec![1],
+            name: "New Fixture".to_string(),
+            fixture_type: serde_json::json!({}),
+            mode: serde_json::json!({}),
+            universe: 1,
+            address: 1,
+        });
+        Ok(())
+    });
+    assert!(res.is_ok());
+
+    // Live state should be reset
+    let live = app_state.output.engine.lock().unwrap();
+    assert_eq!(live.get_group_master(1), 100);
+    assert_eq!(live.button_states.get("btn_1"), None);
+}
+
+#[test]
+fn test_app_state_mutate_show_resets_live_engine_on_group_change() {
+    let app_state = AppState::default();
+
+    // Set some live engine state
+    {
+        let mut live = app_state.output.engine.lock().unwrap();
+        live.set_group_master(1, 75);
+    }
+
+    // Mutate groups
+    let res = app_state.mutate_show(|show| {
+        show.groups.groups.push(FixtureGroup {
+            id: 1,
+            name: "Group 1".to_string(),
+        });
+        Ok(())
+    });
+    assert!(res.is_ok());
+
+    // Live state should be reset
+    let live = app_state.output.engine.lock().unwrap();
+    assert_eq!(live.get_group_master(1), 100);
+}
+
+#[test]
+fn test_app_state_mutate_show_preserves_live_engine_on_identity_only_change() {
+    let app_state = AppState::default();
+
+    // Set some live engine state
+    {
+        let mut live = app_state.output.engine.lock().unwrap();
+        live.set_group_master(1, 42);
+        live.set_button("btn_test".to_string(), true);
+    }
+
+    // Mutate identity only
+    let res = app_state.mutate_show(|show| {
+        show.identity.display_name = "Renamed Show".to_string();
+        Ok(())
+    });
+    assert!(res.is_ok());
+
+    // Live state should be preserved
+    let live = app_state.output.engine.lock().unwrap();
+    assert_eq!(live.get_group_master(1), 42);
+    assert_eq!(live.button_states.get("btn_test"), Some(&true));
 }

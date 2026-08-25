@@ -28,7 +28,7 @@ fn test_show_file_serialization_round_trip() {
             groups: vec![
                 FixtureGroup {
                     id: 0,
-                    name: "All Fixtures".to_string(),
+                    name: "All".to_string(),
                 },
                 FixtureGroup {
                     id: 1,
@@ -56,7 +56,7 @@ fn test_show_file_default_version_handling() {
     let json_without_version = r#"{
         "identity": { "displayName": "Default Version Show" },
         "patch": { "fixtures": [] },
-        "groups": { "groups": [{ "id": 0, "name": "All Fixtures" }] }
+        "groups": { "groups": [{ "id": 0, "name": "All" }] }
     }"#;
 
     let loaded: ShowFileContent = serde_json::from_str(json_without_version).unwrap();

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
-use crate::show::state::{AppState, FixtureGroup, PatchRequest, PatchedFixture};
+use crate::show::{AppState, FixtureGroup, PatchRequest, PatchedFixture};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

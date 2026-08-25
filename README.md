@@ -12,7 +12,7 @@ Modern lighting consoles often require hours of patching and programming before 
 
 ## ✨ Key Features
 
-- **📡 Real-time Art-Net Output:** Direct communication with your lighting network using the Art-Net protocol.
+- **📡 Real-time DMX Output:** Engine computes and generates active DMX universe frames at 44Hz.
 - **🛠️ Integrated Fixture Library:** Access a growing library of DMX fixture definitions (JSON-based) or create your own.
 - **🖥️ Dedicated Workspaces:**
   - **Input:** Handle external control sources.
@@ -27,7 +27,6 @@ Modern lighting consoles often require hours of patching and programming before 
 
 - **Backend:** [Tauri v2](https://v2.tauri.app/) (Rust) for performance and system access.
 - **Frontend:** [Vue 3](https://vuejs.org/) with TypeScript and Vite.
-- **Communication:** [Art-Net Protocol](https://crates.io/crates/artnet_protocol).
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) & [DaisyUI](https://daisyui.com/).
 - **Icons:** [Lucide Vue Next](https://lucide.dev/).
 

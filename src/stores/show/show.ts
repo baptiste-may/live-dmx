@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 
+import { useLiveButtons } from "../live/live-buttons.ts";
 import { usePatchForm } from "../patch/patch-form.ts";
 import { usePatchGroups } from "../patch/patch-groups.ts";
 import { ToastType, useToastStore } from "../toast.ts";
@@ -63,6 +64,8 @@ export const useShow = defineStore("show", {
           "show-state-changed",
           (event) => {
             if (event.payload) {
+              let shouldResetLiveState = false;
+
               if (event.payload.identity) {
                 const identity = event.payload.identity as ShowData["identity"];
                 if (identity.displayName !== undefined) {
@@ -90,6 +93,9 @@ export const useShow = defineStore("show", {
               if (event.payload.patch) {
                 const patch = event.payload.patch as ShowData["patch"];
                 if (patch.fixtures) {
+                  if (JSON.stringify(this.patch.fixtures) !== JSON.stringify(patch.fixtures)) {
+                    shouldResetLiveState = true;
+                  }
                   this.patch.fixtures = patch.fixtures;
                   const patchForm = usePatchForm();
                   if (!patchForm.isFixtureSelected()) {
@@ -103,6 +109,9 @@ export const useShow = defineStore("show", {
                   groups?: FixtureGroup[];
                 };
                 if (groupsPayload.groups) {
+                  if (JSON.stringify(showGroups.groups) !== JSON.stringify(groupsPayload.groups)) {
+                    shouldResetLiveState = true;
+                  }
                   showGroups.groups = groupsPayload.groups;
                   const patchGroups = usePatchGroups();
                   if (!showGroups.groups.some((g) => g.id === patchGroups.selectedGroup)) {
@@ -114,7 +123,14 @@ export const useShow = defineStore("show", {
                 typeof event.payload.status === "string" &&
                 Object.values(ShowStatus).includes(event.payload.status as ShowStatus)
               ) {
+                if (this.state !== event.payload.status) {
+                  shouldResetLiveState = true;
+                }
                 this.state = event.payload.status as ShowStatus;
+              }
+
+              if (shouldResetLiveState) {
+                useLiveButtons().$reset();
               }
             }
           },
@@ -140,6 +156,7 @@ export const useShow = defineStore("show", {
         this.groups.groups = data.groups.groups;
       }
       this.state = ShowStatus.LOADED;
+      useLiveButtons().$reset();
       invoke("show_create").catch((error: unknown) => {
         useToastStore().addToast(`Failed to create show: ${String(error)}`, ToastType.ERROR);
       });
@@ -150,6 +167,7 @@ export const useShow = defineStore("show", {
       this.patch.$reset();
       this.groups.$reset();
       usePatchGroups().$reset();
+      useLiveButtons().$reset();
       this.state = ShowStatus.NOT_LOADED;
       invoke("show_unload").catch((error: unknown) => {
         useToastStore().addToast(`Failed to unload show: ${String(error)}`, ToastType.ERROR);

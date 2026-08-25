@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApp } from "./app";
+import { useLiveButtons } from "./live/live-buttons";
 import { ShowStatus, useShow } from "./show/show";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -31,30 +32,48 @@ describe("app store", () => {
   it("should create new show and set loaded state", async () => {
     const app = useApp();
     const show = useShow();
+    const liveButtons = useLiveButtons();
+
+    liveButtons.strobeRate = 75;
+    liveButtons.effectBpm = 130;
 
     await app.createShow();
 
     expect(show.isLoaded).toBe(true);
+    expect(liveButtons.strobeRate).toBe(50);
+    expect(liveButtons.effectBpm).toBe(60);
   });
 
   it("should load show from path and set loaded state", async () => {
     const app = useApp();
     const show = useShow();
+    const liveButtons = useLiveButtons();
+
+    liveButtons.strobeRate = 85;
+    liveButtons.effectBpm = 110;
 
     await app.loadShow("/path/to/show.json");
 
     expect(show.isLoaded).toBe(true);
+    expect(liveButtons.strobeRate).toBe(50);
+    expect(liveButtons.effectBpm).toBe(60);
   });
 
   it("should unload show when closeShow is called", async () => {
     const app = useApp();
     const show = useShow();
+    const liveButtons = useLiveButtons();
 
     await app.createShow();
     expect(show.isLoaded).toBe(true);
 
+    liveButtons.strobeRate = 95;
+    liveButtons.effectBpm = 150;
+
     app.closeShow();
     expect(show.isLoaded).toBe(false);
+    expect(liveButtons.strobeRate).toBe(50);
+    expect(liveButtons.effectBpm).toBe(60);
   });
 
   it("should open dialog and load show when file is selected in askLoadShow", async () => {

@@ -3,6 +3,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { defineStore } from "pinia";
 
 import { useFixtureBrowser } from "./fixture-browser.ts";
+import { useLiveButtons } from "./live/live-buttons.ts";
 import { useNavigation } from "./navigation.ts";
 import { usePatchForm } from "./patch/patch-form.ts";
 import { useRecentShows } from "./recent-shows.ts";
@@ -29,6 +30,7 @@ export const useApp = defineStore("app", {
           this.show.file.path = undefined;
           this.show.file.isDirty = false;
           this.show.state = ShowStatus.LOADED;
+          useLiveButtons().$reset();
         } catch (error: unknown) {
           this.show.state = ShowStatus.NOT_LOADED;
           useToastStore().addToast(`Failed to create show: ${String(error)}`, ToastType.ERROR);
@@ -67,6 +69,7 @@ export const useApp = defineStore("app", {
           this.show.file.path = path;
           this.show.file.isDirty = false;
           this.show.state = ShowStatus.LOADED;
+          useLiveButtons().$reset();
 
           const recentShows = useRecentShows();
           recentShows.addOrUpdate(this.show.identity.displayName, path);
@@ -83,6 +86,7 @@ export const useApp = defineStore("app", {
         this.navigation.$reset();
         this.patchForm.reset();
         this.fixtureBrowser.clearSearch();
+        useLiveButtons().$reset();
       });
     },
   },

@@ -50,7 +50,7 @@ fn test_group_remove_custom_group_cleans_fixtures() {
         groups: vec![
             FixtureGroup {
                 id: 0,
-                name: "All Fixtures".to_string(),
+                name: "All".to_string(),
             },
             FixtureGroup {
                 id: 1,
@@ -106,7 +106,7 @@ fn test_group_rename_group_zero_protection() {
             group.name = "New Name".to_string();
         }
     }
-    assert_eq!(groups.groups[0].name, "All Fixtures");
+    assert_eq!(groups.groups[0].name, "All");
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn test_group_rename_custom_group() {
         groups: vec![
             FixtureGroup {
                 id: 0,
-                name: "All Fixtures".to_string(),
+                name: "All".to_string(),
             },
             FixtureGroup {
                 id: 1,
