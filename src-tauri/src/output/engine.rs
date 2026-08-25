@@ -1,0 +1,769 @@
+use std::collections::HashMap;
+use std::time::Instant;
+
+use crate::output::channels::{
+    classify_channel, extract_fixture_channel_count, get_fixture_channel_name,
+};
+use crate::output::colors::resolve_color_rgb;
+use crate::output::effects::{
+    calculate_effect_factor, calculate_effect_intensity, compute_random_strobe_active,
+};
+use crate::output::types::{ChannelType, FixtureColorTransition, GroupEffectState};
+use crate::show::{PatchedFixture, ShowData};
+
+pub struct LiveEngine {
+    pub flash_states: HashMap<u32, HashMap<String, bool>>,
+    pub button_states: HashMap<String, bool>,
+    pub group_effects: HashMap<u32, GroupEffectState>,
+    pub group_color_effects: HashMap<u32, GroupEffectState>,
+    pub group_masters: HashMap<u32, u8>,
+    pub group_colors: HashMap<u32, Option<String>>,
+    pub group_secondary_colors: HashMap<u32, Option<String>>,
+    pub strobe_rate: u8,
+    pub random_strobe_rate: u8,
+    pub effect_bpm: u16,
+    pub color_effect_bpm: u16,
+    pub color_fade_speed: f32,
+    pub color_fade_order: Option<String>,
+    pub fixture_color_transitions: HashMap<u32, FixtureColorTransition>,
+    pub fixture_last_colors: HashMap<u32, (u8, u8, u8)>,
+    pub manual_channels: HashMap<(u16, u16), u8>,
+    pub universe_buffers: HashMap<u16, Vec<u8>>,
+    start_time: Instant,
+}
+
+impl Default for LiveEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LiveEngine {
+    pub fn new() -> Self {
+        let mut universe_buffers = HashMap::new();
+        for u in 1..=4 {
+            universe_buffers.insert(u, vec![0u8; 512]);
+        }
+
+        let mut group_colors = HashMap::new();
+        group_colors.insert(0, Some("white".to_string()));
+
+        Self {
+            flash_states: HashMap::new(),
+            button_states: HashMap::new(),
+            group_effects: HashMap::new(),
+            group_color_effects: HashMap::new(),
+            group_masters: HashMap::new(),
+            group_colors,
+            group_secondary_colors: HashMap::new(),
+            strobe_rate: 50,
+            random_strobe_rate: 50,
+            effect_bpm: 60,
+            color_effect_bpm: 60,
+            color_fade_speed: 1.0,
+            color_fade_order: None,
+            fixture_color_transitions: HashMap::new(),
+            fixture_last_colors: HashMap::new(),
+            manual_channels: HashMap::new(),
+            universe_buffers,
+            start_time: Instant::now(),
+        }
+    }
+
+    pub fn set_flash(&mut self, group_id: u32, flash_type: String, active: bool) {
+        let group_flash = self.flash_states.entry(group_id).or_default();
+        group_flash.insert(flash_type, active);
+    }
+
+    pub fn set_button(&mut self, button_id: String, active: bool) {
+        self.button_states.insert(button_id, active);
+    }
+
+    pub fn set_group_effect(
+        &mut self,
+        group_id: u32,
+        effect: Option<String>,
+        alignment: Option<String>,
+        bounce: bool,
+    ) {
+        self.group_effects.insert(
+            group_id,
+            GroupEffectState {
+                effect,
+                alignment,
+                bounce,
+            },
+        );
+    }
+
+    pub fn set_group_master(&mut self, group_id: u32, level: u8) {
+        self.group_masters.insert(group_id, level);
+    }
+
+    pub fn get_group_master(&self, group_id: u32) -> u8 {
+        *self.group_masters.get(&group_id).unwrap_or(&100)
+    }
+
+    pub fn set_effect_bpm(&mut self, bpm: u16) {
+        self.effect_bpm = bpm;
+    }
+
+    pub fn set_color_effect_bpm(&mut self, bpm: u16) {
+        self.color_effect_bpm = bpm;
+    }
+
+    pub fn set_color_fade_speed(&mut self, speed: f32) {
+        self.color_fade_speed = speed.max(0.0);
+    }
+
+    pub fn set_color_fade_order(&mut self, order: Option<String>) {
+        self.color_fade_order = order;
+    }
+
+    pub fn get_fixture_current_rgb_f32(
+        &self,
+        fixture_id: u32,
+        fallback_str: Option<&str>,
+    ) -> (f32, f32, f32) {
+        if let Some(transition) = self.fixture_color_transitions.get(&fixture_id) {
+            let elapsed = transition.start_time.elapsed().as_secs_f32();
+            if elapsed < transition.delay_secs {
+                transition.start_rgb
+            } else if elapsed >= transition.delay_secs + transition.duration_secs
+                || transition.duration_secs <= 0.0
+            {
+                transition.target_rgb
+            } else {
+                let progress = (elapsed - transition.delay_secs) / transition.duration_secs;
+                (
+                    transition.start_rgb.0 * (1.0 - progress) + transition.target_rgb.0 * progress,
+                    transition.start_rgb.1 * (1.0 - progress) + transition.target_rgb.1 * progress,
+                    transition.start_rgb.2 * (1.0 - progress) + transition.target_rgb.2 * progress,
+                )
+            }
+        } else if let Some(&(r, g, b)) = self.fixture_last_colors.get(&fixture_id) {
+            (r as f32, g as f32, b as f32)
+        } else {
+            let (r, g, b) = match fallback_str {
+                Some(s) => resolve_color_rgb(s),
+                None => (255, 255, 255),
+            };
+            (r as f32, g as f32, b as f32)
+        }
+    }
+
+    pub fn set_group_color(
+        &mut self,
+        group_id: u32,
+        color: Option<String>,
+        show: Option<&ShowData>,
+    ) {
+        if let Some(c) = &color {
+            self.group_colors.insert(group_id, Some(c.clone()));
+        } else {
+            self.group_colors.remove(&group_id);
+        }
+
+        let target_rgb = match &color {
+            Some(c) => resolve_color_rgb(c),
+            None => (255, 255, 255),
+        };
+        let target_rgb_f = (
+            target_rgb.0 as f32,
+            target_rgb.1 as f32,
+            target_rgb.2 as f32,
+        );
+
+        let Some(show_data) = show else {
+            return;
+        };
+
+        let fixtures: Vec<&PatchedFixture> = show_data
+            .patch
+            .fixtures
+            .iter()
+            .filter(|f| {
+                if group_id == 0 {
+                    true
+                } else {
+                    f.groups.contains(&group_id)
+                }
+            })
+            .collect();
+
+        if fixtures.is_empty() {
+            return;
+        }
+
+        if self.color_fade_speed <= 0.0 || color.is_none() {
+            for f in fixtures {
+                self.fixture_color_transitions.remove(&f.id);
+                self.fixture_last_colors.insert(f.id, target_rgb);
+            }
+            return;
+        }
+
+        let n = fixtures.len();
+        let speed = self.color_fade_speed;
+        let now = Instant::now();
+
+        for (i, f) in fixtures.into_iter().enumerate() {
+            let fallback_str = f
+                .groups
+                .iter()
+                .find_map(|&g| self.get_group_color(g))
+                .or_else(|| self.get_group_color(0));
+            let current_rgb_f = self.get_fixture_current_rgb_f32(f.id, fallback_str);
+
+            let (delay_secs, duration_secs) = match self.color_fade_order.as_deref() {
+                None => (0.0, speed),
+                Some(order) => {
+                    let p_i = if n <= 1 {
+                        0.0
+                    } else {
+                        match order {
+                            "left" => (i as f32) / ((n - 1) as f32),
+                            "right" => ((n - 1 - i) as f32) / ((n - 1) as f32),
+                            "wing" => (((i as f32 + 0.5) / (n as f32)) - 0.5).abs() * 2.0,
+                            _ => 0.0,
+                        }
+                    }
+                    .clamp(0.0, 1.0);
+
+                    let indiv_duration = (speed * 0.5).max(0.05);
+                    let max_delay = (speed - indiv_duration).max(0.0);
+                    (p_i * max_delay, indiv_duration)
+                }
+            };
+
+            self.fixture_color_transitions.insert(
+                f.id,
+                FixtureColorTransition {
+                    start_rgb: current_rgb_f,
+                    target_rgb: target_rgb_f,
+                    start_time: now,
+                    delay_secs,
+                    duration_secs,
+                },
+            );
+        }
+    }
+
+    pub fn set_all_groups_color(&mut self, color: Option<String>, show: Option<&ShowData>) {
+        if let Some(c) = color {
+            self.group_colors.insert(0, Some(c.clone()));
+            for val in self.group_colors.values_mut() {
+                *val = Some(c.clone());
+            }
+            self.set_group_color(0, Some(c), show);
+        } else {
+            self.group_colors.clear();
+            self.group_colors.insert(0, Some("white".to_string()));
+            self.set_group_color(0, Some("white".to_string()), show);
+        }
+    }
+
+    pub fn get_group_color(&self, group_id: u32) -> Option<&str> {
+        if let Some(Some(c)) = self.group_colors.get(&group_id) {
+            return Some(c.as_str());
+        }
+        if group_id != 0 {
+            if let Some(Some(c)) = self.group_colors.get(&0) {
+                return Some(c.as_str());
+            }
+        }
+        Some("white")
+    }
+
+    pub fn set_group_secondary_color(&mut self, group_id: u32, color: Option<String>) {
+        if let Some(c) = color {
+            self.group_secondary_colors.insert(group_id, Some(c));
+        } else {
+            self.group_secondary_colors.remove(&group_id);
+        }
+    }
+
+    pub fn get_group_secondary_color(&self, group_id: u32) -> Option<&str> {
+        if let Some(Some(c)) = self.group_secondary_colors.get(&group_id) {
+            return Some(c.as_str());
+        }
+        if group_id != 0 {
+            if let Some(Some(c)) = self.group_secondary_colors.get(&0) {
+                return Some(c.as_str());
+            }
+        }
+        None
+    }
+
+    pub fn set_group_color_effect(
+        &mut self,
+        group_id: u32,
+        effect: Option<String>,
+        alignment: Option<String>,
+        bounce: bool,
+    ) {
+        self.group_color_effects.insert(
+            group_id,
+            GroupEffectState {
+                effect,
+                alignment,
+                bounce,
+            },
+        );
+    }
+
+    pub fn get_group_color_effect(&self, group_id: u32) -> GroupEffectState {
+        self.group_color_effects
+            .get(&group_id)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub fn reset_group_color_effect(&mut self, group_id: u32) {
+        self.group_color_effects
+            .insert(group_id, GroupEffectState::default());
+    }
+
+    pub fn reset_group_effect(&mut self, group_id: u32) {
+        self.group_effects
+            .insert(group_id, GroupEffectState::default());
+    }
+
+    pub fn reset_all(&mut self) {
+        self.flash_states.clear();
+        self.button_states.clear();
+        self.group_effects.clear();
+        self.group_color_effects.clear();
+        self.group_masters.clear();
+        self.group_colors.clear();
+        self.group_colors.insert(0, Some("white".to_string()));
+        self.group_secondary_colors.clear();
+        self.strobe_rate = 50;
+        self.random_strobe_rate = 50;
+        self.effect_bpm = 60;
+        self.color_effect_bpm = 60;
+        self.color_fade_speed = 1.0;
+        self.color_fade_order = None;
+        self.fixture_color_transitions.clear();
+        self.fixture_last_colors.clear();
+        self.manual_channels.clear();
+        for buf in self.universe_buffers.values_mut() {
+            buf.fill(0);
+        }
+    }
+
+    pub fn is_flash_active(&self, group_id: u32, flash_type: &str) -> bool {
+        if let Some(types) = self.flash_states.get(&group_id) {
+            if *types.get(flash_type).unwrap_or(&false) {
+                return true;
+            }
+        }
+        if group_id != 0 {
+            if let Some(types) = self.flash_states.get(&0) {
+                if *types.get(flash_type).unwrap_or(&false) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn get_group_effect(&self, group_id: u32) -> GroupEffectState {
+        self.group_effects
+            .get(&group_id)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub fn compute_dmx(&mut self, show_data: &ShowData) {
+        for buf in self.universe_buffers.values_mut() {
+            buf.fill(0);
+        }
+
+        let elapsed = self.start_time.elapsed().as_secs_f32();
+        let fixtures = &show_data.patch.fixtures;
+
+        // Build group fixture mappings to get exact local indices and group counts
+        let mut group_fixture_map: HashMap<u32, Vec<u32>> = HashMap::new();
+        for f in fixtures {
+            group_fixture_map.entry(0).or_default().push(f.id);
+            for &g in &f.groups {
+                group_fixture_map.entry(g).or_default().push(f.id);
+            }
+        }
+
+        for fixture in fixtures {
+            let primary_group_id = fixture.groups.first().copied().unwrap_or(0);
+
+            let group_effect_state = self.get_group_effect(primary_group_id);
+            let global_effect_state = self.get_group_effect(0);
+
+            let (active_group_id, effect_state) = if group_effect_state.effect.is_some() {
+                (primary_group_id, group_effect_state)
+            } else {
+                (0, global_effect_state)
+            };
+
+            let group_color_effect_state = self.get_group_color_effect(primary_group_id);
+            let global_color_effect_state = self.get_group_color_effect(0);
+
+            let (active_color_group_id, color_effect_state) =
+                if group_color_effect_state.effect.is_some() {
+                    (primary_group_id, group_color_effect_state)
+                } else {
+                    (0, global_color_effect_state)
+                };
+
+            let empty_vec = Vec::new();
+            let group_fixtures = group_fixture_map
+                .get(&active_group_id)
+                .unwrap_or(&empty_vec);
+            let local_index = group_fixtures
+                .iter()
+                .position(|&id| id == fixture.id)
+                .unwrap_or(0);
+            let group_count = group_fixtures.len();
+
+            let color_group_fixtures = group_fixture_map
+                .get(&active_color_group_id)
+                .unwrap_or(&empty_vec);
+            let color_local_index = color_group_fixtures
+                .iter()
+                .position(|&id| id == fixture.id)
+                .unwrap_or(0);
+            let color_group_count = color_group_fixtures.len();
+
+            self.compute_fixture_dmx(
+                fixture,
+                local_index,
+                group_count,
+                &effect_state,
+                color_local_index,
+                color_group_count,
+                &color_effect_state,
+                primary_group_id,
+                elapsed,
+            );
+        }
+
+        for (&(universe, channel), &val) in &self.manual_channels {
+            if universe >= 1 && (1..=512).contains(&channel) {
+                if let Some(buf) = self.universe_buffers.get_mut(&universe) {
+                    buf[(channel - 1) as usize] = val;
+                }
+            }
+        }
+
+        self.fixture_color_transitions.retain(|_, trans| {
+            let elapsed = trans.start_time.elapsed().as_secs_f32();
+            elapsed < trans.delay_secs + trans.duration_secs
+        });
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn compute_fixture_dmx(
+        &mut self,
+        fixture: &PatchedFixture,
+        local_index: usize,
+        group_count: usize,
+        effect_state: &GroupEffectState,
+        color_local_index: usize,
+        color_group_count: usize,
+        color_effect_state: &GroupEffectState,
+        primary_group_id: u32,
+        elapsed: f32,
+    ) {
+        let u = fixture.universe as u16;
+        let start_addr = (fixture.address.saturating_sub(1)) as usize;
+
+        if start_addr >= 512 {
+            return;
+        }
+
+        let is_in_flash_group = fixture
+            .groups
+            .iter()
+            .any(|&g| self.is_flash_active(g, "master"))
+            || self.is_flash_active(0, "master");
+
+        let is_in_strobe_group = fixture
+            .groups
+            .iter()
+            .any(|&g| self.is_flash_active(g, "strobe"))
+            || self.is_flash_active(0, "strobe");
+
+        let is_in_random_strobe_group = fixture.groups.iter().any(|&g| {
+            self.is_flash_active(g, "randomStrobe") || self.is_flash_active(g, "random_strobe")
+        }) || self.is_flash_active(0, "randomStrobe")
+            || self.is_flash_active(0, "random_strobe");
+
+        let group_master = self.get_group_master(primary_group_id) as f32 / 100.0;
+        let global_master = self.get_group_master(0) as f32 / 100.0;
+        let master_multiplier = group_master * global_master;
+
+        let raw_intensity = calculate_effect_intensity(
+            effect_state,
+            elapsed,
+            local_index,
+            group_count,
+            fixture.id,
+            self.effect_bpm,
+        );
+
+        let intensity_level = ((raw_intensity as f32) * master_multiplier).clamp(0.0, 255.0) as u8;
+
+        let strobe_val = if is_in_strobe_group {
+            let freq = 1.0 + (self.strobe_rate as f32 / 100.0) * 19.0;
+            if (elapsed * freq * 2.0 * std::f32::consts::PI).sin() > 0.0 {
+                255
+            } else {
+                0
+            }
+        } else if is_in_random_strobe_group {
+            if compute_random_strobe_active(fixture.id, elapsed, self.random_strobe_rate) {
+                255
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        let channel_count = extract_fixture_channel_count(fixture);
+        let channels_to_write = channel_count.min(512 - start_addr);
+
+        let selected_color_str = fixture
+            .groups
+            .iter()
+            .find_map(|&g| self.get_group_color(g))
+            .or_else(|| self.get_group_color(0));
+
+        let current_rgb_f = self.get_fixture_current_rgb_f32(fixture.id, selected_color_str);
+
+        let secondary_color_str = fixture
+            .groups
+            .iter()
+            .find_map(|&g| self.get_group_secondary_color(g))
+            .or_else(|| self.get_group_secondary_color(0));
+
+        let secondary_rgb = match secondary_color_str {
+            Some(s) => resolve_color_rgb(s),
+            None => (0, 0, 0),
+        };
+        let secondary_rgb_f = (
+            secondary_rgb.0 as f32,
+            secondary_rgb.1 as f32,
+            secondary_rgb.2 as f32,
+        );
+
+        let color_factor = calculate_effect_factor(
+            color_effect_state,
+            elapsed,
+            color_local_index,
+            color_group_count,
+            fixture.id,
+            self.color_effect_bpm,
+        );
+
+        let r_f = current_rgb_f.0 * (1.0 - color_factor) + secondary_rgb_f.0 * color_factor;
+        let g_f = current_rgb_f.1 * (1.0 - color_factor) + secondary_rgb_f.1 * color_factor;
+        let b_f = current_rgb_f.2 * (1.0 - color_factor) + secondary_rgb_f.2 * color_factor;
+
+        let r = r_f.round().clamp(0.0, 255.0) as u8;
+        let g = g_f.round().clamp(0.0, 255.0) as u8;
+        let b = b_f.round().clamp(0.0, 255.0) as u8;
+
+        self.fixture_last_colors.insert(fixture.id, (r, g, b));
+
+        let w = if r >= 200 && g >= 200 && b >= 200 {
+            255
+        } else {
+            0
+        };
+
+        let buf = match self.universe_buffers.get_mut(&u) {
+            Some(b) => b,
+            None => return,
+        };
+
+        let mut has_dimmer = false;
+        let mut has_color_channel = false;
+        let mut classified_channels = Vec::with_capacity(channels_to_write);
+
+        for ch in 0..channels_to_write {
+            let ch_type = match get_fixture_channel_name(fixture, ch) {
+                Some(name) => classify_channel(&name),
+                None => {
+                    if channels_to_write == 1 {
+                        ChannelType::Dimmer
+                    } else {
+                        ChannelType::Other
+                    }
+                }
+            };
+            if ch_type == ChannelType::Dimmer {
+                has_dimmer = true;
+            }
+            if matches!(
+                ch_type,
+                ChannelType::Red
+                    | ChannelType::Green
+                    | ChannelType::Blue
+                    | ChannelType::White
+                    | ChannelType::Amber
+                    | ChannelType::Cyan
+                    | ChannelType::Magenta
+                    | ChannelType::Yellow
+                    | ChannelType::UV
+            ) {
+                has_color_channel = true;
+            }
+            classified_channels.push(ch_type);
+        }
+
+        let treat_first_as_dimmer = !has_dimmer && !has_color_channel;
+        let intensity_factor = (intensity_level as f32) / 255.0;
+
+        for (ch, ch_type) in classified_channels.into_iter().enumerate() {
+            let ch_idx = start_addr + ch;
+
+            if is_in_flash_group {
+                // White Flash: Dimmer AND Color channels set to 255 (Full White)
+                buf[ch_idx] = 255;
+            } else if is_in_strobe_group || is_in_random_strobe_group {
+                match ch_type {
+                    ChannelType::Dimmer => buf[ch_idx] = strobe_val,
+                    ChannelType::Red => {
+                        buf[ch_idx] = if has_dimmer {
+                            if strobe_val > 0 {
+                                r
+                            } else {
+                                0
+                            }
+                        } else {
+                            ((r as f32) * (strobe_val as f32 / 255.0)).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Green => {
+                        buf[ch_idx] = if has_dimmer {
+                            if strobe_val > 0 {
+                                g
+                            } else {
+                                0
+                            }
+                        } else {
+                            ((g as f32) * (strobe_val as f32 / 255.0)).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Blue => {
+                        buf[ch_idx] = if has_dimmer {
+                            if strobe_val > 0 {
+                                b
+                            } else {
+                                0
+                            }
+                        } else {
+                            ((b as f32) * (strobe_val as f32 / 255.0)).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::White => {
+                        buf[ch_idx] = if has_dimmer {
+                            if strobe_val > 0 {
+                                w
+                            } else {
+                                0
+                            }
+                        } else {
+                            ((w as f32) * (strobe_val as f32 / 255.0)).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Strobe => buf[ch_idx] = strobe_val,
+                    _ => {
+                        if ch == 0 && treat_first_as_dimmer {
+                            buf[ch_idx] = strobe_val;
+                        } else {
+                            buf[ch_idx] = 0;
+                        }
+                    }
+                }
+            } else {
+                match ch_type {
+                    ChannelType::Dimmer => buf[ch_idx] = intensity_level,
+                    ChannelType::Red => {
+                        buf[ch_idx] = if has_dimmer {
+                            r
+                        } else {
+                            ((r as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Green => {
+                        buf[ch_idx] = if has_dimmer {
+                            g
+                        } else {
+                            ((g as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Blue => {
+                        buf[ch_idx] = if has_dimmer {
+                            b
+                        } else {
+                            ((b as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::White => {
+                        buf[ch_idx] = if has_dimmer {
+                            w
+                        } else {
+                            ((w as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Amber => {
+                        let a = if r > 200 && g > 100 && b < 50 { 255 } else { 0 };
+                        buf[ch_idx] = if has_dimmer {
+                            a
+                        } else {
+                            ((a as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Cyan => {
+                        let c = if g > 200 && b > 200 && r < 50 { 255 } else { 0 };
+                        buf[ch_idx] = if has_dimmer {
+                            c
+                        } else {
+                            ((c as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Magenta => {
+                        let m = if r > 200 && b > 200 && g < 50 { 255 } else { 0 };
+                        buf[ch_idx] = if has_dimmer {
+                            m
+                        } else {
+                            ((m as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::Yellow => {
+                        let y = if r > 200 && g > 200 && b < 50 { 255 } else { 0 };
+                        buf[ch_idx] = if has_dimmer {
+                            y
+                        } else {
+                            ((y as f32) * intensity_factor).clamp(0.0, 255.0) as u8
+                        };
+                    }
+                    ChannelType::UV => {
+                        buf[ch_idx] = 0;
+                    }
+                    ChannelType::Strobe => {
+                        buf[ch_idx] = 0;
+                    }
+                    ChannelType::Other => {
+                        if ch == 0 && treat_first_as_dimmer {
+                            buf[ch_idx] = intensity_level;
+                        } else {
+                            buf[ch_idx] = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

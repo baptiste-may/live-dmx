@@ -21,7 +21,6 @@ Welcome to the `live-dmx` project. This document provides essential information 
   - [Lucide Vue Next](https://lucide.dev/icons) for iconography.
 - **Backend:**
   - [Tauri v2](https://v2.tauri.app/) (Rust)
-  - [Art-Net Protocol](https://crates.io/crates/artnet_protocol) for DMX output.
   - [Serde](https://serde.rs/) for JSON serialization/deserialization.
 
 ## Directory Structure
@@ -37,14 +36,19 @@ Welcome to the `live-dmx` project. This document provides essential information 
   - `types/`: TypeScript type definitions.
 - `src-tauri/`: Rust backend source code.
   - `src/lib.rs`: Tauri application setup and command handlers.
-  - `src/fixtures/`: Rust logic for handling fixture data and caching.
-  - `src/show/`: Show management, patch batching, and history tracking.
-  - `src/output/`: Art-Net output implementation.
+  - `src/fixtures/`: Rust logic for handling fixture data and caching (`commands.rs`, `loader.rs`, `types.rs`).
+  - `src/show/`: Show management, patch batching, history tracking, and show serialization (`types.rs`, `state.rs`, `history.rs`, `commands.rs`, `identity.rs`, `recent.rs`, `patch/`).
+  - `src/output/`: DMX output engine and command handlers (`engine.rs`, `compute.rs`, `effects.rs`, `channels.rs`, `colors.rs`, `runner.rs`, `commands.rs`, `types.rs`).
 - `fixtures/`: JSON data files for lighting fixtures (cached in OS AppData directory, or downloaded for development via `download-fixtures.ts`).
 - `download-fixtures.ts`: Script to download fixtures from the Open Fixture Library.
 
 ## Coding Standards & Conventions
 
+- **Modularity & Separation of Concerns:** Strongly prioritize splitting code into small, decoupled, and single-responsibility units across the entire stack:
+  - **Vue Components:** Break down large views and UI blocks into small, focused child components.
+  - **State Management:** Divide Pinia stores and state into granular, domain-specific stores.
+  - **Backend (Rust):** Keep Tauri command handlers thin and split backend business logic into dedicated modules, services, and helper functions.
+  - **Composables & Utilities:** Extract reusable logic and helpers into dedicated composable functions and utility modules.
 - **Strings:** Use double quotes (`"`) for strings in TypeScript and script blocks.
 - **Vue Templates:** ALWAYS use double quotes for HTML/Vue attributes. For string literals _inside_ attribute expressions, use single quotes (`'`) to avoid quote nesting issues (e.g., `:class="[condition ? 'active' : '']"`).
 - **Language:** ALWAYS use TypeScript (`.ts`) instead of JavaScript (`.js`). All Vue components MUST use `<script setup lang="ts">`.
@@ -53,6 +57,7 @@ Welcome to the `live-dmx` project. This document provides essential information 
 ### Frontend
 
 - **Composition API:** Use `<script setup>` in SFCs.
+- **Inline Handlers:** When an event handler (such as `@click`) in a Vue component only executes a simple single-line statement or method call, it can be placed directly inline in the template (e.g., `@click="isOpen = false"`) instead of defining a dedicated single-line handler in `<script>`.
 - **Styling:** Prefer Tailwind CSS utility classes. Use DaisyUI components where appropriate.
 - **Tauri Commands:** Invoke backend commands using `@tauri-apps/api/core`.
 - **State Management:** The application state is primarily managed within the Pinia store (`src/stores/show/show.ts`). Components should use `useShow()` to access and update the current show state instead of direct prop mutations. Avoid mutating props directly to satisfy Vue linting rules.
@@ -75,7 +80,7 @@ Welcome to the `live-dmx` project. This document provides essential information 
 
 - **Tauri Commands:** Keep command handlers concise; delegate business logic to modules.
 - **Error Handling:** Use `Result` for functions that can fail, especially in Tauri commands.
-- **DMX Logic:** Centralize DMX state and Art-Net output in the `output` module.
+- **DMX Logic:** Centralize DMX computation and engine runner in the `output` module.
 
 ## DMX Fixtures
 
@@ -87,10 +92,10 @@ The application relies on fixture definitions from the Open Fixture Library (OFL
 - New fixtures should be contributed directly to the [Open Fixture Library](https://github.com/OpenLightingProject/open-fixture-library).
 - Refer to `src/types/fixtures.ts` for the expected structure of fixture definitions.
 
-## Working with Art-Net
+## Working with DMX Output
 
-- Art-Net output is initialized in `src-tauri/src/output/mod.rs`.
-- The frontend sends DMX data updates via `set_dmx_channel` or `set_dmx_data` commands.
+- The DMX output engine (`LiveEngine`) and continuous background loop (`LiveEngineRunner`) are initialized in `src-tauri/src/output/`.
+- The frontend sends live control updates (`live_set_*`) or direct manual channel updates via `set_dmx_channel` / `set_dmx_data` commands.
 
 ## Quality Assurance & Tooling
 

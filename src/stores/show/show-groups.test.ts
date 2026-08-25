@@ -10,12 +10,12 @@ describe("show-groups store", () => {
     vi.clearAllMocks();
   });
 
-  it("should initialize with default 'All Fixtures' group", () => {
+  it("should initialize with default 'All' group", () => {
     const store = useShowGroups();
 
     expect(store.groups).toEqual(defaultShowGroupsState.groups);
     expect(store.groups).toHaveLength(1);
-    expect(store.groups[0]).toEqual({ id: 0, name: "All Fixtures" });
+    expect(store.groups[0]).toEqual({ id: 0, name: "All" });
   });
 
   it("should invoke backend command when create is called", async () => {
@@ -68,7 +68,7 @@ describe("show-groups store", () => {
   it("should find group by id via get", () => {
     const store = useShowGroups();
     store.groups = [
-      { id: 0, name: "All Fixtures" },
+      { id: 0, name: "All" },
       { id: 1, name: "Back Truss" },
     ];
 

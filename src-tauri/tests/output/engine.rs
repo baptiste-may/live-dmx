@@ -1,0 +1,199 @@
+use live_dmx_lib::output::LiveEngine;
+use live_dmx_lib::show::{PatchedFixture, ShowData};
+
+#[test]
+fn test_live_engine_default_state_and_blackout() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Test Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    // Default effect is None -> Blackout (0 intensity)
+    engine.compute_dmx(&show);
+    let buf_default = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf_default[0], 0);
+
+    // Set Group 1 effect to Full -> 255 intensity
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.compute_dmx(&show);
+    let buf_full = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf_full[0], 255);
+}
+
+#[test]
+fn test_live_engine_group_zero_all_control() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Spot 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    // Group 0 ("All") effect sets full intensity on fixture 1 (even though fixture is in group 1)
+    engine.set_group_effect(0, Some("full".to_string()), None, false);
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255);
+}
+
+#[test]
+fn test_live_engine_manual_dmx_overrides() {
+    let mut engine = LiveEngine::new();
+    let show = ShowData::default();
+
+    engine.manual_channels.insert((1, 10), 128);
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[9], 128);
+}
+
+#[test]
+fn test_live_engine_rgb_fixture_without_dimmer() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "RGB Par".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Red", "Green", "Blue"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    // Color is blue, effect is Full
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_color(1, Some("blue".to_string()), Some(&show));
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 0); // Red
+    assert_eq!(buf[1], 0); // Green
+    assert_eq!(buf[2], 255); // Blue
+
+    // Effect is None (Blackout) -> Blue should dim to 0
+    engine.set_group_effect(1, None, None, false);
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 0);
+    assert_eq!(buf[1], 0);
+    assert_eq!(buf[2], 0);
+}
+
+#[test]
+fn test_live_engine_group_master_scaling() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_master(1, 50);
+    assert_eq!(engine.get_group_master(1), 50);
+
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 127);
+}
+
+#[test]
+fn test_live_engine_buttons_and_reset() {
+    let mut engine = LiveEngine::new();
+    engine.set_button("btn_1".to_string(), true);
+    assert_eq!(engine.button_states.get("btn_1"), Some(&true));
+
+    engine.reset_all();
+    assert!(engine.button_states.is_empty());
+    assert_eq!(engine.strobe_rate, 50);
+    assert_eq!(engine.random_strobe_rate, 50);
+    assert_eq!(engine.effect_bpm, 60);
+    assert_eq!(engine.get_group_color(0), Some("white"));
+    assert_eq!(engine.get_group_color(1), Some("white"));
+}
+
+#[test]
+fn test_live_engine_color_effects_and_secondary_colors() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "RGB Par 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Red", "Green", "Blue"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    // Set intensity to full
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    // Primary color = Blue, Secondary color = Red
+    engine.set_group_color(1, Some("blue".to_string()), Some(&show));
+    engine.set_group_secondary_color(1, Some("red".to_string()));
+
+    assert_eq!(engine.get_group_color(1), Some("blue"));
+    assert_eq!(engine.get_group_secondary_color(1), Some("red"));
+
+    // No color effect -> primary color (Blue: 0, 0, 255)
+    engine.compute_dmx(&show);
+    let buf_base = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf_base[0], 255); // Dimmer
+    assert_eq!(buf_base[1], 0); // Red
+    assert_eq!(buf_base[2], 0); // Green
+    assert_eq!(buf_base[3], 255); // Blue
+
+    // Set color effect to chase
+    engine.set_group_color_effect(1, Some("chase".to_string()), None, false);
+    assert_eq!(
+        engine.get_group_color_effect(1).effect,
+        Some("chase".to_string())
+    );
+
+    engine.compute_dmx(&show);
+    let buf_chase = engine.universe_buffers.get(&1).unwrap();
+    // In chase, color is either 100% blue or 100% red
+    assert_eq!(buf_chase[0], 255);
+    assert!(
+        (buf_chase[1] == 0 && buf_chase[3] == 255) || (buf_chase[1] == 255 && buf_chase[3] == 0)
+    );
+
+    // Test color effect BPM
+    engine.set_color_effect_bpm(130);
+    assert_eq!(engine.color_effect_bpm, 130);
+
+    // Reset color effect
+    engine.reset_group_color_effect(1);
+    assert_eq!(engine.get_group_color_effect(1).effect, None);
+
+    // Reset all
+    engine.reset_all();
+    assert_eq!(engine.get_group_secondary_color(1), None);
+    assert_eq!(engine.color_effect_bpm, 60);
+}

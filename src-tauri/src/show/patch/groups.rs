@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::show::state::{AppState, FixtureGroup};
+use crate::show::{AppState, FixtureGroup};
 
 #[tauri::command]
 pub fn show_group_create(

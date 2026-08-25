@@ -1,0 +1,144 @@
+import {
+  ActivityIcon,
+  ArrowBigLeftDashIcon,
+  ArrowBigRightDashIcon,
+  ChartNoAxesColumnDecreasingIcon,
+  ChartNoAxesColumnIncreasingIcon,
+  DicesIcon,
+  FlipHorizontal2Icon,
+  SquareSplitHorizontalIcon,
+  SunIcon,
+} from "lucide-vue-next";
+import type { Component } from "vue";
+
+import FourIcon from "@/components/icons/FourIcon.vue";
+import ThreeIcon from "@/components/icons/ThreeIcon.vue";
+import TwoIcon from "@/components/icons/TwoIcon.vue";
+
+export type FlashType = "master" | "strobe" | "randomStrobe";
+
+export type EffectType = "pulse" | "chase" | "ramp_up" | "ramp_down";
+
+export type IntensityEffectType = "full" | EffectType;
+
+export type ColorEffectType = EffectType;
+
+export type AlignmentType = "rng" | "left" | "right" | "wing" | "two" | "three" | "four";
+
+export type ColorFadeOrder = "left" | "right" | "wing";
+
+export type GroupEffectState = {
+  effect: IntensityEffectType | null;
+  alignment: AlignmentType | null;
+  bounce: boolean;
+};
+
+export type GroupColorEffectState = {
+  effect: ColorEffectType | null;
+  alignment: AlignmentType | null;
+  bounce: boolean;
+};
+
+export type LiveButtonsState = {
+  flashStates: Record<number, Record<FlashType, boolean>>;
+  buttonStates: Record<string, boolean>;
+  groupEffects: Record<number, GroupEffectState>;
+  groupColorEffects: Record<number, GroupColorEffectState>;
+  groupMasters: Record<number, number>;
+  groupColors: Record<number, string | null>;
+  groupSecondaryColors: Record<number, string | null>;
+  strobeRate: number;
+  randomStrobeRate: number;
+  effectBpm: number;
+  colorEffectBpm: number;
+  colorFadeSpeed: number;
+  colorFadeOrder: ColorFadeOrder | null;
+};
+
+export const effects: Record<
+  EffectType,
+  {
+    label: string;
+    icon: Component;
+  }
+> = {
+  pulse: {
+    label: "Pulse",
+    icon: ActivityIcon,
+  },
+  chase: {
+    label: "Chase",
+    icon: SquareSplitHorizontalIcon,
+  },
+  ramp_up: {
+    label: "Ramp up",
+    icon: ChartNoAxesColumnIncreasingIcon,
+  },
+  ramp_down: {
+    label: "Ramp down",
+    icon: ChartNoAxesColumnDecreasingIcon,
+  },
+};
+
+export const intensityEffects: Record<IntensityEffectType, { label: string; icon: Component }> = {
+  full: {
+    label: "Full",
+    icon: SunIcon,
+  },
+  ...effects,
+};
+
+export const alignments: Record<
+  AlignmentType,
+  {
+    label: string;
+    icon: Component;
+  }
+> = {
+  rng: {
+    label: "Random",
+    icon: DicesIcon,
+  },
+  left: {
+    label: "Left",
+    icon: ArrowBigLeftDashIcon,
+  },
+  right: {
+    label: "Right",
+    icon: ArrowBigRightDashIcon,
+  },
+  wing: {
+    label: "Wing",
+    icon: FlipHorizontal2Icon,
+  },
+  two: {
+    label: "Two groups",
+    icon: TwoIcon,
+  },
+  three: {
+    label: "Three groups",
+    icon: ThreeIcon,
+  },
+  four: {
+    label: "Four groups",
+    icon: FourIcon,
+  },
+};
+
+export const colors: Record<string, string> = {
+  white: "#FFFFFF",
+  ctb: "#C6E6FF",
+  cto: "#FFC78A",
+  red: "#FF0000",
+  orange: "#FF7F00",
+  yellow: "#FFFF00",
+  lime: "#7FFF00",
+  green: "#00FF00",
+  mint: "#00FF7F",
+  cyan: "#00FFFF",
+  azure: "#007FFF",
+  blue: "#0000FF",
+  violet: "#7F00FF",
+  magenta: "#FF00FF",
+  pink: "#FF007F",
+};

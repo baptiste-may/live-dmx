@@ -57,16 +57,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "artnet_protocol"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "686b971a57c02682e07fdb0866b09aad7df7054d9f3c3bb62a5eaa2092621367"
-dependencies = [
- "bitflags 2.13.1",
- "byteorder",
-]
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1969,7 +1959,6 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 name = "live-dmx"
 version = "0.1.0"
 dependencies = [
- "artnet_protocol",
  "serde",
  "serde_json",
  "tauri",

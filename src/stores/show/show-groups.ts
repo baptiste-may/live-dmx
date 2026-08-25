@@ -14,7 +14,7 @@ export const defaultShowGroupsState: ShowGroupsState = {
   groups: [
     {
       id: 0,
-      name: "All Fixtures",
+      name: "All",
     },
   ],
 };

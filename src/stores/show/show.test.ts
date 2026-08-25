@@ -1,6 +1,7 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { useLiveButtons } from "../live/live-buttons";
 import { defaultShow, ShowStatus, useShow } from "./show";
 
 describe("show store", () => {
@@ -38,14 +39,14 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
-      groups: { groups: [{ id: 0, name: "All Fixtures" }] },
+      groups: { groups: [{ id: 0, name: "All" }] },
     });
 
     expect(show.state).toBe(ShowStatus.LOADED);
     expect(show.isLoaded).toBe(true);
     expect(show.identity.displayName).toBe("Loaded Show");
     expect(show.file.path).toBe("/shows/test.json");
-    expect(show.groups.groups).toEqual([{ id: 0, name: "All Fixtures" }]);
+    expect(show.groups.groups).toEqual([{ id: 0, name: "All" }]);
     expect(show.hasUnsavedChanges).toBe(false);
     expect(show.canSave).toBe(false);
     expect(show.canUndo).toBe(true);
@@ -69,7 +70,7 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
-      groups: { groups: [{ id: 0, name: "All Fixtures" }] },
+      groups: { groups: [{ id: 0, name: "All" }] },
     });
 
     expect(show.isLoaded).toBe(true);
@@ -94,7 +95,7 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
-      groups: { groups: [{ id: 0, name: "All Fixtures" }] },
+      groups: { groups: [{ id: 0, name: "All" }] },
     });
 
     expect(show.hasUnsavedChanges).toBe(true);
@@ -111,5 +112,36 @@ describe("show store", () => {
     expect(show.state).toBe(ShowStatus.NOT_LOADED);
     expect(show.isLoaded).toBe(false);
     expect(show.identity.displayName).toBe("My show");
+  });
+
+  it("should reset live buttons state when show is loaded", () => {
+    const show = useShow();
+    const liveButtons = useLiveButtons();
+
+    liveButtons.strobeRate = 80;
+    liveButtons.effectBpm = 120;
+    liveButtons.groupMasters[1] = 50;
+
+    show.load(defaultShow);
+
+    expect(liveButtons.strobeRate).toBe(50);
+    expect(liveButtons.effectBpm).toBe(60);
+    expect(liveButtons.groupMasters[1]).toBeUndefined();
+  });
+
+  it("should reset live buttons state when show is unloaded", () => {
+    const show = useShow();
+    const liveButtons = useLiveButtons();
+
+    show.load(defaultShow);
+    liveButtons.strobeRate = 90;
+    liveButtons.effectBpm = 140;
+    liveButtons.groupMasters[1] = 20;
+
+    show.unload();
+
+    expect(liveButtons.strobeRate).toBe(50);
+    expect(liveButtons.effectBpm).toBe(60);
+    expect(liveButtons.groupMasters[1]).toBeUndefined();
   });
 });
