@@ -101,6 +101,7 @@ The project uses a strict linting and testing suite to ensure code quality.
 - **Formatting:** Prettier (integrated with ESLint).
 - **Testing:** [Vitest](https://vitest.dev/) for unit and component testing. Use [Vue Testing Library](https://testing-library.com/docs/vue-testing-library/intro/) for component tests to focus on user-centric testing. Test files should be named `Component.test.ts` or `Component.test.vue` and placed next to the component they test.
   - Pinia is configured globally for all tests via `src/test-setup.ts` using `createTestingPinia({ stubActions: false })`. To customize or inspect store state in tests, access store composables directly (e.g. `const store = useShow()`).
+  - **Mocking Conventions:** When mocking functions or modules in tests, prefer defining typed mock references at the top of the file using `const mockFn = vi.mocked(fn)` (e.g., `const mockOpenDialog = vi.mocked(openDialog);` or `const mockInvoke = vi.mocked(invoke);`) instead of calling inline `vi.mocked(...)` repeatedly inside individual test cases. Always clear mocks in `beforeEach(() => { vi.clearAllMocks(); })`.
 
 ### Backend
 

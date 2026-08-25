@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { Button, Menu, MenuItem, MenuTitle } from "daisy-ui-kit";
-import { PenLineIcon, PlusIcon, RedoIcon, SaveIcon, UndoIcon, XIcon } from "lucide-vue-next";
+import {
+  FolderOpenIcon,
+  PenLineIcon,
+  PlusIcon,
+  RedoIcon,
+  SaveIcon,
+  UndoIcon,
+  XIcon,
+} from "lucide-vue-next";
 
 import TextForm from "@/components/inputs/TextForm.vue";
 import { useApp } from "@/stores/app";
@@ -61,6 +69,12 @@ function handleCancelShowName() {
       <button type="button" @click="app.createShow">
         <PlusIcon class="h-4 w-4" />
         New show
+      </button>
+    </MenuItem>
+    <MenuItem>
+      <button type="button" @click="app.askLoadShow">
+        <FolderOpenIcon class="h-4 w-4" />
+        Open show
       </button>
     </MenuItem>
     <MenuItem :disabled="!show.canSave">

@@ -24,6 +24,7 @@ describe("AppSidebar.vue", () => {
 
     expect(screen.getByText("My Stage Show")).toBeInTheDocument();
     expect(screen.getByText("New show")).toBeInTheDocument();
+    expect(screen.getByText("Open show")).toBeInTheDocument();
     expect(screen.getByText("Save show")).toBeInTheDocument();
     expect(screen.getByText("Close show")).toBeInTheDocument();
   });
@@ -37,6 +38,17 @@ describe("AppSidebar.vue", () => {
     await user.click(screen.getByText("New show"));
 
     expect(appStore.createShow).toHaveBeenCalledTimes(1);
+  });
+
+  it("should call app.askLoadShow when Open show is clicked", async () => {
+    const user = userEvent.setup();
+    const appStore = useApp();
+
+    render(AppSidebar);
+
+    await user.click(screen.getByText("Open show"));
+
+    expect(appStore.askLoadShow).toHaveBeenCalledTimes(1);
   });
 
   it("should call changes.save when Save show is clicked", async () => {
