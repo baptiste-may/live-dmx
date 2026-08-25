@@ -1,24 +1,42 @@
 import type { FixtureMode, FixtureType } from "@/types/fixtures.ts";
 
+export type CleanFixtureType = {
+  name: string;
+  shortName?: string;
+  fixtureKey?: string;
+  manufacturerKey?: string;
+};
+
+export type CleanFixtureMode = {
+  name?: string;
+  shortName?: string;
+  channels: (string | null)[];
+};
+
 export type PatchRequest = {
   name: string;
-  fixtureType: FixtureType;
-  mode: FixtureMode;
+  fixtureType: FixtureType | CleanFixtureType;
+  mode: FixtureMode | CleanFixtureMode;
   universe: number;
   address: number;
 };
 
 export type PatchBatchRequest = {
   name: string;
-  fixtureType: FixtureType;
-  mode: FixtureMode;
+  fixtureType: FixtureType | CleanFixtureType;
+  mode: FixtureMode | CleanFixtureMode;
   universe: number;
   startAddress: number;
   count: number;
   channelCount: number;
 };
 
-export type PatchedFixture = PatchRequest & {
+export type PatchedFixture = {
   id: number;
   groups: number[];
+  name: string;
+  fixtureType: FixtureType | CleanFixtureType;
+  mode: FixtureMode | CleanFixtureMode;
+  universe: number;
+  address: number;
 };

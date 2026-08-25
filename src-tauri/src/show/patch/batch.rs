@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
-use crate::show::{AppState, FixtureGroup, PatchRequest, PatchedFixture};
+use crate::show::{
+    clean_fixture_type, clean_mode, AppState, FixtureGroup, PatchRequest, PatchedFixture,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,8 +75,8 @@ pub fn show_patch_fixture(
             id: next_id,
             groups: vec![group_id],
             name: request.name,
-            fixture_type: request.fixture_type,
-            mode: request.mode,
+            fixture_type: clean_fixture_type(&request.fixture_type),
+            mode: clean_mode(&request.mode),
             universe: request.universe,
             address: request.address,
         };
@@ -157,6 +159,9 @@ pub fn show_patch_batch(
             show.patch.fixtures.iter().map(|f| f.id).max().unwrap_or(0) + 1
         };
 
+        let clean_ft = clean_fixture_type(&request.fixture_type);
+        let clean_m = clean_mode(&request.mode);
+
         let mut created_fixtures = Vec::new();
         for (i, (universe, address)) in planned_fixtures.into_iter().enumerate() {
             let fixture_name = if request.count == 1 {
@@ -169,8 +174,8 @@ pub fn show_patch_batch(
                 id: start_id + i as u32,
                 groups: vec![group_id],
                 name: fixture_name,
-                fixture_type: request.fixture_type.clone(),
-                mode: request.mode.clone(),
+                fixture_type: clean_ft.clone(),
+                mode: clean_m.clone(),
                 universe,
                 address,
             };
