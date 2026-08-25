@@ -354,6 +354,31 @@ describe("patch-form store", () => {
     expect(store.selectedMode).toBeUndefined();
   });
 
+  it("should send cleaned fixtureType and mode when patching", async () => {
+    const showPatch = useShowPatch();
+    const patchBatchSpy = vi.spyOn(showPatch, "patchBatch").mockResolvedValue(undefined as never);
+
+    const fixtureBrowser = useFixtureBrowser();
+    fixtureBrowser.manufacturers = mockFixturesData;
+
+    const store = usePatchForm();
+    store.select("chauvet", "gig-bar-2", 0);
+
+    await store.patch();
+
+    expect(patchBatchSpy).toHaveBeenCalledTimes(1);
+    const callArg = patchBatchSpy.mock.calls[0][0];
+    expect(callArg.fixtureType).toEqual({
+      name: "GigBAR 2",
+      fixtureKey: "gig-bar-2",
+      manufacturerKey: "chauvet",
+    });
+    expect(callArg.mode).toEqual({
+      name: "Standard",
+      channels: ["Dimmer", "Red", "Green", "Blue"],
+    });
+  });
+
   it("should do nothing when patch is called without selected fixture", async () => {
     const showPatch = useShowPatch();
     const patchBatchSpy = vi.spyOn(showPatch, "patchBatch");

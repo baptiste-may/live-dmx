@@ -4,7 +4,7 @@ import { useFixtureBrowser } from "@/stores/fixture-browser.ts";
 import { useShowPatch } from "@/stores/show/show-patch.ts";
 import { ToastType, useToastStore } from "@/stores/toast.ts";
 import type { FixtureMode, FixtureType } from "@/types/fixtures.ts";
-import type { PatchedFixture } from "@/types/patch.ts";
+import type { CleanFixtureMode, CleanFixtureType, PatchedFixture } from "@/types/patch.ts";
 
 export type PatchForm = {
   selectedFixture: undefined | FixtureType;
@@ -181,11 +181,33 @@ export const usePatchForm = defineStore("patch-form", {
         return;
       }
 
+      const cleanFixtureType: CleanFixtureType = {
+        name: this.selectedFixture.name,
+        ...(this.selectedFixture.shortName ? { shortName: this.selectedFixture.shortName } : {}),
+        ...(this.selectedFixture.fixtureKey ? { fixtureKey: this.selectedFixture.fixtureKey } : {}),
+        ...(this.selectedFixture.manufacturerKey
+          ? { manufacturerKey: this.selectedFixture.manufacturerKey }
+          : {}),
+      };
+
+      const cleanMode: CleanFixtureMode = {
+        name: this.selectedMode.name,
+        ...(this.selectedMode.shortName ? { shortName: this.selectedMode.shortName } : {}),
+        channels: (this.selectedMode.channels || []).map((ch) => {
+          if (typeof ch === "string") return ch;
+          if (ch && typeof ch === "object") {
+            if ("name" in ch && typeof ch.name === "string") return ch.name;
+            if ("channel" in ch && typeof ch.channel === "string") return ch.channel;
+          }
+          return "";
+        }),
+      };
+
       try {
         await show.patchBatch({
           name: this.name,
-          fixtureType: this.selectedFixture,
-          mode: this.selectedMode,
+          fixtureType: cleanFixtureType,
+          mode: cleanMode,
           universe: this.universe,
           startAddress: this.address,
           count: this.count,

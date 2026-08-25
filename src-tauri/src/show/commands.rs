@@ -2,8 +2,8 @@ use tauri::{AppHandle, State};
 
 use crate::show::state::{emit_show_changed, AppState};
 use crate::show::types::{
-    PatchGroupsState, ShowChangesState, ShowData, ShowFileContent, ShowIdentityState,
-    ShowPatchState, ShowStatus,
+    clean_patched_fixture, PatchGroupsState, ShowChangesState, ShowData, ShowFileContent,
+    ShowIdentityState, ShowPatchState, ShowStatus,
 };
 
 #[tauri::command]
@@ -41,10 +41,19 @@ pub fn show_save(
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
     let mut history = state.history.lock().map_err(|e| e.to_string())?;
 
+    let clean_fixtures: Vec<_> = show
+        .patch
+        .fixtures
+        .iter()
+        .map(clean_patched_fixture)
+        .collect();
+
     let content = ShowFileContent {
         version: 1,
         identity: show.identity.clone(),
-        patch: show.patch.clone(),
+        patch: ShowPatchState {
+            fixtures: clean_fixtures,
+        },
         groups: show.groups.clone(),
     };
 
@@ -79,6 +88,13 @@ pub fn show_load(
     let json_str = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let content: ShowFileContent = serde_json::from_str(&json_str).map_err(|e| e.to_string())?;
 
+    let clean_fixtures: Vec<_> = content
+        .patch
+        .fixtures
+        .into_iter()
+        .map(|f| clean_patched_fixture(&f))
+        .collect();
+
     *show = ShowData {
         status: ShowStatus::Loaded,
         identity: content.identity,
@@ -89,7 +105,9 @@ pub fn show_load(
             can_undo: false,
             can_redo: false,
         },
-        patch: content.patch,
+        patch: ShowPatchState {
+            fixtures: clean_fixtures,
+        },
         groups: content.groups,
     };
     history.reset_with_saved(show.snapshot());
