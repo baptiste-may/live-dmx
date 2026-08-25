@@ -1,7 +1,7 @@
 pub fn resolve_color_rgb(color_name_or_hex: &str) -> (u8, u8, u8) {
     let s = color_name_or_hex.trim();
     if let Some(hex) = s.strip_prefix('#') {
-        if hex.len() == 6 {
+        if hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit()) {
             if let (Ok(r), Ok(g), Ok(b)) = (
                 u8::from_str_radix(&hex[0..2], 16),
                 u8::from_str_radix(&hex[2..4], 16),

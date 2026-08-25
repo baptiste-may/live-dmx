@@ -2,7 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useToastStore } from "@/stores/toast";
+
 import { useLiveButtons } from "./live-buttons";
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+}));
+
+const mockInvoke = vi.mocked(invoke);
 
 describe("live-buttons store", () => {
   beforeEach(() => {
@@ -18,7 +26,7 @@ describe("live-buttons store", () => {
     await liveButtons.setFlash(1, "master", true);
 
     expect(liveButtons.isFlashActive(1, "master")).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("live_set_flash", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_flash", {
       groupId: 1,
       flashType: "master",
       active: true,
@@ -33,7 +41,7 @@ describe("live-buttons store", () => {
     await liveButtons.setButtonState("btn-1", true);
 
     expect(liveButtons.isButtonActive("btn-1")).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("live_set_button", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_button", {
       buttonId: "btn-1",
       active: true,
     });
@@ -41,7 +49,7 @@ describe("live-buttons store", () => {
     await liveButtons.toggleButton("btn-1");
 
     expect(liveButtons.isButtonActive("btn-1")).toBe(false);
-    expect(invoke).toHaveBeenCalledWith("live_set_button", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_button", {
       buttonId: "btn-1",
       active: false,
     });
@@ -59,7 +67,7 @@ describe("live-buttons store", () => {
     await liveButtons.setGroupEffectType(1, "chase");
 
     expect(liveButtons.getGroupEffect(1).effect).toBe("chase");
-    expect(invoke).toHaveBeenCalledWith("live_set_group_effect", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_effect", {
       groupId: 1,
       effect: "chase",
       alignment: null,
@@ -69,7 +77,7 @@ describe("live-buttons store", () => {
     await liveButtons.setGroupEffectAlignment(1, "left");
 
     expect(liveButtons.getGroupEffect(1).alignment).toBe("left");
-    expect(invoke).toHaveBeenCalledWith("live_set_group_effect", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_effect", {
       groupId: 1,
       effect: "chase",
       alignment: "left",
@@ -79,7 +87,7 @@ describe("live-buttons store", () => {
     await liveButtons.setGroupEffectBounce(1, true);
 
     expect(liveButtons.getGroupEffect(1).bounce).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("live_set_group_effect", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_effect", {
       groupId: 1,
       effect: "chase",
       alignment: "left",
@@ -94,23 +102,23 @@ describe("live-buttons store", () => {
 
     await liveButtons.setGroupMaster(1, 80);
     expect(liveButtons.getGroupMaster(1)).toBe(80);
-    expect(invoke).toHaveBeenCalledWith("live_set_group_master", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_master", {
       groupId: 1,
       level: 80,
     });
 
     await liveButtons.setStrobeRate(75);
     expect(liveButtons.strobeRate).toBe(75);
-    expect(invoke).toHaveBeenCalledWith("live_set_strobe_rate", { rate: 75 });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_strobe_rate", { rate: 75 });
 
     await liveButtons.setRandomStrobeRate(90);
     expect(liveButtons.randomStrobeRate).toBe(90);
-    expect(invoke).toHaveBeenCalledWith("live_set_random_strobe_rate", { rate: 90 });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_random_strobe_rate", { rate: 90 });
 
     expect(liveButtons.effectBpm).toBe(60);
     await liveButtons.setEffectBpm(140);
     expect(liveButtons.effectBpm).toBe(140);
-    expect(invoke).toHaveBeenCalledWith("live_set_effect_bpm", { bpm: 140 });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_effect_bpm", { bpm: 140 });
   });
 
   it("should manage group colors and invoke tauri command", async () => {
@@ -120,7 +128,7 @@ describe("live-buttons store", () => {
 
     await liveButtons.setGroupColor(1, "red");
     expect(liveButtons.getGroupColor(1)).toBe("red");
-    expect(invoke).toHaveBeenCalledWith("live_set_group_color", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_color", {
       groupId: 1,
       color: "red",
     });
@@ -130,13 +138,13 @@ describe("live-buttons store", () => {
     expect(liveButtons.getGroupColor(2)).toBe("blue");
     expect(liveButtons.getGroupColor(3)).toBe("blue");
     expect(liveButtons.getGroupColor(0)).toBe("blue");
-    expect(invoke).toHaveBeenCalledWith("live_set_all_groups_color", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_all_groups_color", {
       color: "blue",
     });
 
     await liveButtons.resetGroupColor(1);
     expect(liveButtons.getGroupColor(1)).toBe("blue"); // Falls back to group 0 (which was set to blue)
-    expect(invoke).toHaveBeenCalledWith("live_set_group_color", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_color", {
       groupId: 1,
       color: null,
     });
@@ -150,19 +158,19 @@ describe("live-buttons store", () => {
 
     await liveButtons.setColorFadeSpeed(2.5);
     expect(liveButtons.colorFadeSpeed).toBe(2.5);
-    expect(invoke).toHaveBeenCalledWith("live_set_color_fade_speed", { speed: 2.5 });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_color_fade_speed", { speed: 2.5 });
 
     await liveButtons.setColorFadeOrder("left");
     expect(liveButtons.colorFadeOrder).toBe("left");
-    expect(invoke).toHaveBeenCalledWith("live_set_color_fade_order", { order: "left" });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_color_fade_order", { order: "left" });
 
     await liveButtons.setColorFadeOrder("wing");
     expect(liveButtons.colorFadeOrder).toBe("wing");
-    expect(invoke).toHaveBeenCalledWith("live_set_color_fade_order", { order: "wing" });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_color_fade_order", { order: "wing" });
 
     await liveButtons.setColorFadeOrder(null);
     expect(liveButtons.colorFadeOrder).toBeNull();
-    expect(invoke).toHaveBeenCalledWith("live_set_color_fade_order", { order: null });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_color_fade_order", { order: null });
   });
 
   it("should manage group secondary colors and invoke tauri command", async () => {
@@ -172,14 +180,14 @@ describe("live-buttons store", () => {
 
     await liveButtons.setGroupSecondaryColor(1, "yellow");
     expect(liveButtons.getGroupSecondaryColor(1)).toBe("yellow");
-    expect(invoke).toHaveBeenCalledWith("live_set_group_secondary_color", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_secondary_color", {
       groupId: 1,
       color: "yellow",
     });
 
     await liveButtons.resetGroupSecondaryColor(1);
     expect(liveButtons.getGroupSecondaryColor(1)).toBeNull();
-    expect(invoke).toHaveBeenCalledWith("live_set_group_secondary_color", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_secondary_color", {
       groupId: 1,
       color: null,
     });
@@ -196,7 +204,7 @@ describe("live-buttons store", () => {
 
     await liveButtons.setGroupColorEffectType(1, "pulse");
     expect(liveButtons.getGroupColorEffect(1).effect).toBe("pulse");
-    expect(invoke).toHaveBeenCalledWith("live_set_group_color_effect", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_color_effect", {
       groupId: 1,
       effect: "pulse",
       alignment: null,
@@ -205,7 +213,7 @@ describe("live-buttons store", () => {
 
     await liveButtons.setGroupColorEffectAlignment(1, "wing");
     expect(liveButtons.getGroupColorEffect(1).alignment).toBe("wing");
-    expect(invoke).toHaveBeenCalledWith("live_set_group_color_effect", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_color_effect", {
       groupId: 1,
       effect: "pulse",
       alignment: "wing",
@@ -214,7 +222,7 @@ describe("live-buttons store", () => {
 
     await liveButtons.setGroupColorEffectBounce(1, true);
     expect(liveButtons.getGroupColorEffect(1).bounce).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("live_set_group_color_effect", {
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_color_effect", {
       groupId: 1,
       effect: "pulse",
       alignment: "wing",
@@ -227,7 +235,7 @@ describe("live-buttons store", () => {
       alignment: null,
       bounce: false,
     });
-    expect(invoke).toHaveBeenCalledWith("live_reset_group_color_effect", { groupId: 1 });
+    expect(mockInvoke).toHaveBeenCalledWith("live_reset_group_color_effect", { groupId: 1 });
   });
 
   it("should manage color effect bpm", async () => {
@@ -236,7 +244,7 @@ describe("live-buttons store", () => {
     expect(liveButtons.colorEffectBpm).toBe(60);
     await liveButtons.setColorEffectBpm(120);
     expect(liveButtons.colorEffectBpm).toBe(120);
-    expect(invoke).toHaveBeenCalledWith("live_set_color_effect_bpm", { bpm: 120 });
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_color_effect_bpm", { bpm: 120 });
   });
 
   it("should reset group effect", async () => {
@@ -250,7 +258,7 @@ describe("live-buttons store", () => {
       alignment: null,
       bounce: false,
     });
-    expect(invoke).toHaveBeenCalledWith("live_reset_group_effect", { groupId: 1 });
+    expect(mockInvoke).toHaveBeenCalledWith("live_reset_group_effect", { groupId: 1 });
   });
 
   it("should reset all states", async () => {
@@ -274,6 +282,25 @@ describe("live-buttons store", () => {
     expect(liveButtons.colorEffectBpm).toBe(60);
     expect(liveButtons.colorFadeSpeed).toBe(1);
     expect(liveButtons.colorFadeOrder).toBeNull();
-    expect(invoke).toHaveBeenCalledWith("live_reset_all_buttons");
+    expect(mockInvoke).toHaveBeenCalledWith("live_reset_all_buttons");
+  });
+
+  it("should rollback state and add error toast when invoke fails", async () => {
+    const liveButtons = useLiveButtons();
+    const toastStore = useToastStore();
+
+    mockInvoke.mockRejectedValueOnce(new Error("Network error"));
+    await liveButtons.setFlash(1, "master", true);
+    expect(liveButtons.isFlashActive(1, "master")).toBe(false);
+    expect(toastStore.toasts).toHaveLength(1);
+    expect(toastStore.toasts[0].message).toContain("Network error");
+
+    mockInvoke.mockRejectedValueOnce(new Error("Command failed"));
+    await liveButtons.setGroupMaster(1, 40);
+    expect(liveButtons.getGroupMaster(1)).toBe(100);
+
+    mockInvoke.mockRejectedValueOnce(new Error("Color failed"));
+    await liveButtons.setGroupColor(1, "red");
+    expect(liveButtons.getGroupColor(1)).toBe("white");
   });
 });

@@ -8,10 +8,13 @@ import LiveColorsEffectsRow from "./LiveColorsEffectsRow.vue";
 
 describe("LiveColorsEffectsRow.vue", () => {
   const renderRow = (group = { id: 1, name: "Back Wall" }) => {
+    const table = document.createElement("table");
+    const tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+    document.body.appendChild(table);
     return render(LiveColorsEffectsRow, {
       props: { group },
-      container: document.body.appendChild(document.createElement("tbody"))
-        .parentElement as HTMLElement,
+      container: tbody,
     });
   };
 

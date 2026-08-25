@@ -30,7 +30,7 @@ export const useApp = defineStore("app", {
           this.show.file.path = undefined;
           this.show.file.isDirty = false;
           this.show.state = ShowStatus.LOADED;
-          useLiveButtons().$reset();
+          await useLiveButtons().resetAll();
         } catch (error: unknown) {
           this.show.state = ShowStatus.NOT_LOADED;
           useToastStore().addToast(`Failed to create show: ${String(error)}`, ToastType.ERROR);
@@ -69,7 +69,7 @@ export const useApp = defineStore("app", {
           this.show.file.path = path;
           this.show.file.isDirty = false;
           this.show.state = ShowStatus.LOADED;
-          useLiveButtons().$reset();
+          await useLiveButtons().resetAll();
 
           const recentShows = useRecentShows();
           recentShows.addOrUpdate(this.show.identity.displayName, path);
@@ -79,14 +79,14 @@ export const useApp = defineStore("app", {
         }
       });
     },
-    closeShow() {
+    async closeShow() {
       const changes = useShowChanges();
-      return changes.confirmWithSaveGuard(() => {
+      return changes.confirmWithSaveGuard(async () => {
         this.show.unload();
         this.navigation.$reset();
         this.patchForm.reset();
         this.fixtureBrowser.clearSearch();
-        useLiveButtons().$reset();
+        await useLiveButtons().resetAll();
       });
     },
   },

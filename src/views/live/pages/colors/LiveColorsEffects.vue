@@ -15,7 +15,7 @@ const liveButtons = useLiveButtons();
   <Card class="bg-base-200 h-full overflow-hidden">
     <CardBody class="relative flex h-full min-h-0 flex-col gap-4">
       <CardTitle is="h2" bold size="2xl">Effects</CardTitle>
-      <span class="card-title absolute top-4 right-1/2 translate-x-1/2">
+      <CardTitle class="absolute top-4 right-1/2 translate-x-1/2 font-normal">
         BPM :
         <Knob
           :model-value="liveButtons.colorEffectBpm"
@@ -24,7 +24,7 @@ const liveButtons = useLiveButtons();
           :default-value="60"
           @update:model-value="liveButtons.setColorEffectBpm($event)"
         />
-      </span>
+      </CardTitle>
       <div class="min-h-0 flex-1 overflow-auto">
         <Table sm class="w-auto">
           <tbody>

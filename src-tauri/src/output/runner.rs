@@ -39,16 +39,19 @@ impl LiveEngineRunner {
             while running.load(Ordering::SeqCst) {
                 let start = Instant::now();
 
-                let show_snapshot = {
-                    if let Ok(show) = show_state.lock() {
-                        show.clone()
-                    } else {
-                        ShowData::default()
+                match show_state.lock() {
+                    Ok(show) => {
+                        let show_snapshot = show.clone();
+                        drop(show);
+                        if let Ok(mut eng) = engine.lock() {
+                            eng.compute_dmx(&show_snapshot);
+                        }
                     }
-                };
-
-                if let Ok(mut eng) = engine.lock() {
-                    eng.compute_dmx(&show_snapshot);
+                    Err(err) => {
+                        eprintln!("live engine loop stopping: show state lock poisoned: {err}");
+                        running.store(false, Ordering::SeqCst);
+                        break;
+                    }
                 }
 
                 let elapsed = start.elapsed();

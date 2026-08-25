@@ -36,8 +36,9 @@ describe("LiveColorsFade.vue", () => {
 
     render(LiveColorsFade);
 
-    const buttons = screen.getAllByRole("button");
-    const [leftBtn, rightBtn, wingBtn] = buttons;
+    const leftBtn = screen.getByRole("button", { name: "Fade order left" });
+    const rightBtn = screen.getByRole("button", { name: "Fade order right" });
+    const wingBtn = screen.getByRole("button", { name: "Fade order wing" });
 
     await user.click(leftBtn);
     expect(liveButtons.colorFadeOrder).toBe("left");

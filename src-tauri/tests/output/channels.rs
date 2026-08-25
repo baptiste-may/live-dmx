@@ -17,6 +17,10 @@ fn test_classify_channel() {
     assert_eq!(classify_channel("Yellow"), ChannelType::Yellow);
     assert_eq!(classify_channel("UV"), ChannelType::UV);
     assert_eq!(classify_channel("Strobe"), ChannelType::Strobe);
+    assert_eq!(classify_channel("Dimmer fine"), ChannelType::Other);
+    assert_eq!(classify_channel("Red Fine"), ChannelType::Other);
+    assert_eq!(classify_channel("Green LSB"), ChannelType::Other);
+    assert_eq!(classify_channel("Pan (16 bit)"), ChannelType::Other);
     assert_eq!(classify_channel("Pan"), ChannelType::Other);
     assert_eq!(classify_channel("Tilt"), ChannelType::Other);
 }

@@ -8,10 +8,13 @@ import LiveIntensityEffectsRow from "./LiveIntensityEffectsRow.vue";
 
 describe("LiveIntensityEffectsRow.vue", () => {
   const renderRow = (group = { id: 1, name: "Front Truss" }) => {
+    const table = document.createElement("table");
+    const tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+    document.body.appendChild(table);
     return render(LiveIntensityEffectsRow, {
       props: { group },
-      container: document.body.appendChild(document.createElement("tbody"))
-        .parentElement as HTMLElement,
+      container: tbody,
     });
   };
 

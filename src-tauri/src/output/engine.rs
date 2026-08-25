@@ -11,6 +11,28 @@ use crate::output::effects::{
 use crate::output::types::{ChannelType, FixtureColorTransition, GroupEffectState};
 use crate::show::{PatchedFixture, ShowData};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct FixtureCacheKey {
+    id: u32,
+    groups: Vec<u32>,
+    universe: u32,
+    address: u32,
+    mode: serde_json::Value,
+}
+
+#[derive(Clone, Debug)]
+pub struct CachedFixture {
+    pub id: u32,
+    pub universe: u16,
+    pub start_addr: usize,
+    pub channels: Vec<ChannelType>,
+    pub has_dimmer: bool,
+    pub treat_first_as_dimmer: bool,
+    pub groups: Vec<u32>,
+    pub primary_group_id: u32,
+    pub group_positions: HashMap<u32, (usize, usize)>,
+}
+
 pub struct LiveEngine {
     pub flash_states: HashMap<u32, HashMap<String, bool>>,
     pub button_states: HashMap<String, bool>,
@@ -30,6 +52,8 @@ pub struct LiveEngine {
     pub manual_channels: HashMap<(u16, u16), u8>,
     pub universe_buffers: HashMap<u16, Vec<u8>>,
     start_time: Instant,
+    cached_fixtures: Vec<CachedFixture>,
+    cached_keys: Vec<FixtureCacheKey>,
 }
 
 impl Default for LiveEngine {
@@ -67,6 +91,8 @@ impl LiveEngine {
             manual_channels: HashMap::new(),
             universe_buffers,
             start_time: Instant::now(),
+            cached_fixtures: Vec::new(),
+            cached_keys: Vec::new(),
         }
     }
 
@@ -212,7 +238,8 @@ impl LiveEngine {
                 .groups
                 .iter()
                 .find_map(|&g| self.get_group_color(g))
-                .or_else(|| self.get_group_color(0));
+                .or_else(|| self.get_group_color(0))
+                .or(Some("white"));
             let current_rgb_f = self.get_fixture_current_rgb_f32(f.id, fallback_str);
 
             let (delay_secs, duration_secs) = match self.color_fade_order.as_deref() {
@@ -267,12 +294,7 @@ impl LiveEngine {
         if let Some(Some(c)) = self.group_colors.get(&group_id) {
             return Some(c.as_str());
         }
-        if group_id != 0 {
-            if let Some(Some(c)) = self.group_colors.get(&0) {
-                return Some(c.as_str());
-            }
-        }
-        Some("white")
+        None
     }
 
     pub fn set_group_secondary_color(&mut self, group_id: u32, color: Option<String>) {
@@ -347,6 +369,8 @@ impl LiveEngine {
         self.fixture_color_transitions.clear();
         self.fixture_last_colors.clear();
         self.manual_channels.clear();
+        self.cached_fixtures.clear();
+        self.cached_keys.clear();
         for buf in self.universe_buffers.values_mut() {
             buf.fill(0);
         }
@@ -375,15 +399,21 @@ impl LiveEngine {
             .unwrap_or_default()
     }
 
-    pub fn compute_dmx(&mut self, show_data: &ShowData) {
-        for buf in self.universe_buffers.values_mut() {
-            buf.fill(0);
+    fn ensure_fixtures_cache(&mut self, show_data: &ShowData) {
+        let fixtures = &show_data.patch.fixtures;
+        let is_cache_valid = self.cached_keys.len() == fixtures.len()
+            && self.cached_keys.iter().zip(fixtures.iter()).all(|(k, f)| {
+                k.id == f.id
+                    && k.groups == f.groups
+                    && k.universe == f.universe
+                    && k.address == f.address
+                    && k.mode == f.mode
+            });
+
+        if is_cache_valid {
+            return;
         }
 
-        let elapsed = self.start_time.elapsed().as_secs_f32();
-        let fixtures = &show_data.patch.fixtures;
-
-        // Build group fixture mappings to get exact local indices and group counts
         let mut group_fixture_map: HashMap<u32, Vec<u32>> = HashMap::new();
         for f in fixtures {
             group_fixture_map.entry(0).or_default().push(f.id);
@@ -392,8 +422,102 @@ impl LiveEngine {
             }
         }
 
-        for fixture in fixtures {
-            let primary_group_id = fixture.groups.first().copied().unwrap_or(0);
+        let mut new_cached = Vec::with_capacity(fixtures.len());
+        let mut new_keys = Vec::with_capacity(fixtures.len());
+
+        for f in fixtures {
+            let primary_group_id = f.groups.first().copied().unwrap_or(0);
+            let mut group_positions = HashMap::new();
+
+            let empty_vec = Vec::new();
+            let g0_fixtures = group_fixture_map.get(&0).unwrap_or(&empty_vec);
+            let pos0 = g0_fixtures.iter().position(|&id| id == f.id).unwrap_or(0);
+            group_positions.insert(0, (pos0, g0_fixtures.len()));
+
+            for &g in &f.groups {
+                let g_fixtures = group_fixture_map.get(&g).unwrap_or(&empty_vec);
+                let pos = g_fixtures.iter().position(|&id| id == f.id).unwrap_or(0);
+                group_positions.insert(g, (pos, g_fixtures.len()));
+            }
+
+            let start_addr = (f.address.saturating_sub(1)) as usize;
+            let channel_count = extract_fixture_channel_count(f);
+            let channels_to_write = channel_count.min(512usize.saturating_sub(start_addr));
+
+            let mut has_dimmer = false;
+            let mut has_color_channel = false;
+            let mut classified_channels = Vec::with_capacity(channels_to_write);
+
+            for ch in 0..channels_to_write {
+                let ch_type = match get_fixture_channel_name(f, ch) {
+                    Some(name) => classify_channel(&name),
+                    None => {
+                        if channels_to_write == 1 {
+                            ChannelType::Dimmer
+                        } else {
+                            ChannelType::Other
+                        }
+                    }
+                };
+                if ch_type == ChannelType::Dimmer {
+                    has_dimmer = true;
+                }
+                if matches!(
+                    ch_type,
+                    ChannelType::Red
+                        | ChannelType::Green
+                        | ChannelType::Blue
+                        | ChannelType::White
+                        | ChannelType::Amber
+                        | ChannelType::Cyan
+                        | ChannelType::Magenta
+                        | ChannelType::Yellow
+                        | ChannelType::UV
+                ) {
+                    has_color_channel = true;
+                }
+                classified_channels.push(ch_type);
+            }
+
+            let treat_first_as_dimmer = !has_dimmer && !has_color_channel;
+
+            new_cached.push(CachedFixture {
+                id: f.id,
+                universe: f.universe as u16,
+                start_addr,
+                channels: classified_channels,
+                has_dimmer,
+                treat_first_as_dimmer,
+                groups: f.groups.clone(),
+                primary_group_id,
+                group_positions,
+            });
+
+            new_keys.push(FixtureCacheKey {
+                id: f.id,
+                groups: f.groups.clone(),
+                universe: f.universe,
+                address: f.address,
+                mode: f.mode.clone(),
+            });
+        }
+
+        self.cached_fixtures = new_cached;
+        self.cached_keys = new_keys;
+    }
+
+    pub fn compute_dmx(&mut self, show_data: &ShowData) {
+        for buf in self.universe_buffers.values_mut() {
+            buf.fill(0);
+        }
+
+        self.ensure_fixtures_cache(show_data);
+
+        let elapsed = self.start_time.elapsed().as_secs_f32();
+        let cached_fixtures = std::mem::take(&mut self.cached_fixtures);
+
+        for fixture in &cached_fixtures {
+            let primary_group_id = fixture.primary_group_id;
 
             let group_effect_state = self.get_group_effect(primary_group_id);
             let global_effect_state = self.get_group_effect(0);
@@ -414,24 +538,15 @@ impl LiveEngine {
                     (0, global_color_effect_state)
                 };
 
-            let empty_vec = Vec::new();
-            let group_fixtures = group_fixture_map
+            let (local_index, group_count) = *fixture
+                .group_positions
                 .get(&active_group_id)
-                .unwrap_or(&empty_vec);
-            let local_index = group_fixtures
-                .iter()
-                .position(|&id| id == fixture.id)
-                .unwrap_or(0);
-            let group_count = group_fixtures.len();
+                .unwrap_or(&(0, 1));
 
-            let color_group_fixtures = group_fixture_map
+            let (color_local_index, color_group_count) = *fixture
+                .group_positions
                 .get(&active_color_group_id)
-                .unwrap_or(&empty_vec);
-            let color_local_index = color_group_fixtures
-                .iter()
-                .position(|&id| id == fixture.id)
-                .unwrap_or(0);
-            let color_group_count = color_group_fixtures.len();
+                .unwrap_or(&(0, 1));
 
             self.compute_fixture_dmx(
                 fixture,
@@ -441,10 +556,11 @@ impl LiveEngine {
                 color_local_index,
                 color_group_count,
                 &color_effect_state,
-                primary_group_id,
                 elapsed,
             );
         }
+
+        self.cached_fixtures = cached_fixtures;
 
         for (&(universe, channel), &val) in &self.manual_channels {
             if universe >= 1 && (1..=512).contains(&channel) {
@@ -463,20 +579,16 @@ impl LiveEngine {
     #[allow(clippy::too_many_arguments)]
     fn compute_fixture_dmx(
         &mut self,
-        fixture: &PatchedFixture,
+        fixture: &CachedFixture,
         local_index: usize,
         group_count: usize,
         effect_state: &GroupEffectState,
         color_local_index: usize,
         color_group_count: usize,
         color_effect_state: &GroupEffectState,
-        primary_group_id: u32,
         elapsed: f32,
     ) {
-        let u = fixture.universe as u16;
-        let start_addr = (fixture.address.saturating_sub(1)) as usize;
-
-        if start_addr >= 512 {
+        if fixture.start_addr >= 512 {
             return;
         }
 
@@ -497,7 +609,7 @@ impl LiveEngine {
         }) || self.is_flash_active(0, "randomStrobe")
             || self.is_flash_active(0, "random_strobe");
 
-        let group_master = self.get_group_master(primary_group_id) as f32 / 100.0;
+        let group_master = self.get_group_master(fixture.primary_group_id) as f32 / 100.0;
         let global_master = self.get_group_master(0) as f32 / 100.0;
         let master_multiplier = group_master * global_master;
 
@@ -529,14 +641,12 @@ impl LiveEngine {
             0
         };
 
-        let channel_count = extract_fixture_channel_count(fixture);
-        let channels_to_write = channel_count.min(512 - start_addr);
-
         let selected_color_str = fixture
             .groups
             .iter()
             .find_map(|&g| self.get_group_color(g))
-            .or_else(|| self.get_group_color(0));
+            .or_else(|| self.get_group_color(0))
+            .or(Some("white"));
 
         let current_rgb_f = self.get_fixture_current_rgb_f32(fixture.id, selected_color_str);
 
@@ -581,32 +691,21 @@ impl LiveEngine {
             0
         };
 
-        let buf = match self.universe_buffers.get_mut(&u) {
+        let buf = match self.universe_buffers.get_mut(&fixture.universe) {
             Some(b) => b,
             None => return,
         };
 
-        let mut has_dimmer = false;
-        let mut has_color_channel = false;
-        let mut classified_channels = Vec::with_capacity(channels_to_write);
+        let intensity_factor = (intensity_level as f32) / 255.0;
 
-        for ch in 0..channels_to_write {
-            let ch_type = match get_fixture_channel_name(fixture, ch) {
-                Some(name) => classify_channel(&name),
-                None => {
-                    if channels_to_write == 1 {
-                        ChannelType::Dimmer
-                    } else {
-                        ChannelType::Other
-                    }
-                }
-            };
-            if ch_type == ChannelType::Dimmer {
-                has_dimmer = true;
-            }
-            if matches!(
-                ch_type,
-                ChannelType::Red
+        for (ch, &ch_type) in fixture.channels.iter().enumerate() {
+            let ch_idx = fixture.start_addr + ch;
+
+            if is_in_flash_group {
+                // White Flash: Dimmer AND Color channels set to 255 (Full White)
+                match ch_type {
+                    ChannelType::Dimmer
+                    | ChannelType::Red
                     | ChannelType::Green
                     | ChannelType::Blue
                     | ChannelType::White
@@ -614,27 +713,17 @@ impl LiveEngine {
                     | ChannelType::Cyan
                     | ChannelType::Magenta
                     | ChannelType::Yellow
-                    | ChannelType::UV
-            ) {
-                has_color_channel = true;
-            }
-            classified_channels.push(ch_type);
-        }
-
-        let treat_first_as_dimmer = !has_dimmer && !has_color_channel;
-        let intensity_factor = (intensity_level as f32) / 255.0;
-
-        for (ch, ch_type) in classified_channels.into_iter().enumerate() {
-            let ch_idx = start_addr + ch;
-
-            if is_in_flash_group {
-                // White Flash: Dimmer AND Color channels set to 255 (Full White)
-                buf[ch_idx] = 255;
+                    | ChannelType::UV => buf[ch_idx] = 255,
+                    ChannelType::Other if ch == 0 && fixture.treat_first_as_dimmer => {
+                        buf[ch_idx] = 255
+                    }
+                    _ => {}
+                }
             } else if is_in_strobe_group || is_in_random_strobe_group {
                 match ch_type {
                     ChannelType::Dimmer => buf[ch_idx] = strobe_val,
                     ChannelType::Red => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             if strobe_val > 0 {
                                 r
                             } else {
@@ -645,7 +734,7 @@ impl LiveEngine {
                         };
                     }
                     ChannelType::Green => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             if strobe_val > 0 {
                                 g
                             } else {
@@ -656,7 +745,7 @@ impl LiveEngine {
                         };
                     }
                     ChannelType::Blue => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             if strobe_val > 0 {
                                 b
                             } else {
@@ -667,7 +756,7 @@ impl LiveEngine {
                         };
                     }
                     ChannelType::White => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             if strobe_val > 0 {
                                 w
                             } else {
@@ -679,7 +768,7 @@ impl LiveEngine {
                     }
                     ChannelType::Strobe => buf[ch_idx] = strobe_val,
                     _ => {
-                        if ch == 0 && treat_first_as_dimmer {
+                        if ch == 0 && fixture.treat_first_as_dimmer {
                             buf[ch_idx] = strobe_val;
                         } else {
                             buf[ch_idx] = 0;
@@ -690,28 +779,28 @@ impl LiveEngine {
                 match ch_type {
                     ChannelType::Dimmer => buf[ch_idx] = intensity_level,
                     ChannelType::Red => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             r
                         } else {
                             ((r as f32) * intensity_factor).clamp(0.0, 255.0) as u8
                         };
                     }
                     ChannelType::Green => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             g
                         } else {
                             ((g as f32) * intensity_factor).clamp(0.0, 255.0) as u8
                         };
                     }
                     ChannelType::Blue => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             b
                         } else {
                             ((b as f32) * intensity_factor).clamp(0.0, 255.0) as u8
                         };
                     }
                     ChannelType::White => {
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             w
                         } else {
                             ((w as f32) * intensity_factor).clamp(0.0, 255.0) as u8
@@ -719,7 +808,7 @@ impl LiveEngine {
                     }
                     ChannelType::Amber => {
                         let a = if r > 200 && g > 100 && b < 50 { 255 } else { 0 };
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             a
                         } else {
                             ((a as f32) * intensity_factor).clamp(0.0, 255.0) as u8
@@ -727,7 +816,7 @@ impl LiveEngine {
                     }
                     ChannelType::Cyan => {
                         let c = if g > 200 && b > 200 && r < 50 { 255 } else { 0 };
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             c
                         } else {
                             ((c as f32) * intensity_factor).clamp(0.0, 255.0) as u8
@@ -735,7 +824,7 @@ impl LiveEngine {
                     }
                     ChannelType::Magenta => {
                         let m = if r > 200 && b > 200 && g < 50 { 255 } else { 0 };
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             m
                         } else {
                             ((m as f32) * intensity_factor).clamp(0.0, 255.0) as u8
@@ -743,7 +832,7 @@ impl LiveEngine {
                     }
                     ChannelType::Yellow => {
                         let y = if r > 200 && g > 200 && b < 50 { 255 } else { 0 };
-                        buf[ch_idx] = if has_dimmer {
+                        buf[ch_idx] = if fixture.has_dimmer {
                             y
                         } else {
                             ((y as f32) * intensity_factor).clamp(0.0, 255.0) as u8
@@ -756,7 +845,7 @@ impl LiveEngine {
                         buf[ch_idx] = 0;
                     }
                     ChannelType::Other => {
-                        if ch == 0 && treat_first_as_dimmer {
+                        if ch == 0 && fixture.treat_first_as_dimmer {
                             buf[ch_idx] = intensity_level;
                         } else {
                             buf[ch_idx] = 0;

@@ -44,6 +44,7 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
           <tr>
             <td>
               <ToggleButton
+                aria-label="Fade order left"
                 :model-value="colorFadeOrder === 'left'"
                 color="secondary"
                 @update:model-value="handleOrderSelect('left', $event)"
@@ -55,6 +56,7 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
           <tr>
             <td>
               <ToggleButton
+                aria-label="Fade order right"
                 :model-value="colorFadeOrder === 'right'"
                 color="secondary"
                 @update:model-value="handleOrderSelect('right', $event)"
@@ -66,6 +68,7 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
           <tr>
             <td>
               <ToggleButton
+                aria-label="Fade order wing"
                 :model-value="colorFadeOrder === 'wing'"
                 color="secondary"
                 @update:model-value="handleOrderSelect('wing', $event)"

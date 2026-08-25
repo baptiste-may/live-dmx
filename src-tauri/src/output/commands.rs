@@ -184,11 +184,9 @@ pub fn set_dmx_data(
     data: Vec<u8>,
 ) -> Result<(), String> {
     let mut live = state.output.engine.lock().map_err(|e| e.to_string())?;
-    for (idx, &val) in data.iter().enumerate() {
-        let ch = (idx + 1) as u16;
-        if ch <= 512 {
-            live.manual_channels.insert((universe, ch), val);
-        }
+    for (idx, &val) in data.iter().take(512).enumerate() {
+        live.manual_channels
+            .insert((universe, (idx + 1) as u16), val);
     }
     Ok(())
 }
