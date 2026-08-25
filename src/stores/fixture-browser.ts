@@ -7,12 +7,25 @@ import type { Manufacturers } from "@/types/fixtures";
 
 import { ToastType, useToastStore } from "./toast.ts";
 
+export type FixtureDownloadProgressPayload = {
+  percentage: number;
+  status: string;
+};
+
 export type FixtureLoadProgressPayload = {
   current: number;
   total: number;
   percentage: number;
   manufacturer: string;
 };
+
+export async function checkFixturesInstalled(): Promise<boolean> {
+  try {
+    return await invoke<boolean>("check_fixtures_installed");
+  } catch {
+    return false;
+  }
+}
 
 export async function loadManufacturers(query?: string): Promise<Manufacturers> {
   try {
@@ -31,12 +44,15 @@ export type FixtureBrowser = {
   searchQuery: string;
   filteredManufacturers: Manufacturers;
   isLoading: boolean;
+  isInstalled: boolean | null;
+  isDownloading: boolean;
   progress: number;
   loadingStatus: string;
   searchId: number;
 };
 
 let unlistenProgress: (() => void) | null = null;
+let unlistenDownloadProgress: (() => void) | null = null;
 
 export const useFixtureBrowser = defineStore("fixture-browser", {
   state: (): FixtureBrowser => ({
@@ -44,6 +60,8 @@ export const useFixtureBrowser = defineStore("fixture-browser", {
     searchQuery: "",
     filteredManufacturers: markRaw({}),
     isLoading: true,
+    isInstalled: null,
+    isDownloading: false,
     progress: 0,
     loadingStatus: "Loading fixtures...",
     searchId: 0,
@@ -64,6 +82,55 @@ export const useFixtureBrowser = defineStore("fixture-browser", {
         );
       } catch {
         // Ignored in non-Tauri / test environments
+      }
+    },
+    async initDownloadEventListener() {
+      if (unlistenDownloadProgress) {
+        unlistenDownloadProgress();
+        unlistenDownloadProgress = null;
+      }
+      try {
+        unlistenDownloadProgress = await listen<FixtureDownloadProgressPayload>(
+          "fixture-download-progress",
+          (event) => {
+            this.progress = event.payload.percentage;
+            this.loadingStatus = event.payload.status;
+          },
+        );
+      } catch {
+        // Ignored in non-Tauri / test environments
+      }
+    },
+    async checkInstalled() {
+      const installed = await checkFixturesInstalled();
+      this.isInstalled = installed;
+      return installed;
+    },
+    async init() {
+      const installed = await this.checkInstalled();
+      if (installed) {
+        if (this.manufacturers === undefined) {
+          await this.search();
+        }
+      } else {
+        this.isLoading = false;
+      }
+    },
+    async downloadFixtures() {
+      this.isDownloading = true;
+      this.progress = 0;
+      this.loadingStatus = "Starting download...";
+
+      await this.initDownloadEventListener();
+
+      try {
+        await invoke("download_fixtures");
+        this.isInstalled = true;
+        this.isDownloading = false;
+        await this.search();
+      } catch (error: unknown) {
+        this.isDownloading = false;
+        useToastStore().addToast(`Failed to download fixtures: ${String(error)}`, ToastType.ERROR);
       }
     },
     async search(query?: string) {

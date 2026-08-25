@@ -40,7 +40,7 @@ Welcome to the `live-dmx` project. This document provides essential information 
   - `src/fixtures/`: Rust logic for handling fixture data and caching.
   - `src/show/`: Show management, patch batching, and history tracking.
   - `src/output/`: Art-Net output implementation.
-- `fixtures/`: JSON data files for lighting fixtures (downloaded automatically at build time, not committed to repo).
+- `fixtures/`: JSON data files for lighting fixtures (cached in OS AppData directory, or downloaded for development via `download-fixtures.ts`).
 - `download-fixtures.ts`: Script to download fixtures from the Open Fixture Library.
 
 ## Coding Standards & Conventions
@@ -82,9 +82,10 @@ Welcome to the `live-dmx` project. This document provides essential information 
 The application relies on fixture definitions from the Open Fixture Library (OFL).
 
 - Fixtures are stored and cached in the native OS AppData directory (`<app_data_dir>/fixtures/`).
-- If missing on startup, the Rust backend automatically downloads `https://open-fixture-library.org/download.ofl` and extracts it into the AppData directory once.
+- When the fixture browser is opened and fixtures are not yet installed in AppData, the user is prompted to download the Open Fixture Library on-demand (`download_fixtures` command).
+- Once downloaded or when already present, the backend loads and parses them on-demand (`get_fixtures` command) with progress reporting.
 - New fixtures should be contributed directly to the [Open Fixture Library](https://github.com/OpenLightingProject/open-fixture-library).
-- Refer to `src/lib/fixture-types.ts` for the expected structure of fixture definitions.
+- Refer to `src/types/fixtures.ts` for the expected structure of fixture definitions.
 
 ## Working with Art-Net
 

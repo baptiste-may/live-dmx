@@ -1,18 +1,42 @@
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
-use std::sync::OnceLock;
-use tauri::Manager;
+use std::io::Read;
+use std::sync::RwLock;
+use tauri::{Emitter, Manager};
 
 use super::types::{
-    Fixture, FixtureLoadProgress, Fixtures, Manufacturer, ManufacturerParsed, RawFixture,
+    Fixture, FixtureDownloadProgress, FixtureLoadProgress, Fixtures, Manufacturer,
+    ManufacturerParsed, RawFixture,
 };
 
-pub static CACHED_FIXTURES: OnceLock<Fixtures> = OnceLock::new();
+pub static CACHED_FIXTURES: RwLock<Option<Fixtures>> = RwLock::new(None);
 
-pub fn download_and_extract_ofl_fixtures(target_dir: &std::path::Path) -> Result<(), String> {
+pub fn check_fixtures_installed_sync(app: &tauri::AppHandle) -> Result<bool, String> {
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {:?}", e))?;
+    let manufacturers_path = app_data.join("fixtures").join("manufacturers.json");
+    Ok(manufacturers_path.exists())
+}
+
+pub fn download_and_extract_ofl_fixtures(
+    app: Option<&tauri::AppHandle>,
+    target_dir: &std::path::Path,
+) -> Result<(), String> {
     const FIXTURES_URL: &str = "https://open-fixture-library.org/download.ofl";
     const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
+
+    if let Some(app) = app {
+        let _ = app.emit(
+            "fixture-download-progress",
+            FixtureDownloadProgress {
+                percentage: 0,
+                status: "Connecting to Open Fixture Library...".to_string(),
+            },
+        );
+    }
 
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(std::time::Duration::from_secs(15))
@@ -24,10 +48,54 @@ pub fn download_and_extract_ofl_fixtures(target_dir: &std::path::Path) -> Result
         .call()
         .map_err(|e| format!("Failed to download fixtures from OFL: {}", e))?;
 
-    let mut reader = std::io::Read::take(response.into_reader(), MAX_ARCHIVE_BYTES);
+    let content_length: Option<u64> = response
+        .header("Content-Length")
+        .and_then(|v| v.parse().ok());
+
+    let mut reader = Read::take(response.into_reader(), MAX_ARCHIVE_BYTES);
     let mut buffer = Vec::new();
-    std::io::copy(&mut reader, &mut buffer)
-        .map_err(|e| format!("Failed to read downloaded fixtures zip: {}", e))?;
+    let mut chunk = [0u8; 64 * 1024];
+    let mut downloaded_bytes = 0u64;
+
+    loop {
+        let bytes_read = reader
+            .read(&mut chunk)
+            .map_err(|e| format!("Failed to read downloaded fixtures zip: {}", e))?;
+        if bytes_read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..bytes_read]);
+        downloaded_bytes += bytes_read as u64;
+
+        if let Some(app) = app {
+            let pct = if let Some(total) = content_length {
+                if total > 0 {
+                    ((downloaded_bytes as f64 / total as f64) * 50.0).round() as u8
+                } else {
+                    25
+                }
+            } else {
+                25
+            };
+            let _ = app.emit(
+                "fixture-download-progress",
+                FixtureDownloadProgress {
+                    percentage: pct.min(50),
+                    status: "Downloading fixtures...".to_string(),
+                },
+            );
+        }
+    }
+
+    if let Some(app) = app {
+        let _ = app.emit(
+            "fixture-download-progress",
+            FixtureDownloadProgress {
+                percentage: 50,
+                status: "Extracting fixtures...".to_string(),
+            },
+        );
+    }
 
     let cursor = std::io::Cursor::new(buffer);
     let mut archive = zip::ZipArchive::new(cursor)
@@ -38,9 +106,133 @@ pub fn download_and_extract_ofl_fixtures(target_dir: &std::path::Path) -> Result
             .map_err(|e| format!("Failed to create fixtures directory: {}", e))?;
     }
 
-    archive
-        .extract(target_dir)
-        .map_err(|e| format!("Failed to extract fixtures zip: {}", e))?;
+    const MAX_EXTRACTED_BYTES: u64 = 512 * 1024 * 1024;
+    let mut total_extracted_bytes = 0u64;
+
+    let total_files = archive.len();
+    for i in 0..total_files {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("Failed to read entry from zip: {}", e))?;
+
+        let outpath = match file.enclosed_name() {
+            Some(path) => target_dir.join(path),
+            None => continue,
+        };
+
+        if file.is_dir() {
+            fs::create_dir_all(&outpath)
+                .map_err(|e| format!("Failed to create directory {:?}: {}", outpath, e))?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    fs::create_dir_all(p)
+                        .map_err(|e| format!("Failed to create directory {:?}: {}", p, e))?;
+                }
+            }
+            let mut outfile = fs::File::create(&outpath)
+                .map_err(|e| format!("Failed to create file {:?}: {}", outpath, e))?;
+
+            let remaining_budget = MAX_EXTRACTED_BYTES.saturating_sub(total_extracted_bytes);
+            let mut entry_reader = Read::take(&mut file, remaining_budget + 1);
+            let copied = std::io::copy(&mut entry_reader, &mut outfile)
+                .map_err(|e| format!("Failed to write file {:?}: {}", outpath, e))?;
+
+            if copied > remaining_budget {
+                return Err(
+                    "Extracted fixtures archive exceeded maximum allowed size limit".to_string(),
+                );
+            }
+            total_extracted_bytes += copied;
+        }
+
+        if let Some(app) = app {
+            let extract_pct = if total_files > 0 {
+                ((i + 1) as f64 / total_files as f64 * 50.0).round() as u8
+            } else {
+                50
+            };
+            let _ = app.emit(
+                "fixture-download-progress",
+                FixtureDownloadProgress {
+                    percentage: 50 + extract_pct,
+                    status: "Extracting fixtures...".to_string(),
+                },
+            );
+        }
+    }
+
+    if let Some(app) = app {
+        let _ = app.emit(
+            "fixture-download-progress",
+            FixtureDownloadProgress {
+                percentage: 100,
+                status: "Download complete".to_string(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+static FIXTURE_DOWNLOAD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+pub fn download_fixtures_sync(app: &tauri::AppHandle) -> Result<(), String> {
+    let _download_guard = FIXTURE_DOWNLOAD_LOCK.lock().map_err(|e| e.to_string())?;
+
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {:?}", e))?;
+    let app_data_fixtures = app_data.join("fixtures");
+    let staging_dir = app_data.join(format!("fixtures_staging_{}", std::process::id()));
+
+    if staging_dir.exists() {
+        let _ = fs::remove_dir_all(&staging_dir);
+    }
+
+    let download_result = download_and_extract_ofl_fixtures(Some(app), &staging_dir);
+
+    if let Err(e) = download_result {
+        if staging_dir.exists() {
+            let _ = fs::remove_dir_all(&staging_dir);
+        }
+        return Err(e);
+    }
+
+    if !staging_dir.join("manufacturers.json").exists() {
+        if staging_dir.exists() {
+            let _ = fs::remove_dir_all(&staging_dir);
+        }
+        return Err(
+            "Extracted fixtures archive is invalid: manufacturers.json not found".to_string(),
+        );
+    }
+
+    let backup_dir = app_data.join(format!("fixtures_backup_{}", std::process::id()));
+    if backup_dir.exists() {
+        let _ = fs::remove_dir_all(&backup_dir);
+    }
+
+    if app_data_fixtures.exists() {
+        fs::rename(&app_data_fixtures, &backup_dir)
+            .map_err(|e| format!("Failed to move old fixtures directory: {}", e))?;
+    }
+
+    if let Err(e) = fs::rename(&staging_dir, &app_data_fixtures) {
+        if backup_dir.exists() {
+            let _ = fs::rename(&backup_dir, &app_data_fixtures);
+        }
+        return Err(format!("Failed to activate new fixtures directory: {}", e));
+    }
+
+    if backup_dir.exists() {
+        let _ = fs::remove_dir_all(&backup_dir);
+    }
+
+    if let Ok(mut write_guard) = CACHED_FIXTURES.write() {
+        *write_guard = None;
+    }
 
     Ok(())
 }
@@ -56,13 +248,10 @@ pub fn resolve_fixtures_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf
         return Ok(app_data_fixtures);
     }
 
-    download_and_extract_ofl_fixtures(&app_data_fixtures)?;
-    Ok(app_data_fixtures)
+    Err("Fixtures directory does not exist or manufacturers.json is missing".to_string())
 }
 
 pub fn load_fixtures_sync(app: &tauri::AppHandle) -> Result<Fixtures, String> {
-    use tauri::Emitter;
-
     let fixtures_dir = resolve_fixtures_dir(app)?;
 
     let manufacturers_file_path = fixtures_dir.join("manufacturers.json");

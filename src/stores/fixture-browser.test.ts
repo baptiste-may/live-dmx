@@ -65,4 +65,68 @@ describe("fixture-browser store", () => {
     expect(fixture).not.toBeNull();
     expect(fixture?.name).toBe("SlimPAR 64");
   });
+
+  it("should check if fixtures are installed", async () => {
+    mockInvoke.mockResolvedValue(true);
+    const store = useFixtureBrowser();
+
+    const result = await store.checkInstalled();
+    expect(result).toBe(true);
+    expect(store.isInstalled).toBe(true);
+    expect(mockInvoke).toHaveBeenCalledWith("check_fixtures_installed");
+  });
+
+  it("should initialize by searching if fixtures are installed", async () => {
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "check_fixtures_installed") return true;
+      if (cmd === "get_fixtures") return mockFixturesData;
+      return {};
+    });
+
+    const store = useFixtureBrowser();
+    await store.init();
+
+    expect(store.isInstalled).toBe(true);
+    expect(store.isLoading).toBe(false);
+    expect(store.manufacturers).toEqual(mockFixturesData);
+  });
+
+  it("should initialize by setting isLoading false if fixtures are not installed", async () => {
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "check_fixtures_installed") return false;
+      return {};
+    });
+
+    const store = useFixtureBrowser();
+    await store.init();
+
+    expect(store.isInstalled).toBe(false);
+    expect(store.isLoading).toBe(false);
+    expect(store.manufacturers).toBeUndefined();
+  });
+
+  it("should download fixtures and then search", async () => {
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "download_fixtures") return undefined;
+      if (cmd === "get_fixtures") return mockFixturesData;
+      return {};
+    });
+
+    const store = useFixtureBrowser();
+    await store.downloadFixtures();
+
+    expect(mockInvoke).toHaveBeenCalledWith("download_fixtures");
+    expect(store.isInstalled).toBe(true);
+    expect(store.isDownloading).toBe(false);
+    expect(store.manufacturers).toEqual(mockFixturesData);
+  });
+
+  it("should handle error when downloadFixtures fails", async () => {
+    mockInvoke.mockRejectedValue(new Error("Network connection error"));
+
+    const store = useFixtureBrowser();
+    await store.downloadFixtures();
+
+    expect(store.isDownloading).toBe(false);
+  });
 });

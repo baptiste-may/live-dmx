@@ -526,6 +526,13 @@ pub struct ManufacturerParsed {
     pub rdm_id: Option<u16>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FixtureDownloadProgress {
+    pub percentage: u8,
+    pub status: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FixtureLoadProgress {

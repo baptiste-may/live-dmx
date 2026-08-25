@@ -1,8 +1,23 @@
 use live_dmx_lib::fixtures::{
-    Capability, ChannelRef, Fixture, FixtureLinks, FixtureMeta, FixturePhysical, FixtureWheel,
-    GoboReference, ManufacturerParsed, Mode, NumberOrString, RawFixture, StringOrBool,
-    StringOrVecString,
+    Capability, ChannelRef, Fixture, FixtureDownloadProgress, FixtureLinks, FixtureMeta,
+    FixturePhysical, FixtureWheel, GoboReference, ManufacturerParsed, Mode, NumberOrString,
+    RawFixture, StringOrBool, StringOrVecString,
 };
+
+#[test]
+fn test_fixture_download_progress_serialization() {
+    let progress = FixtureDownloadProgress {
+        percentage: 42,
+        status: "Downloading fixtures...".to_string(),
+    };
+    let json = serde_json::to_string(&progress).unwrap();
+    assert_eq!(
+        json,
+        r#"{"percentage":42,"status":"Downloading fixtures..."}"#
+    );
+    let parsed: FixtureDownloadProgress = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed, progress);
+}
 
 #[test]
 fn test_number_or_string_enum() {

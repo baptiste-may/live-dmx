@@ -1,7 +1,7 @@
 pub mod fixtures;
 pub mod show;
 
-use fixtures::get_fixtures;
+use fixtures::{check_fixtures_installed, download_fixtures, get_fixtures};
 use show::{
     get_recent_shows, remove_recent_show, save_recent_show, show_create, show_get_data,
     show_group_create, show_group_remove, show_group_rename, show_identity_update, show_load,
@@ -20,6 +20,8 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            check_fixtures_installed,
+            download_fixtures,
             get_fixtures,
             get_recent_shows,
             save_recent_show,
