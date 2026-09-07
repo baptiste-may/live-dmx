@@ -3,13 +3,14 @@ import { Button } from "daisy-ui-kit";
 import { CheckIcon } from "lucide-vue-next";
 import type { Component } from "vue";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     color?: string;
     cell?: boolean;
     label?: string;
     icon?: Component;
     size?: "xs" | "sm" | "md" | "lg" | "xl";
+    mode?: "toggle" | "momentary";
   }>(),
   {
     color: undefined,
@@ -17,10 +18,49 @@ withDefaults(
     label: undefined,
     icon: undefined,
     size: undefined,
+    mode: "toggle",
   },
 );
 
 const modelValue = defineModel<boolean>({ default: false });
+
+function handleClick() {
+  if (props.mode !== "momentary") {
+    modelValue.value = !modelValue.value;
+  }
+}
+
+function handlePointerDown() {
+  if (props.mode === "momentary") {
+    modelValue.value = true;
+  }
+}
+
+function handlePointerUp() {
+  if (props.mode === "momentary") {
+    modelValue.value = false;
+  }
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (
+    props.mode === "momentary" &&
+    (event.code === "Space" || event.key === " " || event.key === "Enter")
+  ) {
+    event.preventDefault();
+    modelValue.value = true;
+  }
+}
+
+function handleKeyUp(event: KeyboardEvent) {
+  if (
+    props.mode === "momentary" &&
+    (event.code === "Space" || event.key === " " || event.key === "Enter")
+  ) {
+    event.preventDefault();
+    modelValue.value = false;
+  }
+}
 </script>
 
 <template>
@@ -34,7 +74,13 @@ const modelValue = defineModel<boolean>({ default: false });
     class="rounded-lg border-0"
     :class="[cell && !color ? 'bg-warning' : '']"
     :style="cell && color ? { backgroundColor: color } : undefined"
-    @click="modelValue = !modelValue"
+    @click="handleClick"
+    @mousedown="handlePointerDown"
+    @mouseup="handlePointerUp"
+    @mouseleave="handlePointerUp"
+    @keydown="handleKeyDown"
+    @keyup="handleKeyUp"
+    @blur="handlePointerUp"
   >
     <template v-if="cell">
       <CheckIcon v-if="modelValue" class="h-6 w-6" :stroke-width="4" />

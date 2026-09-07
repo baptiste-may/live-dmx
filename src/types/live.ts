@@ -16,9 +16,7 @@ import {
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
-import FourIcon from "@/components/icons/FourIcon.vue";
-import ThreeIcon from "@/components/icons/ThreeIcon.vue";
-import TwoIcon from "@/components/icons/TwoIcon.vue";
+import { FourIcon, ThreeIcon, TwoIcon } from "@/components/icons";
 
 export type FlashType = "simple" | "white" | "strobe" | "randomStrobe" | "master";
 

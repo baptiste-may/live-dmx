@@ -4,7 +4,7 @@ import { computed } from "vue";
 
 import { useShowGroups } from "@/stores/show/show-groups";
 import type { PatchedFixture } from "@/types/patch";
-import PatchGroupsTableForm from "@/views/patch/groups/table/PatchGroupsTableForm.vue";
+import PatchGroupsTableActions from "@/views/patch/groups/table/PatchGroupsTableActions.vue";
 
 const patchNumberFormat = new Intl.NumberFormat(undefined, {
   minimumIntegerDigits: 3,
@@ -42,7 +42,7 @@ const groupsData = computed(() => patch.groups.map((groupId) => showGroups.get(g
       </Badge>
     </td>
     <td>
-      <PatchGroupsTableForm :selected-fixtures="[patch.id]" />
+      <PatchGroupsTableActions :selected-fixtures="[patch.id]" />
     </td>
   </tr>
 </template>

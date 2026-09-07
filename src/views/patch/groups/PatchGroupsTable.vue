@@ -4,8 +4,8 @@ import { computed } from "vue";
 
 import { usePatchGroups } from "@/stores/patch/patch-groups";
 import { useShowPatch } from "@/stores/show/show-patch";
-import PatchGroupsTableForm from "@/views/patch/groups/table/PatchGroupsTableForm.vue";
-import PatchGroupsTableModal from "@/views/patch/groups/table/PatchGroupsTableModal.vue";
+import PatchGroupsEditModal from "@/views/patch/groups/PatchGroupsEditModal.vue";
+import PatchGroupsTableActions from "@/views/patch/groups/table/PatchGroupsTableActions.vue";
 import PatchGroupsTableRow from "@/views/patch/groups/table/PatchGroupsTableRow.vue";
 
 const showPatch = useShowPatch();
@@ -23,23 +23,23 @@ const isAllSelected = computed(() => {
   return displayedFixtures.value.every((f) => patchGroups.table.selectedFixtures.includes(f.id));
 });
 
+function toggleFixtureInSelection(set: Set<number>, id: number, checked: boolean) {
+  if (checked) {
+    set.add(id);
+  } else {
+    set.delete(id);
+  }
+}
+
 function handleToggleSelectAll(checked: boolean) {
   const selectedSet = new Set(patchGroups.table.selectedFixtures);
-  if (checked) {
-    displayedFixtures.value.forEach((f) => selectedSet.add(f.id));
-  } else {
-    displayedFixtures.value.forEach((f) => selectedSet.delete(f.id));
-  }
+  displayedFixtures.value.forEach((f) => toggleFixtureInSelection(selectedSet, f.id, checked));
   patchGroups.table.selectedFixtures = Array.from(selectedSet);
 }
 
 function handleUpdateSelection(fixtureId: number, checked: boolean) {
   const selectedSet = new Set(patchGroups.table.selectedFixtures);
-  if (checked) {
-    selectedSet.add(fixtureId);
-  } else {
-    selectedSet.delete(fixtureId);
-  }
+  toggleFixtureInSelection(selectedSet, fixtureId, checked);
   patchGroups.table.selectedFixtures = Array.from(selectedSet);
 }
 </script>
@@ -65,7 +65,7 @@ function handleUpdateSelection(fixtureId: number, checked: boolean) {
             <th>Patch</th>
             <th>Groups</th>
             <th>
-              <PatchGroupsTableForm :selected-fixtures="patchGroups.table.selectedFixtures" />
+              <PatchGroupsTableActions :selected-fixtures="patchGroups.table.selectedFixtures" />
             </th>
           </tr>
         </thead>
@@ -81,5 +81,5 @@ function handleUpdateSelection(fixtureId: number, checked: boolean) {
       </Table>
     </div>
   </div>
-  <PatchGroupsTableModal />
+  <PatchGroupsEditModal />
 </template>

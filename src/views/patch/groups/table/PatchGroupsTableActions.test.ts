@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import { usePatchGroups } from "@/stores/patch/patch-groups.ts";
 
-import PatchGroupsTableForm from "./PatchGroupsTableForm.vue";
+import PatchGroupsTableActions from "./PatchGroupsTableActions.vue";
 
-describe("PatchGroupsTableForm.vue", () => {
+describe("PatchGroupsTableActions.vue", () => {
   it("should disable buttons when no fixtures are selected", () => {
-    render(PatchGroupsTableForm, {
+    render(PatchGroupsTableActions, {
       props: {
         selectedFixtures: [],
       },
@@ -21,7 +21,7 @@ describe("PatchGroupsTableForm.vue", () => {
 
   it("should open edit modal when configure button is clicked", async () => {
     const user = userEvent.setup();
-    render(PatchGroupsTableForm, {
+    render(PatchGroupsTableActions, {
       props: {
         selectedFixtures: [1, 2],
       },

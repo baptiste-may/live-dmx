@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import { usePatchGroups } from "@/stores/patch/patch-groups.ts";
 
-import PatchGroupsTableModal from "./PatchGroupsTableModal.vue";
+import PatchGroupsEditModal from "./PatchGroupsEditModal.vue";
 
-describe("PatchGroupsTableModal.vue", () => {
+describe("PatchGroupsEditModal.vue", () => {
   it("should not render modal when modal.isOpen is false", () => {
-    render(PatchGroupsTableModal);
+    render(PatchGroupsEditModal);
 
     expect(screen.queryByText(/Edit/)).not.toBeInTheDocument();
   });
@@ -20,7 +20,7 @@ describe("PatchGroupsTableModal.vue", () => {
     patchGroups.table.modal.isOpen = true;
     patchGroups.table.modal.nameInput = "Updated Fixtures";
 
-    render(PatchGroupsTableModal);
+    render(PatchGroupsEditModal);
 
     expect(screen.getByText(/Edit 2 fixtures/)).toBeInTheDocument();
 

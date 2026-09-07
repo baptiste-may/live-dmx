@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen } from "@testing-library/vue";
+import { fireEvent, render, screen } from "@testing-library/vue";
 import { SunIcon } from "lucide-vue-next";
 import { describe, expect, it } from "vitest";
 
@@ -152,5 +152,22 @@ describe("ToggleButton.vue", () => {
     const button = screen.getByRole("button", { name: "Fallback Cell" });
     expect(button).toBeInTheDocument();
     expect(button).toHaveClass("bg-warning");
+  });
+
+  it("supports momentary mode with mousedown and mouseup", async () => {
+    const { emitted } = render(ToggleButton, {
+      props: {
+        mode: "momentary",
+        modelValue: false,
+        label: "Flash",
+      },
+    });
+
+    const button = screen.getByRole("button", { name: "Flash" });
+    await fireEvent.mouseDown(button);
+    expect(emitted("update:modelValue")).toContainEqual([true]);
+
+    await fireEvent.mouseUp(button);
+    expect(emitted("update:modelValue")).toContainEqual([false]);
   });
 });

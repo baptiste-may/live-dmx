@@ -11,7 +11,7 @@ import {
   UndoIcon,
   XIcon,
 } from "lucide-vue-next";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 import TextForm from "@/components/inputs/TextForm.vue";
 import { useApp } from "@/stores/app";
@@ -51,6 +51,45 @@ function handleSaveShowName(newName: string) {
 function handleCancelShowName() {
   identity.nameForm.isEditing = false;
 }
+
+const showActions = computed(() => [
+  {
+    label: "New show",
+    icon: PlusIcon,
+    disabled: false,
+    handler: () => app.createShow(),
+  },
+  {
+    label: "Open show",
+    icon: FolderOpenIcon,
+    disabled: false,
+    handler: () => app.askLoadShow(),
+  },
+  {
+    label: "Save show",
+    icon: SaveIcon,
+    disabled: !show.canSave,
+    handler: () => changes.save(),
+  },
+  {
+    label: "Undo",
+    icon: UndoIcon,
+    disabled: !show.canUndo,
+    handler: () => changes.undo(),
+  },
+  {
+    label: "Redo",
+    icon: RedoIcon,
+    disabled: !show.canRedo,
+    handler: () => changes.redo(),
+  },
+  {
+    label: "Close show",
+    icon: XIcon,
+    disabled: false,
+    handler: () => app.closeShow(),
+  },
+]);
 </script>
 
 <template>
@@ -81,93 +120,21 @@ function handleCancelShowName() {
 
     <MenuTitle v-if="!isCollapsed" class="mt-2">Show</MenuTitle>
     <MenuItem
+      v-for="action in showActions"
+      :key="action.label"
+      :disabled="action.disabled"
       :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
-      :data-tip="isCollapsed ? 'New show' : undefined"
+      :data-tip="isCollapsed ? action.label : undefined"
     >
       <button
         type="button"
+        :disabled="action.disabled"
         :class="{ 'justify-center': isCollapsed }"
-        aria-label="New show"
-        @click="app.createShow"
+        :aria-label="action.label"
+        @click="action.handler"
       >
-        <PlusIcon class="h-4 w-4 shrink-0" />
-        <span v-if="!isCollapsed">New show</span>
-      </button>
-    </MenuItem>
-    <MenuItem
-      :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
-      :data-tip="isCollapsed ? 'Open show' : undefined"
-    >
-      <button
-        type="button"
-        :class="{ 'justify-center': isCollapsed }"
-        aria-label="Open show"
-        @click="app.askLoadShow"
-      >
-        <FolderOpenIcon class="h-4 w-4 shrink-0" />
-        <span v-if="!isCollapsed">Open show</span>
-      </button>
-    </MenuItem>
-    <MenuItem
-      :disabled="!show.canSave"
-      :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
-      :data-tip="isCollapsed ? 'Save show' : undefined"
-    >
-      <button
-        type="button"
-        :disabled="!show.canSave"
-        :class="{ 'justify-center': isCollapsed }"
-        aria-label="Save show"
-        @click="() => changes.save()"
-      >
-        <SaveIcon class="h-4 w-4 shrink-0" />
-        <span v-if="!isCollapsed">Save show</span>
-      </button>
-    </MenuItem>
-    <MenuItem
-      :disabled="!show.canUndo"
-      :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
-      :data-tip="isCollapsed ? 'Undo' : undefined"
-    >
-      <button
-        type="button"
-        :disabled="!show.canUndo"
-        :class="{ 'justify-center': isCollapsed }"
-        aria-label="Undo"
-        @click="() => changes.undo()"
-      >
-        <UndoIcon class="h-4 w-4 shrink-0" />
-        <span v-if="!isCollapsed">Undo</span>
-      </button>
-    </MenuItem>
-    <MenuItem
-      :disabled="!show.canRedo"
-      :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
-      :data-tip="isCollapsed ? 'Redo' : undefined"
-    >
-      <button
-        type="button"
-        :disabled="!show.canRedo"
-        :class="{ 'justify-center': isCollapsed }"
-        aria-label="Redo"
-        @click="() => changes.redo()"
-      >
-        <RedoIcon class="h-4 w-4 shrink-0" />
-        <span v-if="!isCollapsed">Redo</span>
-      </button>
-    </MenuItem>
-    <MenuItem
-      :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
-      :data-tip="isCollapsed ? 'Close show' : undefined"
-    >
-      <button
-        type="button"
-        :class="{ 'justify-center': isCollapsed }"
-        aria-label="Close show"
-        @click="app.closeShow"
-      >
-        <XIcon class="h-4 w-4 shrink-0" />
-        <span v-if="!isCollapsed">Close show</span>
+        <component :is="action.icon" class="h-4 w-4 shrink-0" />
+        <span v-if="!isCollapsed">{{ action.label }}</span>
       </button>
     </MenuItem>
 

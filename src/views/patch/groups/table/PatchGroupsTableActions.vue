@@ -29,6 +29,7 @@ const confirmationMsg = computed(() => {
 <template>
   <Join>
     <Button
+      aria-label="Configure selected fixtures"
       sm
       join
       square
@@ -39,6 +40,7 @@ const confirmationMsg = computed(() => {
       <SlidersIcon class="h-3.5 w-3.5" />
     </Button>
     <Button
+      aria-label="Delete selected fixtures"
       sm
       join
       square
