@@ -161,4 +161,69 @@ describe("AppSidebar.vue", () => {
 
     expect(identityStore.displayName).toBe("Original Name");
   });
+
+  it("should toggle between expanded and collapsed states when hide/show button is clicked", async () => {
+    const user = userEvent.setup();
+    const appStore = useApp();
+    const showStore = useShow();
+    showStore.state = ShowStatus.LOADED;
+    showStore.identity.displayName = "My Stage Show";
+
+    render(AppSidebar);
+
+    // Initially expanded
+    expect(screen.getByText("My Stage Show")).toBeInTheDocument();
+    expect(screen.getByText("Show")).toBeInTheDocument();
+    expect(screen.getByText("Windows")).toBeInTheDocument();
+    expect(screen.getByText("New show")).toBeInTheDocument();
+    const hideBtn = screen.getByRole("button", { name: "Hide sidebar" });
+    expect(hideBtn).toBeInTheDocument();
+
+    // Click hide button to collapse
+    await user.click(hideBtn);
+
+    // Labels and titles should be hidden
+    expect(screen.queryByText("My Stage Show")).not.toBeInTheDocument();
+    expect(screen.queryByText("Show")).not.toBeInTheDocument();
+    expect(screen.queryByText("Windows")).not.toBeInTheDocument();
+    expect(screen.queryByText("New show")).not.toBeInTheDocument();
+    expect(screen.queryByText("Hide")).not.toBeInTheDocument();
+
+    // Buttons are still present and functional
+    const newShowBtn = screen.getByRole("button", { name: "New show" });
+    expect(newShowBtn).toBeInTheDocument();
+    await user.click(newShowBtn);
+    expect(appStore.createShow).toHaveBeenCalledTimes(1);
+
+    // Expand sidebar again
+    const showBtn = screen.getByRole("button", { name: "Show sidebar" });
+    expect(showBtn).toBeInTheDocument();
+    await user.click(showBtn);
+
+    // Labels and titles are visible again
+    expect(screen.getByText("My Stage Show")).toBeInTheDocument();
+    expect(screen.getByText("Show")).toBeInTheDocument();
+    expect(screen.getByText("Windows")).toBeInTheDocument();
+    expect(screen.getByText("New show")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide sidebar" })).toBeInTheDocument();
+  });
+
+  it("should cancel show name editing when sidebar is collapsed", async () => {
+    const user = userEvent.setup();
+    const identityStore = useShowIdentity();
+    const showStore = useShow();
+    showStore.state = ShowStatus.LOADED;
+    showStore.identity.displayName = "My Stage Show";
+
+    render(AppSidebar);
+
+    const editBtn = screen.getByRole("button", { name: "Edit show name" });
+    await user.click(editBtn);
+    expect(identityStore.nameForm.isEditing).toBe(true);
+
+    const hideBtn = screen.getByRole("button", { name: "Hide sidebar" });
+    await user.click(hideBtn);
+
+    expect(identityStore.nameForm.isEditing).toBe(false);
+  });
 });
