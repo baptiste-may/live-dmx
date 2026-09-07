@@ -17,7 +17,7 @@ describe("LiveIntensityMasters.vue", () => {
     render(LiveIntensityMasters);
 
     expect(screen.getByRole("heading", { name: "Masters" })).toBeInTheDocument();
-    expect(screen.getByText("All")).toBeInTheDocument();
+    expect(screen.getByText("Grand Master")).toBeInTheDocument();
     expect(screen.getByText("Spots")).toBeInTheDocument();
   });
 
