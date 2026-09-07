@@ -1,6 +1,6 @@
 use live_dmx_lib::output::{
-    calculate_effect_factor, calculate_effect_intensity, compute_random_strobe_active,
-    GroupEffectState, LiveEngine,
+    calculate_effect_factor, calculate_effect_intensity, calculate_effective_fract,
+    compute_random_strobe_active, GroupEffectState, LiveEngine,
 };
 use live_dmx_lib::show::{PatchedFixture, ShowData};
 
@@ -212,4 +212,80 @@ fn test_calculate_effect_factor() {
 #[test]
 fn test_compute_random_strobe_active() {
     let _active = compute_random_strobe_active(1, 0.5, 50);
+}
+
+#[test]
+fn test_calculate_effect_factor_sine_triangle_dip() {
+    let state_sine = GroupEffectState {
+        effect: Some("sine".to_string()),
+        alignment: None,
+        bounce: false,
+    };
+    // At elapsed 0.0 with 60 BPM (cycle 1.0s), t = 0.0, sin(0) = 0, factor = 0.5
+    let factor_sine = calculate_effect_factor(&state_sine, 0.0, 0, 1, 1, 60);
+    assert!((factor_sine - 0.5).abs() < 0.01);
+
+    // At elapsed 0.25 with 60 BPM, t = PI/2, sin(PI/2) = 1.0, factor = 1.0
+    let factor_sine_peak = calculate_effect_factor(&state_sine, 0.25, 0, 1, 1, 60);
+    assert!((factor_sine_peak - 1.0).abs() < 0.01);
+
+    let state_triangle = GroupEffectState {
+        effect: Some("triangle".to_string()),
+        alignment: None,
+        bounce: false,
+    };
+    // At elapsed 0.0, fract = 0.0 -> factor = 0.0
+    let factor_tri_0 = calculate_effect_factor(&state_triangle, 0.0, 0, 1, 1, 60);
+    assert!((factor_tri_0 - 0.0).abs() < 0.01);
+
+    // At elapsed 0.5, fract = 0.5 -> factor = 1.0
+    let factor_tri_half = calculate_effect_factor(&state_triangle, 0.5, 0, 1, 1, 60);
+    assert!((factor_tri_half - 1.0).abs() < 0.01);
+
+    // At elapsed 0.25, fract = 0.25 -> factor = 0.5
+    let factor_tri_q = calculate_effect_factor(&state_triangle, 0.25, 0, 1, 1, 60);
+    assert!((factor_tri_q - 0.5).abs() < 0.01);
+
+    let state_dip = GroupEffectState {
+        effect: Some("dip".to_string()),
+        alignment: None,
+        bounce: false,
+    };
+    // At elapsed 0.25 (sin > 0.5), dip should be 0.0
+    let factor_dip_off = calculate_effect_factor(&state_dip, 0.25, 0, 1, 1, 60);
+    assert_eq!(factor_dip_off, 0.0);
+
+    // At elapsed 0.75 (sin < 0), dip should be 1.0
+    let factor_dip_on = calculate_effect_factor(&state_dip, 0.75, 0, 1, 1, 60);
+    assert_eq!(factor_dip_on, 1.0);
+}
+
+#[test]
+fn test_center_alignment_and_calculate_effective_fract() {
+    let state_center = GroupEffectState {
+        effect: Some("pulse".to_string()),
+        alignment: Some("center".to_string()),
+        bounce: false,
+    };
+
+    // 3 fixtures: i=0 (left edge), i=1 (center), i=2 (right edge)
+    let fract_left = calculate_effective_fract(&state_center, 0.0, 0, 3, 1, 60).unwrap();
+    let fract_center = calculate_effective_fract(&state_center, 0.0, 1, 3, 2, 60).unwrap();
+    let fract_right = calculate_effective_fract(&state_center, 0.0, 2, 3, 3, 60).unwrap();
+
+    // Symmetrical outer fixtures should have equal phase offsets
+    assert!((fract_left - fract_right).abs() < 0.01);
+    // Center fixture has a distinct phase from the edges
+    assert!((fract_center - fract_left).abs() > 0.1);
+
+    // If BPM is 0, calculate_effective_fract returns None
+    assert!(calculate_effective_fract(&state_center, 0.0, 0, 3, 1, 0).is_none());
+
+    // If effect is None or off, returns None
+    let state_none = GroupEffectState {
+        effect: None,
+        alignment: None,
+        bounce: false,
+    };
+    assert!(calculate_effective_fract(&state_none, 0.0, 0, 3, 1, 60).is_none());
 }

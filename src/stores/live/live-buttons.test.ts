@@ -236,6 +236,11 @@ describe("live-buttons store", () => {
       bounce: false,
     });
     expect(mockInvoke).toHaveBeenCalledWith("live_reset_group_color_effect", { groupId: 1 });
+
+    await liveButtons.setGroupColorEffectType(1, "rainbow");
+    await liveButtons.setGroupColorEffectAlignment(1, "center");
+    expect(liveButtons.getGroupColorEffect(1).effect).toBe("rainbow");
+    expect(liveButtons.getGroupColorEffect(1).alignment).toBe("center");
   });
 
   it("should manage color effect bpm", async () => {

@@ -6,7 +6,7 @@ import ToggleButton from "@/components/inputs/ToggleButton.vue";
 import { useLiveButtons } from "@/stores/live/live-buttons.ts";
 import type { FixtureGroup } from "@/stores/show/show-groups.ts";
 import type { AlignmentType, ColorEffectType } from "@/types/live.ts";
-import { alignments, effects } from "@/types/live.ts";
+import { alignments, colorEffects } from "@/types/live.ts";
 
 const props = defineProps<{
   group: FixtureGroup;
@@ -22,7 +22,7 @@ function handleEffectsReset() {
 <template>
   <tr>
     <th class="px-2 text-end">{{ group.name }} :</th>
-    <td v-for="(effect, key) in effects" :key="key" class="px-1">
+    <td v-for="(effect, key) in colorEffects" :key="key" class="px-1">
       <ToggleButton
         :icon="effect.icon"
         :label="effect.label"

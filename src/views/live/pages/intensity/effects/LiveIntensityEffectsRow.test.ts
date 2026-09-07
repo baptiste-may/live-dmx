@@ -27,6 +27,10 @@ describe("LiveIntensityEffectsRow.vue", () => {
     expect(screen.getByRole("button", { name: /Chase/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ramp up/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ramp down/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sine/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Triangle/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Dip/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Center/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Bounce/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reset/i })).toBeInTheDocument();
   });
@@ -40,7 +44,11 @@ describe("LiveIntensityEffectsRow.vue", () => {
     await user.click(pulseButton);
     expect(liveButtons.getGroupEffect(1).effect).toBe("pulse");
 
-    await user.click(pulseButton);
+    const sineButton = screen.getByRole("button", { name: /Sine/i });
+    await user.click(sineButton);
+    expect(liveButtons.getGroupEffect(1).effect).toBe("sine");
+
+    await user.click(sineButton);
     expect(liveButtons.getGroupEffect(1).effect).toBeNull();
   });
 
@@ -53,7 +61,11 @@ describe("LiveIntensityEffectsRow.vue", () => {
     await user.click(leftButton);
     expect(liveButtons.getGroupEffect(1).alignment).toBe("left");
 
-    await user.click(leftButton);
+    const centerButton = screen.getByRole("button", { name: /Center/i });
+    await user.click(centerButton);
+    expect(liveButtons.getGroupEffect(1).alignment).toBe("center");
+
+    await user.click(centerButton);
     expect(liveButtons.getGroupEffect(1).alignment).toBeNull();
   });
 

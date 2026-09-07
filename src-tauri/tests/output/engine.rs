@@ -197,3 +197,29 @@ fn test_live_engine_color_effects_and_secondary_colors() {
     assert_eq!(engine.get_group_secondary_color(1), None);
     assert_eq!(engine.color_effect_bpm, 60);
 }
+
+#[test]
+fn test_live_engine_rainbow_color_effect() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "RGB Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Red", "Green", "Blue"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color_effect(1, Some("rainbow".to_string()), None, false);
+    engine.set_color_effect_bpm(60);
+
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255);
+    assert!(buf[1] > 0 || buf[2] > 0 || buf[3] > 0);
+}
