@@ -8,7 +8,7 @@ describe("LiveIntensity.vue", () => {
     render(LiveIntensity);
 
     expect(screen.getByRole("heading", { name: "Effects" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Strobes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Flashs" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Masters" })).toBeInTheDocument();
   });
 });

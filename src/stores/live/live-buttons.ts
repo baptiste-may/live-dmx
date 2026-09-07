@@ -40,6 +40,8 @@ export const getDefaultLiveButtonsState = (): LiveButtonsState => ({
   groupSecondaryColors: {},
   strobeRate: 50,
   randomStrobeRate: 50,
+  simpleFlashFade: 0,
+  whiteFlashFade: 0,
   effectBpm: 60,
   colorEffectBpm: 60,
   colorFadeSpeed: 1,
@@ -95,6 +97,8 @@ export const useLiveButtons = defineStore("live-buttons", {
     async setFlash(groupId: number, flashType: FlashType, active: boolean) {
       if (!this.flashStates[groupId]) {
         this.flashStates[groupId] = {
+          simple: false,
+          white: false,
           master: false,
           strobe: false,
           randomStrobe: false,
@@ -334,6 +338,26 @@ export const useLiveButtons = defineStore("live-buttons", {
         handleActionError(error);
       }
     },
+    async setSimpleFlashFade(fade: number) {
+      const prev = this.simpleFlashFade;
+      this.simpleFlashFade = fade;
+      try {
+        await invoke("live_set_simple_flash_fade", { fade });
+      } catch (error) {
+        this.simpleFlashFade = prev;
+        handleActionError(error);
+      }
+    },
+    async setWhiteFlashFade(fade: number) {
+      const prev = this.whiteFlashFade;
+      this.whiteFlashFade = fade;
+      try {
+        await invoke("live_set_white_flash_fade", { fade });
+      } catch (error) {
+        this.whiteFlashFade = prev;
+        handleActionError(error);
+      }
+    },
     async setEffectBpm(bpm: number) {
       const prev = this.effectBpm;
       this.effectBpm = bpm;
@@ -399,6 +423,8 @@ export const useLiveButtons = defineStore("live-buttons", {
         groupSecondaryColors: { ...this.groupSecondaryColors },
         strobeRate: this.strobeRate,
         randomStrobeRate: this.randomStrobeRate,
+        simpleFlashFade: this.simpleFlashFade,
+        whiteFlashFade: this.whiteFlashFade,
         effectBpm: this.effectBpm,
         colorEffectBpm: this.colorEffectBpm,
         colorFadeSpeed: this.colorFadeSpeed,
@@ -417,6 +443,8 @@ export const useLiveButtons = defineStore("live-buttons", {
         this.groupSecondaryColors = prev.groupSecondaryColors;
         this.strobeRate = prev.strobeRate;
         this.randomStrobeRate = prev.randomStrobeRate;
+        this.simpleFlashFade = prev.simpleFlashFade;
+        this.whiteFlashFade = prev.whiteFlashFade;
         this.effectBpm = prev.effectBpm;
         this.colorEffectBpm = prev.colorEffectBpm;
         this.colorFadeSpeed = prev.colorFadeSpeed;

@@ -261,24 +261,47 @@ describe("live-buttons store", () => {
     expect(mockInvoke).toHaveBeenCalledWith("live_reset_group_effect", { groupId: 1 });
   });
 
+  it("should manage simple and white flash fade timing", async () => {
+    const liveButtons = useLiveButtons();
+
+    expect(liveButtons.simpleFlashFade).toBe(0);
+    expect(liveButtons.whiteFlashFade).toBe(0);
+
+    await liveButtons.setSimpleFlashFade(1.5);
+    expect(liveButtons.simpleFlashFade).toBe(1.5);
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_simple_flash_fade", { fade: 1.5 });
+
+    await liveButtons.setWhiteFlashFade(2.0);
+    expect(liveButtons.whiteFlashFade).toBe(2.0);
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_white_flash_fade", { fade: 2.0 });
+  });
+
   it("should reset all states", async () => {
     const liveButtons = useLiveButtons();
 
+    await liveButtons.setFlash(1, "simple", true);
+    await liveButtons.setFlash(1, "white", true);
     await liveButtons.setFlash(1, "strobe", true);
     await liveButtons.setButtonState("b1", true);
     await liveButtons.setGroupColor(1, "cyan");
     await liveButtons.setGroupSecondaryColor(1, "magenta");
     await liveButtons.setGroupColorEffectType(1, "chase");
+    await liveButtons.setSimpleFlashFade(1.2);
+    await liveButtons.setWhiteFlashFade(0.8);
     await liveButtons.setColorEffectBpm(140);
     await liveButtons.setColorFadeSpeed(2.5);
     await liveButtons.setColorFadeOrder("right");
     await liveButtons.resetAll();
 
+    expect(liveButtons.isFlashActive(1, "simple")).toBe(false);
+    expect(liveButtons.isFlashActive(1, "white")).toBe(false);
     expect(liveButtons.isFlashActive(1, "strobe")).toBe(false);
     expect(liveButtons.isButtonActive("b1")).toBe(false);
     expect(liveButtons.getGroupColor(1)).toBe("white");
     expect(liveButtons.getGroupSecondaryColor(1)).toBeNull();
     expect(liveButtons.getGroupColorEffect(1).effect).toBeNull();
+    expect(liveButtons.simpleFlashFade).toBe(0);
+    expect(liveButtons.whiteFlashFade).toBe(0);
     expect(liveButtons.colorEffectBpm).toBe(60);
     expect(liveButtons.colorFadeSpeed).toBe(1);
     expect(liveButtons.colorFadeOrder).toBeNull();

@@ -11,7 +11,7 @@ describe("LiveColorsFade.vue", () => {
     render(LiveColorsFade);
 
     expect(screen.getByRole("heading", { name: "Fade" })).toBeInTheDocument();
-    expect(screen.getByText("Speed (s)")).toBeInTheDocument();
+    expect(screen.getByText("Speed")).toBeInTheDocument();
     expect(screen.getByText("Order")).toBeInTheDocument();
     expect(screen.getByRole("slider")).toBeInTheDocument();
     expect(screen.getAllByRole("button")).toHaveLength(3);

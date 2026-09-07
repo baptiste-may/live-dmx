@@ -32,3 +32,9 @@ pub struct FixtureColorTransition {
     pub delay_secs: f32,
     pub duration_secs: f32,
 }
+
+#[derive(Debug, Clone)]
+pub struct FlashFadeTransition {
+    pub start_time: std::time::Instant,
+    pub duration_secs: f32,
+}

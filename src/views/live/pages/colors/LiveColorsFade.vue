@@ -23,7 +23,7 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
       <Table sm>
         <tbody>
           <tr>
-            <th>Speed (s)</th>
+            <th>Speed</th>
           </tr>
           <tr>
             <td>
@@ -33,6 +33,7 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
                 :max="3"
                 :step="0.25"
                 :default-value="1"
+                unit="s"
                 :model-value="colorFadeSpeed"
                 @update:model-value="liveButtons.setColorFadeSpeed($event)"
               />
@@ -45,36 +46,33 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
             <td>
               <ToggleButton
                 aria-label="Fade order left"
+                :icon="MoveLeftIcon"
                 :model-value="colorFadeOrder === 'left'"
                 color="secondary"
                 @update:model-value="handleOrderSelect('left', $event)"
-              >
-                <MoveLeftIcon />
-              </ToggleButton>
+              />
             </td>
           </tr>
           <tr>
             <td>
               <ToggleButton
                 aria-label="Fade order right"
+                :icon="MoveRightIcon"
                 :model-value="colorFadeOrder === 'right'"
                 color="secondary"
                 @update:model-value="handleOrderSelect('right', $event)"
-              >
-                <MoveRightIcon />
-              </ToggleButton>
+              />
             </td>
           </tr>
           <tr>
             <td>
               <ToggleButton
                 aria-label="Fade order wing"
+                :icon="FlipHorizontal2Icon"
                 :model-value="colorFadeOrder === 'wing'"
                 color="secondary"
                 @update:model-value="handleOrderSelect('wing', $event)"
-              >
-                <FlipHorizontal2Icon />
-              </ToggleButton>
+              />
             </td>
           </tr>
         </tbody>

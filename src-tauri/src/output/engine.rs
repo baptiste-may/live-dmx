@@ -8,7 +8,9 @@ use crate::output::colors::resolve_color_rgb;
 use crate::output::effects::{
     calculate_effect_factor, calculate_effect_intensity, compute_random_strobe_active,
 };
-use crate::output::types::{ChannelType, FixtureColorTransition, GroupEffectState};
+use crate::output::types::{
+    ChannelType, FixtureColorTransition, FlashFadeTransition, GroupEffectState,
+};
 use crate::show::{PatchedFixture, ShowData};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,6 +45,9 @@ pub struct LiveEngine {
     pub group_secondary_colors: HashMap<u32, Option<String>>,
     pub strobe_rate: u8,
     pub random_strobe_rate: u8,
+    pub simple_flash_fade: f32,
+    pub white_flash_fade: f32,
+    pub flash_fade_transitions: HashMap<(u32, String), FlashFadeTransition>,
     pub effect_bpm: u16,
     pub color_effect_bpm: u16,
     pub color_fade_speed: f32,
@@ -82,6 +87,9 @@ impl LiveEngine {
             group_secondary_colors: HashMap::new(),
             strobe_rate: 50,
             random_strobe_rate: 50,
+            simple_flash_fade: 0.0,
+            white_flash_fade: 0.0,
+            flash_fade_transitions: HashMap::new(),
             effect_bpm: 60,
             color_effect_bpm: 60,
             color_fade_speed: 1.0,
@@ -98,7 +106,62 @@ impl LiveEngine {
 
     pub fn set_flash(&mut self, group_id: u32, flash_type: String, active: bool) {
         let group_flash = self.flash_states.entry(group_id).or_default();
-        group_flash.insert(flash_type, active);
+        let was_active = *group_flash.get(&flash_type).unwrap_or(&false);
+        group_flash.insert(flash_type.clone(), active);
+
+        if active {
+            self.flash_fade_transitions.remove(&(group_id, flash_type));
+        } else if was_active {
+            let fade_duration = match flash_type.as_str() {
+                "simple" => self.simple_flash_fade,
+                "white" | "master" => self.white_flash_fade,
+                _ => 0.0,
+            };
+            if fade_duration > 0.0 {
+                self.flash_fade_transitions.insert(
+                    (group_id, flash_type),
+                    FlashFadeTransition {
+                        start_time: Instant::now(),
+                        duration_secs: fade_duration,
+                    },
+                );
+            }
+        }
+    }
+
+    pub fn set_simple_flash_fade(&mut self, fade: f32) {
+        self.simple_flash_fade = fade.max(0.0);
+    }
+
+    pub fn set_white_flash_fade(&mut self, fade: f32) {
+        self.white_flash_fade = fade.max(0.0);
+    }
+
+    pub fn get_flash_factor(&self, group_id: u32, flash_type: &str) -> f32 {
+        if self.is_flash_active(group_id, flash_type) {
+            return 1.0;
+        }
+        if let Some(trans) = self
+            .flash_fade_transitions
+            .get(&(group_id, flash_type.to_string()))
+        {
+            let elapsed = trans.start_time.elapsed().as_secs_f32();
+            if elapsed < trans.duration_secs && trans.duration_secs > 0.0 {
+                return (1.0 - elapsed / trans.duration_secs).clamp(0.0, 1.0);
+            }
+        }
+        if group_id != 0 {
+            if let Some(trans) = self
+                .flash_fade_transitions
+                .get(&(0, flash_type.to_string()))
+            {
+                let elapsed = trans.start_time.elapsed().as_secs_f32();
+                if elapsed < trans.duration_secs && trans.duration_secs > 0.0 {
+                    return (1.0 - elapsed / trans.duration_secs).clamp(0.0, 1.0);
+                }
+            }
+        }
+        0.0
     }
 
     pub fn set_button(&mut self, button_id: String, active: bool) {
@@ -362,6 +425,9 @@ impl LiveEngine {
         self.group_secondary_colors.clear();
         self.strobe_rate = 50;
         self.random_strobe_rate = 50;
+        self.simple_flash_fade = 0.0;
+        self.white_flash_fade = 0.0;
+        self.flash_fade_transitions.clear();
         self.effect_bpm = 60;
         self.color_effect_bpm = 60;
         self.color_fade_speed = 1.0;
@@ -574,6 +640,9 @@ impl LiveEngine {
             let elapsed = trans.start_time.elapsed().as_secs_f32();
             elapsed < trans.delay_secs + trans.duration_secs
         });
+
+        self.flash_fade_transitions
+            .retain(|_, trans| trans.start_time.elapsed().as_secs_f32() < trans.duration_secs);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -592,11 +661,24 @@ impl LiveEngine {
             return;
         }
 
-        let is_in_flash_group = fixture
+        let simple_factor = fixture
             .groups
             .iter()
-            .any(|&g| self.is_flash_active(g, "master"))
-            || self.is_flash_active(0, "master");
+            .chain(std::iter::once(&0))
+            .map(|&g| self.get_flash_factor(g, "simple"))
+            .fold(0.0, f32::max);
+
+        let white_factor = fixture
+            .groups
+            .iter()
+            .chain(std::iter::once(&0))
+            .map(|&g| {
+                self.get_flash_factor(g, "white")
+                    .max(self.get_flash_factor(g, "master"))
+            })
+            .fold(0.0, f32::max);
+
+        let flash_dimmer_factor = simple_factor.max(white_factor);
 
         let is_in_strobe_group = fixture
             .groups
@@ -701,23 +783,126 @@ impl LiveEngine {
         for (ch, &ch_type) in fixture.channels.iter().enumerate() {
             let ch_idx = fixture.start_addr + ch;
 
-            if is_in_flash_group {
-                // White Flash: Dimmer AND Color channels set to 255 (Full White)
+            if flash_dimmer_factor > 0.0 {
+                let effective_dimmer = ((intensity_level as f32)
+                    + (255.0 - intensity_level as f32) * flash_dimmer_factor)
+                    .round()
+                    .clamp(0.0, 255.0) as u8;
+                let effective_intensity_factor = effective_dimmer as f32 / 255.0;
+
                 match ch_type {
-                    ChannelType::Dimmer
-                    | ChannelType::Red
-                    | ChannelType::Green
-                    | ChannelType::Blue
-                    | ChannelType::White
-                    | ChannelType::Amber
-                    | ChannelType::Cyan
-                    | ChannelType::Magenta
-                    | ChannelType::Yellow
-                    | ChannelType::UV => buf[ch_idx] = 255,
-                    ChannelType::Other if ch == 0 && fixture.treat_first_as_dimmer => {
-                        buf[ch_idx] = 255
+                    ChannelType::Dimmer => buf[ch_idx] = effective_dimmer,
+                    ChannelType::Red => {
+                        let base_r = if fixture.has_dimmer {
+                            r as f32
+                        } else {
+                            (r as f32) * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_r + (255.0 - base_r) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
                     }
-                    _ => {}
+                    ChannelType::Green => {
+                        let base_g = if fixture.has_dimmer {
+                            g as f32
+                        } else {
+                            (g as f32) * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_g + (255.0 - base_g) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::Blue => {
+                        let base_b = if fixture.has_dimmer {
+                            b as f32
+                        } else {
+                            (b as f32) * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_b + (255.0 - base_b) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::White => {
+                        let base_w = if fixture.has_dimmer {
+                            w as f32
+                        } else {
+                            (w as f32) * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_w + (255.0 - base_w) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::Amber => {
+                        let a = if r > 200 && g > 100 && b < 50 {
+                            255.0
+                        } else {
+                            0.0
+                        };
+                        let base_a = if fixture.has_dimmer {
+                            a
+                        } else {
+                            a * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_a + (255.0 - base_a) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::Cyan => {
+                        let c = if g > 200 && b > 200 && r < 50 {
+                            255.0
+                        } else {
+                            0.0
+                        };
+                        let base_c = if fixture.has_dimmer {
+                            c
+                        } else {
+                            c * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_c + (255.0 - base_c) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::Magenta => {
+                        let m = if r > 200 && b > 200 && g < 50 {
+                            255.0
+                        } else {
+                            0.0
+                        };
+                        let base_m = if fixture.has_dimmer {
+                            m
+                        } else {
+                            m * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_m + (255.0 - base_m) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::Yellow => {
+                        let y = if r > 200 && g > 200 && b < 50 {
+                            255.0
+                        } else {
+                            0.0
+                        };
+                        let base_y = if fixture.has_dimmer {
+                            y
+                        } else {
+                            y * effective_intensity_factor
+                        };
+                        buf[ch_idx] = (base_y + (255.0 - base_y) * white_factor)
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::UV => {
+                        buf[ch_idx] = (255.0 * white_factor).round().clamp(0.0, 255.0) as u8;
+                    }
+                    ChannelType::Strobe => buf[ch_idx] = 0,
+                    ChannelType::Other => {
+                        if ch == 0 && fixture.treat_first_as_dimmer {
+                            buf[ch_idx] = effective_dimmer;
+                        } else {
+                            buf[ch_idx] = 0;
+                        }
+                    }
                 }
             } else if is_in_strobe_group || is_in_random_strobe_group {
                 match ch_type {
