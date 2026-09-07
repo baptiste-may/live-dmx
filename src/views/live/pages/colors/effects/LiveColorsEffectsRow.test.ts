@@ -26,6 +26,11 @@ describe("LiveColorsEffectsRow.vue", () => {
     expect(screen.getByRole("button", { name: /Chase/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ramp up/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ramp down/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sine/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Triangle/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Dip/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Rainbow/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Center/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Bounce/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reset/i })).toBeInTheDocument();
   });
@@ -39,7 +44,11 @@ describe("LiveColorsEffectsRow.vue", () => {
     await user.click(chaseButton);
     expect(liveButtons.getGroupColorEffect(1).effect).toBe("chase");
 
-    await user.click(chaseButton);
+    const rainbowButton = screen.getByRole("button", { name: /Rainbow/i });
+    await user.click(rainbowButton);
+    expect(liveButtons.getGroupColorEffect(1).effect).toBe("rainbow");
+
+    await user.click(rainbowButton);
     expect(liveButtons.getGroupColorEffect(1).effect).toBeNull();
   });
 
@@ -52,7 +61,11 @@ describe("LiveColorsEffectsRow.vue", () => {
     await user.click(wingButton);
     expect(liveButtons.getGroupColorEffect(1).alignment).toBe("wing");
 
-    await user.click(wingButton);
+    const centerButton = screen.getByRole("button", { name: /Center/i });
+    await user.click(centerButton);
+    expect(liveButtons.getGroupColorEffect(1).alignment).toBe("center");
+
+    await user.click(centerButton);
     expect(liveButtons.getGroupColorEffect(1).alignment).toBeNull();
   });
 

@@ -1,4 +1,4 @@
-use live_dmx_lib::output::{resolve_color_rgb, LiveEngine};
+use live_dmx_lib::output::{hsv_to_rgb, resolve_color_rgb, LiveEngine};
 use live_dmx_lib::show::{PatchedFixture, ShowData};
 
 #[test]
@@ -210,6 +210,69 @@ fn test_color_fade_wing_order_staggered() {
     // Center fixture 2 starts first (lowest delay)
     assert!(t2.delay_secs < t1.delay_secs);
     assert!(t2.delay_secs < t3.delay_secs);
+}
+
+#[test]
+fn test_color_fade_center_order_staggered() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    for i in 1..=3 {
+        show.patch.fixtures.push(PatchedFixture {
+            id: i,
+            groups: vec![1],
+            name: format!("Par {i}"),
+            fixture_type: serde_json::json!({}),
+            mode: serde_json::json!({"channels": ["Red", "Green", "Blue"]}),
+            universe: 1,
+            address: ((i - 1) * 3 + 1) as u32,
+        });
+    }
+
+    engine.set_color_fade_speed(0.4);
+    engine.set_color_fade_order(Some("center".to_string()));
+
+    engine.set_group_color(1, Some("red".to_string()), Some(&show));
+
+    let t1 = engine.fixture_color_transitions.get(&1).unwrap();
+    let t2 = engine.fixture_color_transitions.get(&2).unwrap();
+    let t3 = engine.fixture_color_transitions.get(&3).unwrap();
+
+    // In a 3-fixture group with center fade, outer fixtures 1 & 3 start first, center 2 starts last
+    assert!(t1.delay_secs < t2.delay_secs);
+    assert!(t3.delay_secs < t2.delay_secs);
+    assert_eq!(t1.delay_secs, t3.delay_secs);
+}
+
+#[test]
+fn test_hsv_to_rgb() {
+    // Red (h = 0)
+    let (r, g, b) = hsv_to_rgb(0.0, 1.0, 1.0);
+    assert_eq!(
+        (r.round() as u8, g.round() as u8, b.round() as u8),
+        (255, 0, 0)
+    );
+
+    // Green (h = 1/3)
+    let (r, g, b) = hsv_to_rgb(1.0 / 3.0, 1.0, 1.0);
+    assert_eq!(
+        (r.round() as u8, g.round() as u8, b.round() as u8),
+        (0, 255, 0)
+    );
+
+    // Blue (h = 2/3)
+    let (r, g, b) = hsv_to_rgb(2.0 / 3.0, 1.0, 1.0);
+    assert_eq!(
+        (r.round() as u8, g.round() as u8, b.round() as u8),
+        (0, 0, 255)
+    );
+
+    // Zero saturation produces pure white
+    let (r, g, b) = hsv_to_rgb(0.5, 0.0, 1.0);
+    assert_eq!(
+        (r.round() as u8, g.round() as u8, b.round() as u8),
+        (255, 255, 255)
+    );
 }
 
 #[test]

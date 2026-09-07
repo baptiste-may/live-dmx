@@ -4,9 +4,10 @@ use std::time::Instant;
 use crate::output::channels::{
     classify_channel, extract_fixture_channel_count, get_fixture_channel_name,
 };
-use crate::output::colors::resolve_color_rgb;
+use crate::output::colors::{hsv_to_rgb, resolve_color_rgb};
 use crate::output::effects::{
-    calculate_effect_factor, calculate_effect_intensity, compute_random_strobe_active,
+    calculate_effect_factor, calculate_effect_intensity, calculate_effective_fract,
+    compute_random_strobe_active,
 };
 use crate::output::types::{
     ChannelType, FixtureColorTransition, FlashFadeTransition, GroupEffectState,
@@ -315,6 +316,8 @@ impl LiveEngine {
                             "left" => (i as f32) / ((n - 1) as f32),
                             "right" => ((n - 1 - i) as f32) / ((n - 1) as f32),
                             "wing" => (((i as f32 + 0.5) / (n as f32)) - 0.5).abs() * 2.0,
+                            "center" => (1.0 - (((i as f32 + 0.5) / (n as f32)) - 0.5).abs() * 2.0)
+                                .clamp(0.0, 1.0),
                             _ => 0.0,
                         }
                     }
@@ -484,7 +487,9 @@ impl LiveEngine {
         for f in fixtures {
             group_fixture_map.entry(0).or_default().push(f.id);
             for &g in &f.groups {
-                group_fixture_map.entry(g).or_default().push(f.id);
+                if g != 0 {
+                    group_fixture_map.entry(g).or_default().push(f.id);
+                }
             }
         }
 
@@ -748,18 +753,35 @@ impl LiveEngine {
             secondary_rgb.2 as f32,
         );
 
-        let color_factor = calculate_effect_factor(
-            color_effect_state,
-            elapsed,
-            color_local_index,
-            color_group_count,
-            fixture.id,
-            self.color_effect_bpm,
-        );
+        let (r_f, g_f, b_f) = if color_effect_state.effect.as_deref() == Some("rainbow") {
+            if let Some(fract) = calculate_effective_fract(
+                color_effect_state,
+                elapsed,
+                color_local_index,
+                color_group_count,
+                fixture.id,
+                self.color_effect_bpm,
+            ) {
+                hsv_to_rgb(fract, 1.0, 1.0)
+            } else {
+                current_rgb_f
+            }
+        } else {
+            let color_factor = calculate_effect_factor(
+                color_effect_state,
+                elapsed,
+                color_local_index,
+                color_group_count,
+                fixture.id,
+                self.color_effect_bpm,
+            );
 
-        let r_f = current_rgb_f.0 * (1.0 - color_factor) + secondary_rgb_f.0 * color_factor;
-        let g_f = current_rgb_f.1 * (1.0 - color_factor) + secondary_rgb_f.1 * color_factor;
-        let b_f = current_rgb_f.2 * (1.0 - color_factor) + secondary_rgb_f.2 * color_factor;
+            (
+                current_rgb_f.0 * (1.0 - color_factor) + secondary_rgb_f.0 * color_factor,
+                current_rgb_f.1 * (1.0 - color_factor) + secondary_rgb_f.1 * color_factor,
+                current_rgb_f.2 * (1.0 - color_factor) + secondary_rgb_f.2 * color_factor,
+            )
+        };
 
         let r = r_f.round().clamp(0.0, 255.0) as u8;
         let g = g_f.round().clamp(0.0, 255.0) as u8;

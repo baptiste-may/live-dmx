@@ -14,7 +14,7 @@ describe("LiveColorsFade.vue", () => {
     expect(screen.getByText("Speed")).toBeInTheDocument();
     expect(screen.getByText("Order")).toBeInTheDocument();
     expect(screen.getByRole("slider")).toBeInTheDocument();
-    expect(screen.getAllByRole("button")).toHaveLength(3);
+    expect(screen.getAllByRole("button")).toHaveLength(4);
   });
 
   it("updates fade speed via knob", async () => {
@@ -39,6 +39,7 @@ describe("LiveColorsFade.vue", () => {
     const leftBtn = screen.getByRole("button", { name: "Fade order left" });
     const rightBtn = screen.getByRole("button", { name: "Fade order right" });
     const wingBtn = screen.getByRole("button", { name: "Fade order wing" });
+    const centerBtn = screen.getByRole("button", { name: "Fade order center" });
 
     await user.click(leftBtn);
     expect(liveButtons.colorFadeOrder).toBe("left");
@@ -49,7 +50,10 @@ describe("LiveColorsFade.vue", () => {
     await user.click(wingBtn);
     expect(liveButtons.colorFadeOrder).toBe("wing");
 
-    await user.click(wingBtn);
+    await user.click(centerBtn);
+    expect(liveButtons.colorFadeOrder).toBe("center");
+
+    await user.click(centerBtn);
     expect(liveButtons.colorFadeOrder).toBeNull();
   });
 });

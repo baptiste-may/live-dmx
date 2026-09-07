@@ -1,24 +1,20 @@
 use crate::output::types::GroupEffectState;
 
-pub fn calculate_effect_factor(
+pub fn calculate_effective_fract(
     effect_state: &GroupEffectState,
     elapsed: f32,
     local_index: usize,
     group_count: usize,
     fixture_id: u32,
     bpm: u16,
-) -> f32 {
-    let effect_type = match effect_state.effect.as_deref() {
+) -> Option<f32> {
+    match effect_state.effect.as_deref() {
         Some(e) if e != "none" && e != "off" => e,
-        _ => return 0.0,
+        _ => return None,
     };
 
-    if effect_type == "full" {
-        return 1.0;
-    }
-
     if bpm == 0 {
-        return 0.0;
+        return None;
     }
 
     let speed = (bpm as f32 / 60.0) * 2.0 * std::f32::consts::PI;
@@ -32,6 +28,10 @@ pub fn calculate_effect_factor(
         "wing" => {
             let center_dist = (((i + 0.5) / n) - 0.5).abs() * 2.0;
             center_dist * 2.0 * std::f32::consts::PI
+        }
+        "center" => {
+            let center_dist = (((i + 0.5) / n) - 0.5).abs() * 2.0;
+            (1.0 - center_dist.clamp(0.0, 1.0)) * 2.0 * std::f32::consts::PI
         }
         "two" => (local_index % 2) as f32 * std::f32::consts::PI,
         "three" => (local_index % 3) as f32 * (2.0 * std::f32::consts::PI / 3.0),
@@ -53,6 +53,37 @@ pub fn calculate_effect_factor(
         fract
     };
 
+    Some(effective_fract)
+}
+
+pub fn calculate_effect_factor(
+    effect_state: &GroupEffectState,
+    elapsed: f32,
+    local_index: usize,
+    group_count: usize,
+    fixture_id: u32,
+    bpm: u16,
+) -> f32 {
+    let effect_type = match effect_state.effect.as_deref() {
+        Some(e) if e != "none" && e != "off" => e,
+        _ => return 0.0,
+    };
+
+    if effect_type == "full" {
+        return 1.0;
+    }
+
+    let Some(effective_fract) = calculate_effective_fract(
+        effect_state,
+        elapsed,
+        local_index,
+        group_count,
+        fixture_id,
+        bpm,
+    ) else {
+        return 0.0;
+    };
+
     let t = effective_fract * 2.0 * std::f32::consts::PI;
 
     let val = match effect_type {
@@ -69,6 +100,15 @@ pub fn calculate_effect_factor(
         }
         "ramp_up" => effective_fract,
         "ramp_down" => 1.0 - effective_fract,
+        "sine" => (t.sin() + 1.0) * 0.5,
+        "triangle" => {
+            if effective_fract < 0.5 {
+                effective_fract * 2.0
+            } else {
+                (1.0 - effective_fract) * 2.0
+            }
+        }
+        "dip" if t.sin() > 0.5 => 0.0,
         _ => 1.0,
     };
 

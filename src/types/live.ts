@@ -6,8 +6,13 @@ import {
   ChartNoAxesColumnIncreasingIcon,
   DicesIcon,
   FlipHorizontal2Icon,
+  FoldHorizontalIcon,
+  RainbowIcon,
+  SquareMinusIcon,
   SquareSplitHorizontalIcon,
   SunIcon,
+  TriangleIcon,
+  WavesIcon,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -17,15 +22,15 @@ import TwoIcon from "@/components/icons/TwoIcon.vue";
 
 export type FlashType = "simple" | "white" | "strobe" | "randomStrobe" | "master";
 
-export type EffectType = "pulse" | "chase" | "ramp_up" | "ramp_down";
+export type EffectType = "pulse" | "chase" | "ramp_up" | "ramp_down" | "sine" | "triangle" | "dip";
 
 export type IntensityEffectType = "full" | EffectType;
 
-export type ColorEffectType = EffectType;
+export type ColorEffectType = EffectType | "rainbow";
 
-export type AlignmentType = "rng" | "left" | "right" | "wing" | "two" | "three" | "four";
+export type AlignmentType = "rng" | "left" | "right" | "wing" | "center" | "two" | "three" | "four";
 
-export type ColorFadeOrder = "left" | "right" | "wing";
+export type ColorFadeOrder = "left" | "right" | "wing" | "center";
 
 export type GroupEffectState = {
   effect: IntensityEffectType | null;
@@ -80,6 +85,18 @@ export const effects: Record<
     label: "Ramp down",
     icon: ChartNoAxesColumnDecreasingIcon,
   },
+  sine: {
+    label: "Sine",
+    icon: WavesIcon,
+  },
+  triangle: {
+    label: "Triangle",
+    icon: TriangleIcon,
+  },
+  dip: {
+    label: "Dip",
+    icon: SquareMinusIcon,
+  },
 };
 
 export const intensityEffects: Record<IntensityEffectType, { label: string; icon: Component }> = {
@@ -88,6 +105,20 @@ export const intensityEffects: Record<IntensityEffectType, { label: string; icon
     icon: SunIcon,
   },
   ...effects,
+};
+
+export const colorEffects: Record<
+  ColorEffectType,
+  {
+    label: string;
+    icon: Component;
+  }
+> = {
+  ...effects,
+  rainbow: {
+    label: "Rainbow",
+    icon: RainbowIcon,
+  },
 };
 
 export const alignments: Record<
@@ -112,6 +143,10 @@ export const alignments: Record<
   wing: {
     label: "Wing",
     icon: FlipHorizontal2Icon,
+  },
+  center: {
+    label: "Center",
+    icon: FoldHorizontalIcon,
   },
   two: {
     label: "groups",

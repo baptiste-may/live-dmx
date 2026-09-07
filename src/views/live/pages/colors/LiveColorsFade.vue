@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { Card, CardBody, CardTitle, Table } from "daisy-ui-kit";
-import { FlipHorizontal2Icon, MoveLeftIcon, MoveRightIcon } from "lucide-vue-next";
+import {
+  FlipHorizontal2Icon,
+  FoldHorizontalIcon,
+  MoveLeftIcon,
+  MoveRightIcon,
+} from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 
 import Knob from "@/components/inputs/Knob.vue";
@@ -72,6 +77,17 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
                 :model-value="colorFadeOrder === 'wing'"
                 color="secondary"
                 @update:model-value="handleOrderSelect('wing', $event)"
+              />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <ToggleButton
+                aria-label="Fade order center"
+                :icon="FoldHorizontalIcon"
+                :model-value="colorFadeOrder === 'center'"
+                color="secondary"
+                @update:model-value="handleOrderSelect('center', $event)"
               />
             </td>
           </tr>
