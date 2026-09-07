@@ -3,7 +3,6 @@ import { Badge, Card, CardBody, CardTitle } from "daisy-ui-kit";
 import { storeToRefs } from "pinia";
 
 import Fader from "@/components/inputs/Fader.vue";
-import FlashButton from "@/components/inputs/FlashButton.vue";
 import { useLiveButtons } from "@/stores/live/live-buttons.ts";
 import { useShowGroups } from "@/stores/show/show-groups.ts";
 
@@ -26,12 +25,6 @@ const liveButtons = useLiveButtons();
             :error="group.id === 0"
             @update:model-value="liveButtons.setGroupMaster(group.id, $event)"
           />
-          <FlashButton
-            :model-value="liveButtons.isFlashActive(group.id, 'master')"
-            @update:model-value="liveButtons.setFlash(group.id, 'master', $event)"
-          >
-            Flash
-          </FlashButton>
           <Badge neutral>{{ group.name }}</Badge>
         </div>
       </div>

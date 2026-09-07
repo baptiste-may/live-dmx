@@ -1,18 +1,97 @@
 import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/vue";
+import { SunIcon } from "lucide-vue-next";
 import { describe, expect, it } from "vitest";
 
 import ToggleButton from "./ToggleButton.vue";
 
 describe("ToggleButton.vue", () => {
-  it("renders default slot content when cell is false", () => {
-    render(ToggleButton, {
-      slots: {
-        default: "Toggle Me",
+  it("renders label when cell is false and applies square styling", () => {
+    const { container } = render(ToggleButton, {
+      props: {
+        label: "Toggle Me",
       },
     });
 
-    expect(screen.getByRole("button", { name: "Toggle Me" })).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Toggle Me" });
+    expect(button).toBeInTheDocument();
+    expect(screen.getByText("Toggle Me")).toBeInTheDocument();
+    expect(container.querySelector("button")).toHaveClass("btn-square");
+  });
+
+  it("renders icon at the top and text at the bottom", () => {
+    const { container } = render(ToggleButton, {
+      props: {
+        icon: SunIcon,
+        label: "Full",
+      },
+    });
+
+    const button = screen.getByRole("button", { name: "Full" });
+    expect(button).toBeInTheDocument();
+
+    const svg = container.querySelector("svg");
+    const label = screen.getByText("Full");
+
+    expect(svg).toBeInTheDocument();
+    expect(label).toBeInTheDocument();
+    // Icon is placed before the label in the DOM
+    expect(svg?.compareDocumentPosition(label)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("renders only icon when label is omitted", () => {
+    const { container } = render(ToggleButton, {
+      props: {
+        icon: SunIcon,
+      },
+      attrs: {
+        "aria-label": "Sun Icon Button",
+      },
+    });
+
+    const button = screen.getByRole("button", { name: "Sun Icon Button" });
+    expect(button).toBeInTheDocument();
+    expect(container.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("defaults to btn-lg and rounded-lg for non-cell buttons", () => {
+    const { container } = render(ToggleButton, {
+      props: {
+        label: "Default Size Button",
+      },
+    });
+
+    const button = container.querySelector("button");
+    expect(button).toHaveClass("btn-lg");
+    expect(button).toHaveClass("btn-square");
+    expect(button).toHaveClass("rounded-lg");
+  });
+
+  it("applies specified size class", () => {
+    const { container } = render(ToggleButton, {
+      props: {
+        label: "Small Button",
+        size: "sm",
+      },
+    });
+
+    const button = container.querySelector("button");
+    expect(button).toHaveClass("btn-sm");
+    expect(button).toHaveClass("btn-square");
+  });
+
+  it("defaults to btn-sm for cell mode", () => {
+    const { container } = render(ToggleButton, {
+      props: {
+        cell: true,
+        label: "Cell Button",
+      },
+    });
+
+    const button = container.querySelector("button");
+    expect(button).toHaveClass("btn-sm");
+    expect(button).toHaveClass("btn-square");
+    expect(button).toHaveClass("rounded-lg");
   });
 
   it("emits update:modelValue when clicked", async () => {
@@ -20,9 +99,7 @@ describe("ToggleButton.vue", () => {
     const { emitted } = render(ToggleButton, {
       props: {
         modelValue: false,
-      },
-      slots: {
-        default: "Click",
+        label: "Click",
       },
     });
 
@@ -63,14 +140,12 @@ describe("ToggleButton.vue", () => {
     expect(button).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("applies bg-warning and uses slot content as accessible name when color is not provided", () => {
+  it("applies bg-warning in cell mode when color is not provided", () => {
     render(ToggleButton, {
       props: {
         cell: true,
         modelValue: false,
-      },
-      slots: {
-        default: "Fallback Cell",
+        label: "Fallback Cell",
       },
     });
 

@@ -138,6 +138,20 @@ pub fn live_set_random_strobe_rate(state: State<'_, AppState>, rate: u8) -> Resu
 }
 
 #[tauri::command]
+pub fn live_set_simple_flash_fade(state: State<'_, AppState>, fade: f32) -> Result<(), String> {
+    let mut live = state.output.engine.lock().map_err(|e| e.to_string())?;
+    live.set_simple_flash_fade(fade);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn live_set_white_flash_fade(state: State<'_, AppState>, fade: f32) -> Result<(), String> {
+    let mut live = state.output.engine.lock().map_err(|e| e.to_string())?;
+    live.set_white_flash_fade(fade);
+    Ok(())
+}
+
+#[tauri::command]
 pub fn live_set_effect_bpm(state: State<'_, AppState>, bpm: u16) -> Result<(), String> {
     let mut live = state.output.engine.lock().map_err(|e| e.to_string())?;
     live.set_effect_bpm(bpm);

@@ -15,7 +15,7 @@ import FourIcon from "@/components/icons/FourIcon.vue";
 import ThreeIcon from "@/components/icons/ThreeIcon.vue";
 import TwoIcon from "@/components/icons/TwoIcon.vue";
 
-export type FlashType = "master" | "strobe" | "randomStrobe";
+export type FlashType = "simple" | "white" | "strobe" | "randomStrobe" | "master";
 
 export type EffectType = "pulse" | "chase" | "ramp_up" | "ramp_down";
 
@@ -49,6 +49,8 @@ export type LiveButtonsState = {
   groupSecondaryColors: Record<number, string | null>;
   strobeRate: number;
   randomStrobeRate: number;
+  simpleFlashFade: number;
+  whiteFlashFade: number;
   effectBpm: number;
   colorEffectBpm: number;
   colorFadeSpeed: number;
@@ -112,15 +114,15 @@ export const alignments: Record<
     icon: FlipHorizontal2Icon,
   },
   two: {
-    label: "Two groups",
+    label: "groups",
     icon: TwoIcon,
   },
   three: {
-    label: "Three groups",
+    label: "groups",
     icon: ThreeIcon,
   },
   four: {
-    label: "Four groups",
+    label: "groups",
     icon: FourIcon,
   },
 };

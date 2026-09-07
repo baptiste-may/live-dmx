@@ -33,20 +33,4 @@ describe("LiveIntensityMasters.vue", () => {
 
     expect(liveButtons.getGroupMaster(1)).toBe(65);
   });
-
-  it("activates flash on mousedown and deactivates on mouseup", async () => {
-    const showGroups = useShowGroups();
-    const liveButtons = useLiveButtons();
-    showGroups.groups = [{ id: 1, name: "Spots" }];
-
-    render(LiveIntensityMasters);
-
-    const flashButton = screen.getByRole("button", { name: "Flash" });
-
-    await fireEvent.mouseDown(flashButton);
-    expect(liveButtons.isFlashActive(1, "master")).toBe(true);
-
-    await fireEvent.mouseUp(flashButton);
-    expect(liveButtons.isFlashActive(1, "master")).toBe(false);
-  });
 });

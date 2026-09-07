@@ -13,7 +13,7 @@ describe("LiveContent.vue", () => {
     const { rerender } = render(LiveContent);
 
     expect(screen.getByRole("heading", { name: "Masters" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Strobes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Flashs" })).toBeInTheDocument();
 
     navStore.navigate(LivePageId.COLORS);
     await rerender({});
