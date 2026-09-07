@@ -7,7 +7,7 @@ const navigation = useLiveNavigation();
 </script>
 
 <template>
-  <Join>
+  <Join class="justify-center">
     <Button
       v-for="(page, id) in EVERY_LIVE_PAGES"
       :key="id"
