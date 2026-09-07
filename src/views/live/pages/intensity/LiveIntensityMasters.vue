@@ -22,10 +22,13 @@ const liveButtons = useLiveButtons();
         >
           <Fader
             :model-value="liveButtons.getGroupMaster(group.id)"
+            :label="group.id === 0 ? 'Grand Master' : group.name"
             :error="group.id === 0"
             @update:model-value="liveButtons.setGroupMaster(group.id, $event)"
           />
-          <Badge neutral>{{ group.name }}</Badge>
+          <Badge neutral>
+            {{ group.id === 0 ? "Grand Master" : group.name }}
+          </Badge>
         </div>
       </div>
     </CardBody>
