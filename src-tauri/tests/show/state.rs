@@ -110,6 +110,7 @@ fn test_show_data_snapshot_and_restore() {
             ],
         },
         output: ShowOutputState::default(),
+        fixture_definitions: std::collections::HashMap::new(),
     };
 
     let snapshot = show.snapshot();
@@ -124,6 +125,7 @@ fn test_show_data_snapshot_and_restore() {
         patch: ShowPatchState::default(),
         groups: PatchGroupsState::default(),
         output: ShowOutputState::default(),
+        fixture_definitions: std::collections::HashMap::new(),
     };
 
     show.restore_snapshot(new_snapshot);

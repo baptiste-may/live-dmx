@@ -37,6 +37,7 @@ fn test_show_file_serialization_round_trip() {
             ],
         },
         output: ShowOutputState::default(),
+        fixture_definitions: std::collections::HashMap::new(),
     };
 
     let json_str = serde_json::to_string_pretty(&content).unwrap();
@@ -193,4 +194,54 @@ fn test_clean_patched_fixture_cleans_entire_fixture() {
             "channels": ["Dimmer", "Red"]
         })
     );
+}
+
+#[test]
+fn test_show_file_with_embedded_gdtf_definitions() {
+    use live_dmx_lib::show::types::{EmbeddedGdtfDefinition, EmbeddedGdtfMode};
+    use std::collections::HashMap;
+
+    let dir = tempfile::tempdir().unwrap();
+    let file_path = dir.path().join("gdtf_show.ldmx");
+
+    let mut definitions = HashMap::new();
+    definitions.insert(
+        "robe@robin-pointe".to_string(),
+        EmbeddedGdtfDefinition {
+            name: "Robin Pointe".to_string(),
+            short_name: Some("Pointe".to_string()),
+            manufacturer: "Robe Lighting".to_string(),
+            description: Some("Discharge moving head".to_string()),
+            fixture_type_id: Some("uuid-pointe".to_string()),
+            rid: Some(1234),
+            modes: vec![EmbeddedGdtfMode {
+                name: "Standard 24ch".to_string(),
+                short_name: Some("Std".to_string()),
+                channel_count: 24,
+                channels: vec!["Pan".to_string(), "Tilt".to_string(), "Dimmer".to_string()],
+            }],
+        },
+    );
+
+    let content = ShowFileContent {
+        version: 1,
+        identity: ShowIdentityState {
+            display_name: "GDTF Show".to_string(),
+        },
+        patch: ShowPatchState::default(),
+        groups: PatchGroupsState::default(),
+        output: ShowOutputState::default(),
+        fixture_definitions: definitions.clone(),
+    };
+
+    let json_str = serde_json::to_string_pretty(&content).unwrap();
+    std::fs::write(&file_path, &json_str).unwrap();
+
+    let loaded: ShowFileContent = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(loaded.fixture_definitions.len(), 1);
+    let def = loaded.fixture_definitions.get("robe@robin-pointe").unwrap();
+    assert_eq!(def.name, "Robin Pointe");
+    assert_eq!(def.manufacturer, "Robe Lighting");
+    assert_eq!(def.rid, Some(1234));
+    assert_eq!(def.modes[0].channels.len(), 3);
 }

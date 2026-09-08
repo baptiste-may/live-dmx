@@ -10,7 +10,6 @@
     "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri",
-    "download-fixtures": "bun run download-fixtures.ts",
     "lint:front": "eslint .",
     "lint:back": "cd src-tauri && cargo clippy -- -D warnings",
     "lint": "bun lint:front && bun lint:back",

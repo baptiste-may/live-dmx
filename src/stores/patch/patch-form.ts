@@ -1,6 +1,8 @@
+import { invoke } from "@tauri-apps/api/core";
 import { defineStore } from "pinia";
 
 import { useFixtureBrowser } from "@/stores/fixture-browser.ts";
+import { useSettings } from "@/stores/settings.ts";
 import { useShowPatch } from "@/stores/show/show-patch.ts";
 import { ToastType, useToastStore } from "@/stores/toast.ts";
 import type { FixtureMode, FixtureType } from "@/types/fixtures.ts";
@@ -163,7 +165,51 @@ export const usePatchForm = defineStore("patch-form", {
         return;
       }
       const show = useShowPatch();
-      const channelCount = this.selectedMode.channels?.length ?? 1;
+      const browser = useFixtureBrowser();
+
+      let resolvedChannels: string[] = (this.selectedMode.channels || []).map((ch, idx) => {
+        if (typeof ch === "string" && ch.trim()) return ch;
+        if (ch && typeof ch === "object") {
+          if ("name" in ch && typeof ch.name === "string" && ch.name.trim()) return ch.name;
+          if ("channel" in ch && typeof ch.channel === "string" && ch.channel.trim())
+            return ch.channel;
+        }
+        return `Channel ${idx + 1}`;
+      });
+
+      // If fixture is from GDTF-Share and is uninstalled or has placeholder channels, fetch/persist to storage
+      const isPlaceholder =
+        resolvedChannels.length === 0 || resolvedChannels.every((c, i) => c === `Channel ${i + 1}`);
+      const isUninstalled = Boolean(this.selectedFixture.rid && !this.selectedFixture.isInstalled);
+
+      if (this.selectedFixture.rid && (isUninstalled || isPlaceholder)) {
+        try {
+          const parsed = await browser.fetchMode(this.selectedFixture, this.selectedMode.name, {
+            persist: true,
+          });
+          if (parsed && parsed.channels.length > 0) {
+            resolvedChannels = parsed.channels;
+            this.selectedMode.channels = parsed.channels;
+          }
+        } catch (err: unknown) {
+          const errMsg = String(err);
+          if (errMsg.includes("authentication required")) {
+            useSettings().openModal();
+            useToastStore().addToast(
+              "Please connect your GDTF-Share account in Settings to download this fixture",
+              ToastType.INFO,
+            );
+            return;
+          }
+          useToastStore().addToast(`Failed to fetch GDTF: ${errMsg}`, ToastType.ERROR);
+          return;
+        }
+      }
+
+      const channelCount =
+        resolvedChannels.length > 0
+          ? resolvedChannels.length
+          : (this.selectedMode.dmxfootprint ?? 1);
 
       const collision = findPatchCollision(show.fixtures, {
         universe: this.universe,
@@ -181,6 +227,30 @@ export const usePatchForm = defineStore("patch-form", {
         return;
       }
 
+      // Register fixture definition in show
+      try {
+        await invoke("show_register_fixture_definition", {
+          definition: {
+            name: this.selectedFixture.name,
+            shortName: this.selectedFixture.shortName,
+            manufacturer: this.selectedFixture.manufacturer || "Generic",
+            description: this.selectedFixture.description,
+            rid: this.selectedFixture.rid,
+            modes: [
+              {
+                name: this.selectedMode.name,
+                shortName: this.selectedMode.shortName,
+                channelCount,
+                channels: resolvedChannels,
+              },
+            ],
+          },
+        });
+      } catch (err: unknown) {
+        // Tolerated in test / non-Tauri environments, but logged for visibility.
+        console.warn("Failed to register fixture definition in show:", err);
+      }
+
       const cleanFixtureType: CleanFixtureType = {
         name: this.selectedFixture.name,
         ...(this.selectedFixture.shortName ? { shortName: this.selectedFixture.shortName } : {}),
@@ -193,14 +263,7 @@ export const usePatchForm = defineStore("patch-form", {
       const cleanMode: CleanFixtureMode = {
         name: this.selectedMode.name,
         ...(this.selectedMode.shortName ? { shortName: this.selectedMode.shortName } : {}),
-        channels: (this.selectedMode.channels || []).map((ch) => {
-          if (typeof ch === "string") return ch;
-          if (ch && typeof ch === "object") {
-            if ("name" in ch && typeof ch.name === "string") return ch.name;
-            if ("channel" in ch && typeof ch.channel === "string") return ch.channel;
-          }
-          return "";
-        }),
+        channels: resolvedChannels,
       };
 
       try {

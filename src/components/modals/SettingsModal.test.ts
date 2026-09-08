@@ -29,6 +29,7 @@ describe("SettingsModal.vue", () => {
     expect(screen.getByRole("heading", { name: /settings/i })).toBeInTheDocument();
     expect(screen.getByText("Global")).toBeInTheDocument();
     expect(screen.getByText("Live")).toBeInTheDocument();
+    expect(screen.getByText("GDTF-Share Library")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();

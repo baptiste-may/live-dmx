@@ -1,6 +1,8 @@
 import type { NamedChannel } from "@/types/fixtures";
 import type { PatchedFixture } from "@/types/patch";
 
+export const failedPreviewKeys = new Set<string>();
+
 /**
  * Type guard to check if a DMX channel reference is a NamedChannel object.
  */

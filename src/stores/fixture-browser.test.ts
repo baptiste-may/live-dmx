@@ -2,10 +2,37 @@ import { invoke } from "@tauri-apps/api/core";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { mockFixturesData } from "./__mocks__/fixture-browser";
-import { useFixtureBrowser } from "./fixture-browser";
+import type { GdtfCatalogItem } from "@/types/fixtures";
+
+import { catalogItemsToManufacturers, useFixtureBrowser } from "./fixture-browser";
+import { useSettings } from "./settings.ts";
 
 const mockInvoke = vi.mocked(invoke);
+
+const mockCatalogItems: GdtfCatalogItem[] = [
+  {
+    fixture: "SlimPAR 64",
+    manufacturer: "Chauvet DJ",
+    isInstalled: true,
+    isGeneric: false,
+    modes: [{ name: "Standard", dmxfootprint: 4, channels: ["Dimmer", "Red", "Green", "Blue"] }],
+  },
+  {
+    fixture: "GigBAR 2",
+    manufacturer: "Chauvet DJ",
+    isInstalled: true,
+    isGeneric: false,
+    modes: [{ name: "Standard", dmxfootprint: 4, channels: ["Dimmer", "Red", "Green", "Blue"] }],
+  },
+  {
+    fixture: "Mega Par Profile",
+    manufacturer: "American DJ",
+    isInstalled: false,
+    isGeneric: false,
+    rid: 1234,
+    modes: [{ name: "Standard", dmxfootprint: 4, channels: ["Dimmer", "Red", "Green", "Blue"] }],
+  },
+];
 
 describe("fixture-browser store", () => {
   beforeEach(() => {
@@ -19,139 +46,214 @@ describe("fixture-browser store", () => {
     expect(store.manufacturers).toBeUndefined();
     expect(store.searchQuery).toBe("");
     expect(store.filteredManufacturers).toEqual({});
-    expect(store.isLoading).toBe(true);
+    expect(store.isLoading).toBe(false);
+    expect(store.isInstalled).toBe(true);
+    expect(store.isAuthenticated).toBe(false);
   });
 
-  it("should fetch manufacturers and perform search filtering", async () => {
-    mockInvoke.mockResolvedValue(mockFixturesData);
+  it("should convert catalog items to manufacturers correctly", () => {
+    const manufacturers = catalogItemsToManufacturers(mockCatalogItems);
+
+    expect(Object.keys(manufacturers)).toContain("chauvet-dj");
+    expect(Object.keys(manufacturers)).toContain("american-dj");
+    expect(manufacturers["chauvet-dj"].fixtures["slimpar-64"].name).toBe("SlimPAR 64");
+    expect(manufacturers["american-dj"].fixtures["mega-par-profile"].rid).toBe(1234);
+  });
+
+  it("should fetch fixtures and perform search via gdtf_search", async () => {
+    mockInvoke.mockResolvedValue(mockCatalogItems);
 
     const store = useFixtureBrowser();
     await store.loadAll();
 
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_search", { query: undefined });
     expect(store.isLoading).toBe(false);
-    expect(store.manufacturers).toEqual(mockFixturesData);
+    expect(store.manufacturers).toBeDefined();
+    expect(store.manufacturers?.["chauvet-dj"].fixtures).toHaveProperty("slimpar-64");
 
     await store.search("SlimPAR");
     expect(store.searchQuery).toBe("SlimPAR");
-    expect(Object.keys(store.filteredManufacturers)).toEqual(["chauvet"]);
-    expect(store.filteredManufacturers.chauvet.fixtures).toHaveProperty("slimpar-64");
-
-    // Multi-token search
-    await store.search("American mega");
-    expect(Object.keys(store.filteredManufacturers)).toEqual(["adj"]);
-    expect(store.filteredManufacturers.adj.fixtures).toHaveProperty("mega-par-profile");
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_search", { query: "SlimPAR" });
   });
 
   it("should clear search query when clearSearch is called", async () => {
-    mockInvoke.mockResolvedValue(mockFixturesData);
+    mockInvoke.mockResolvedValue(mockCatalogItems);
 
     const store = useFixtureBrowser();
-    await store.loadAll();
-
     await store.search("gig");
     expect(store.searchQuery).toBe("gig");
-    expect(Object.keys(store.filteredManufacturers.chauvet.fixtures)).toEqual(["gig-bar-2"]);
 
     store.clearSearch();
     expect(store.searchQuery).toBe("");
-    expect(store.filteredManufacturers).toEqual(mockFixturesData);
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_search", { query: undefined });
   });
 
   it("should reload fixtures when refresh is called", async () => {
-    mockInvoke.mockImplementation(async (cmd) => {
-      if (cmd === "reload_fixtures") return mockFixturesData;
-      return {};
-    });
+    mockInvoke.mockResolvedValue(mockCatalogItems);
 
     const store = useFixtureBrowser();
     await store.refresh();
 
-    expect(mockInvoke).toHaveBeenCalledWith("reload_fixtures");
-    expect(store.manufacturers).toEqual(mockFixturesData);
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_search", { query: undefined });
     expect(store.isLoading).toBe(false);
   });
 
-  it("should handle error when refresh fails", async () => {
-    mockInvoke.mockRejectedValue(new Error("Reload failure"));
+  it("should handle error when loadAll fails", async () => {
+    mockInvoke.mockRejectedValue(new Error("Search failure"));
 
     const store = useFixtureBrowser();
-    await store.refresh();
+    const res = await store.loadAll();
 
+    expect(res).toBe(false);
     expect(store.isLoading).toBe(false);
   });
 
   it("should get fixture by manufacturer key and fixture key", async () => {
-    mockInvoke.mockResolvedValue(mockFixturesData);
+    mockInvoke.mockResolvedValue(mockCatalogItems);
 
     const store = useFixtureBrowser();
-    await store.search();
+    await store.loadAll();
 
-    const fixture = store.getFixture("chauvet", "slimpar-64");
+    const fixture = store.getFixture("chauvet-dj", "slimpar-64");
     expect(fixture).not.toBeNull();
     expect(fixture?.name).toBe("SlimPAR 64");
   });
 
-  it("should check if fixtures are installed", async () => {
+  it("should check auth status from backend", async () => {
     mockInvoke.mockResolvedValue(true);
-    const store = useFixtureBrowser();
 
-    const result = await store.checkInstalled();
-    expect(result).toBe(true);
-    expect(store.isInstalled).toBe(true);
-    expect(mockInvoke).toHaveBeenCalledWith("check_fixtures_installed");
+    const store = useFixtureBrowser();
+    await store.checkAuthStatus();
+
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_get_credentials_status");
+    expect(store.isAuthenticated).toBe(true);
   });
 
-  it("should initialize by searching if fixtures are installed", async () => {
+  it("should login with credentials via gdtf_set_credentials", async () => {
+    mockInvoke.mockResolvedValue(true);
+
+    const store = useFixtureBrowser();
+    const success = await store.setCredentials("user@example.com", "secret");
+
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_set_credentials", {
+      user: "user@example.com",
+      pass: "secret",
+    });
+    expect(success).toBe(true);
+    expect(store.isAuthenticated).toBe(true);
+  });
+
+  it("should fetch mode on demand via gdtf_fetch_mode", async () => {
+    const mockParsedMode = {
+      name: "Standard",
+      shortName: "Std",
+      channelCount: 4,
+      channels: ["Dimmer", "Red", "Green", "Blue"],
+    };
+    mockInvoke.mockResolvedValue(mockParsedMode);
+
+    const store = useFixtureBrowser();
+    const fixture = {
+      name: "SlimPAR 64",
+      manufacturer: "Chauvet DJ",
+      manufacturerKey: "chauvet-dj",
+      fixtureKey: "slimpar-64",
+      rid: 100,
+      isInstalled: false,
+      modes: [],
+    };
+
+    const mode = await store.fetchMode(fixture, "Standard");
+
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_fetch_mode", {
+      rid: 100,
+      manufacturer: "Chauvet DJ",
+      fixture: "SlimPAR 64",
+      modeName: "Standard",
+      persist: true,
+    });
+    expect(mode).toEqual(mockParsedMode);
+    expect(fixture.isInstalled).toBe(true);
+  });
+
+  it("should fetch mode for preview without persisting or setting isInstalled", async () => {
+    const mockParsedMode = {
+      name: "Standard",
+      shortName: "Std",
+      channelCount: 4,
+      channels: ["Dimmer", "Red", "Green", "Blue"],
+    };
+    mockInvoke.mockResolvedValue(mockParsedMode);
+
+    const store = useFixtureBrowser();
+    const fixture = {
+      name: "SlimPAR 64",
+      manufacturer: "Chauvet DJ",
+      manufacturerKey: "chauvet-dj",
+      fixtureKey: "slimpar-64",
+      rid: 100,
+      isInstalled: false,
+      modes: [{ name: "Standard", channels: [] }],
+    };
+
+    const mode = await store.fetchMode(fixture, "Standard", { persist: false });
+
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_fetch_mode", {
+      rid: 100,
+      manufacturer: "Chauvet DJ",
+      fixture: "SlimPAR 64",
+      modeName: "Standard",
+      persist: false,
+    });
+    expect(mode).toEqual(mockParsedMode);
+    expect(fixture.isInstalled).toBe(false);
+    expect(fixture.modes[0].channels).toEqual(["Dimmer", "Red", "Green", "Blue"]);
+  });
+
+  it("should import GDTF file via gdtf_import_file", async () => {
+    const importedItem: GdtfCatalogItem = {
+      fixture: "Imported Spot",
+      manufacturer: "Custom",
+      isInstalled: true,
+      isGeneric: false,
+      modes: [{ name: "Default", dmxfootprint: 5 }],
+    };
     mockInvoke.mockImplementation(async (cmd) => {
-      if (cmd === "check_fixtures_installed") return true;
-      if (cmd === "get_fixtures") return mockFixturesData;
+      if (cmd === "gdtf_import_file") return importedItem;
+      if (cmd === "gdtf_search") return [importedItem];
       return {};
     });
 
     const store = useFixtureBrowser();
-    await store.init();
+    const success = await store.importGdtf("/path/to/fixture.gdtf");
 
-    expect(store.isInstalled).toBe(true);
-    expect(store.isLoading).toBe(false);
-    expect(store.manufacturers).toEqual(mockFixturesData);
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_import_file", { path: "/path/to/fixture.gdtf" });
+    expect(success).toBe(true);
   });
 
-  it("should initialize by setting isLoading false if fixtures are not installed", async () => {
+  it("should open settings modal if unauthenticated when syncing catalog", async () => {
+    const store = useFixtureBrowser();
+    const settings = useSettings();
+    store.isAuthenticated = false;
+    settings.isModalOpen = false;
+    const success = await store.syncCatalog();
+
+    expect(settings.isModalOpen).toBe(true);
+    expect(success).toBe(false);
+  });
+
+  it("should sync online catalog via gdtf_sync_catalog when authenticated", async () => {
     mockInvoke.mockImplementation(async (cmd) => {
-      if (cmd === "check_fixtures_installed") return false;
+      if (cmd === "gdtf_sync_catalog") return 42;
+      if (cmd === "gdtf_search") return mockCatalogItems;
       return {};
     });
 
     const store = useFixtureBrowser();
-    await store.init();
+    store.isAuthenticated = true;
+    const success = await store.syncCatalog();
 
-    expect(store.isInstalled).toBe(false);
-    expect(store.isLoading).toBe(false);
-    expect(store.manufacturers).toBeUndefined();
-  });
-
-  it("should download fixtures and then search", async () => {
-    mockInvoke.mockImplementation(async (cmd) => {
-      if (cmd === "download_fixtures") return undefined;
-      if (cmd === "get_fixtures") return mockFixturesData;
-      return {};
-    });
-
-    const store = useFixtureBrowser();
-    await store.downloadFixtures();
-
-    expect(mockInvoke).toHaveBeenCalledWith("download_fixtures");
-    expect(store.isInstalled).toBe(true);
-    expect(store.isDownloading).toBe(false);
-    expect(store.manufacturers).toEqual(mockFixturesData);
-  });
-
-  it("should handle error when downloadFixtures fails", async () => {
-    mockInvoke.mockRejectedValue(new Error("Network connection error"));
-
-    const store = useFixtureBrowser();
-    await store.downloadFixtures();
-
-    expect(store.isDownloading).toBe(false);
+    expect(mockInvoke).toHaveBeenCalledWith("gdtf_sync_catalog");
+    expect(success).toBe(true);
   });
 });

@@ -23,6 +23,7 @@ pub fn show_create(state: State<'_, AppState>, app: AppHandle) -> Result<ShowDat
         patch: ShowPatchState::default(),
         groups: PatchGroupsState::default(),
         output: ShowOutputState::default(),
+        fixture_definitions: std::collections::HashMap::new(),
     };
     history.reset_with_saved(show.snapshot());
     show.file.is_dirty = false;
@@ -57,6 +58,7 @@ pub fn show_save(
         },
         groups: show.groups.clone(),
         output: show.output.clone(),
+        fixture_definitions: show.fixture_definitions.clone(),
     };
 
     let json_str = serde_json::to_string_pretty(&content).map_err(|e| e.to_string())?;
@@ -112,6 +114,7 @@ pub fn show_load(
         },
         groups: content.groups,
         output: content.output,
+        fixture_definitions: content.fixture_definitions,
     };
     history.reset_with_saved(show.snapshot());
     state.reset_live_engine()?;
@@ -185,4 +188,21 @@ pub fn show_redo(state: State<'_, AppState>, app: AppHandle) -> Result<ShowData,
         emit_show_changed(&app, &show);
     }
     Ok(show.clone())
+}
+
+#[tauri::command]
+pub fn show_register_fixture_definition(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    definition: crate::show::types::EmbeddedGdtfDefinition,
+) -> Result<(), String> {
+    state.apply_mutation(&app, |show| {
+        let key = format!(
+            "{}@{}",
+            definition.manufacturer.to_lowercase(),
+            definition.name.to_lowercase()
+        );
+        show.fixture_definitions.insert(key, definition);
+        Ok(())
+    })
 }

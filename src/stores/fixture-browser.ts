@@ -1,195 +1,150 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 import { markRaw } from "vue";
 
-import type { FixtureType, Manufacturers } from "@/types/fixtures";
+import type {
+  FixtureMode,
+  FixtureType,
+  GdtfCatalogItem,
+  Manufacturers,
+  ParsedGdtfMode,
+} from "@/types/fixtures";
 
+import { useSettings } from "./settings.ts";
 import { ToastType, useToastStore } from "./toast.ts";
 
-export type FixtureDownloadProgressPayload = {
-  percentage: number;
-  status: string;
-};
-
-export type FixtureLoadProgressPayload = {
-  current: number;
-  total: number;
-  percentage: number;
-  manufacturer: string;
-};
-
-export async function checkFixturesInstalled(): Promise<boolean> {
-  try {
-    return await invoke<boolean>("check_fixtures_installed");
-  } catch {
-    return false;
-  }
-}
-
-export function filterManufacturersLocally(
-  manufacturers: Manufacturers,
-  query?: string,
-): Manufacturers {
-  const trimmed = (query ?? "").trim().toLowerCase();
-  if (!trimmed) {
-    return manufacturers;
-  }
-  const tokens = trimmed.split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) {
-    return manufacturers;
-  }
-
+export function catalogItemsToManufacturers(items: GdtfCatalogItem[]): Manufacturers {
   const result: Manufacturers = {};
 
-  for (const [manId, manufacturer] of Object.entries(manufacturers)) {
-    const manNameLower = manufacturer.name.toLowerCase();
-    const manIdLower = manId.toLowerCase();
+  for (const item of items) {
+    const manKey = (item.manufacturer || "Generic").toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+    let fixKey = (item.fixture || "Fixture").toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 
-    const matchingFixtures: Record<string, FixtureType> = {};
-
-    for (const [fixId, fixture] of Object.entries(manufacturer.fixtures)) {
-      const fixNameLower = fixture.name.toLowerCase();
-      const fixIdLower = fixId.toLowerCase();
-      const shortNameLower = (fixture.shortName || "").toLowerCase();
-      const categories = (fixture.categories || []).map((c) => c.toLowerCase());
-      const modeNames = (fixture.modes || []).map((m) => m.name.toLowerCase());
-
-      const allTokensMatch = tokens.every(
-        (token) =>
-          manNameLower.includes(token) ||
-          manIdLower.includes(token) ||
-          fixNameLower.includes(token) ||
-          fixIdLower.includes(token) ||
-          shortNameLower.includes(token) ||
-          categories.some((cat) => cat.includes(token)) ||
-          modeNames.some((mode) => mode.includes(token)),
-      );
-
-      if (allTokensMatch) {
-        matchingFixtures[fixId] = fixture;
-      }
-    }
-
-    if (Object.keys(matchingFixtures).length > 0) {
-      result[manId] = {
-        ...manufacturer,
-        fixtures: matchingFixtures,
+    if (!result[manKey]) {
+      result[manKey] = {
+        name: item.manufacturer,
+        fixtures: {},
       };
     }
+
+    const baseFixKey = fixKey;
+    let collisionCounter = 1;
+    while (result[manKey].fixtures[fixKey]) {
+      const discriminator = item.rid ?? (item.uuid ? item.uuid.slice(0, 8) : collisionCounter);
+      fixKey = `${baseFixKey}-${discriminator}`;
+      collisionCounter++;
+    }
+
+    const modes: FixtureMode[] = (item.modes || []).map((m) => ({
+      name: m.name,
+      channels:
+        m.channels && m.channels.length > 0
+          ? m.channels
+          : Array.from({ length: m.dmxfootprint }, (_, i) => `Channel ${i + 1}`),
+      dmxfootprint: m.dmxfootprint,
+    }));
+
+    result[manKey].fixtures[fixKey] = {
+      name: item.fixture,
+      manufacturer: item.manufacturer,
+      manufacturerKey: manKey,
+      fixtureKey: fixKey,
+      modes,
+      rid: item.rid,
+      isInstalled: item.isInstalled,
+      isGeneric: item.isGeneric,
+      uploader: item.uploader,
+      rating: item.rating,
+      revision: item.revision,
+      categories: item.isGeneric ? ["Generic"] : ["GDTF"],
+    };
   }
 
   return result;
 }
 
-export async function loadManufacturers(query?: string): Promise<Manufacturers> {
-  try {
-    const raw = await invoke<Manufacturers>("get_fixtures", {
-      query: query && query.trim() ? query.trim() : undefined,
-    });
-    return markRaw(raw);
-  } catch (error: unknown) {
-    useToastStore().addToast(`Failed to load fixtures: ${String(error)}`, ToastType.ERROR);
-    return {};
-  }
-}
-
-export type FixtureBrowser = {
-  manufacturers: undefined | Manufacturers;
+export type FixtureBrowserState = {
+  manufacturers: Manufacturers | undefined;
   searchQuery: string;
   filteredManufacturers: Manufacturers;
   isLoading: boolean;
   isInstalled: boolean | null;
-  isDownloading: boolean;
-  progress: number;
-  loadingStatus: string;
+  isFetchingMode: boolean;
+  isAuthenticated: boolean;
   searchId: number;
 };
 
-let unlistenProgress: (() => void) | null = null;
-let unlistenDownloadProgress: (() => void) | null = null;
-
 export const useFixtureBrowser = defineStore("fixture-browser", {
-  state: (): FixtureBrowser => ({
+  state: (): FixtureBrowserState => ({
     manufacturers: undefined,
     searchQuery: "",
     filteredManufacturers: markRaw({}),
-    isLoading: true,
-    isInstalled: null,
-    isDownloading: false,
-    progress: 0,
-    loadingStatus: "Loading fixtures...",
+    isLoading: false,
+    isInstalled: true,
+    isFetchingMode: false,
+    isAuthenticated: false,
     searchId: 0,
   }),
   actions: {
-    async initEventListener() {
-      if (unlistenProgress) {
-        unlistenProgress();
-        unlistenProgress = null;
-      }
+    async checkAuthStatus() {
       try {
-        unlistenProgress = await listen<FixtureLoadProgressPayload>(
-          "fixture-load-progress",
-          (event) => {
-            this.progress = event.payload.percentage;
-            this.loadingStatus = `Loading ${event.payload.manufacturer}...`;
-          },
-        );
+        this.isAuthenticated = await invoke<boolean>("gdtf_get_credentials_status");
       } catch {
-        // Ignored in non-Tauri / test environments
+        this.isAuthenticated = false;
       }
     },
-    async initDownloadEventListener() {
-      if (unlistenDownloadProgress) {
-        unlistenDownloadProgress();
-        unlistenDownloadProgress = null;
-      }
+    async setCredentials(user: string, pass: string): Promise<boolean> {
       try {
-        unlistenDownloadProgress = await listen<FixtureDownloadProgressPayload>(
-          "fixture-download-progress",
-          (event) => {
-            this.progress = event.payload.percentage;
-            this.loadingStatus = event.payload.status;
-          },
-        );
-      } catch {
-        // Ignored in non-Tauri / test environments
+        await invoke<boolean>("gdtf_set_credentials", { user, pass });
+        this.isAuthenticated = true;
+        useToastStore().addToast("Connected to GDTF-Share successfully!", ToastType.SUCCESS);
+        return true;
+      } catch (err) {
+        useToastStore().addToast(`GDTF-Share login failed: ${String(err)}`, ToastType.ERROR);
+        return false;
       }
     },
-    async checkInstalled() {
-      const installed = await checkFixturesInstalled();
-      this.isInstalled = installed;
-      return installed;
+    async logout(): Promise<void> {
+      try {
+        await invoke("gdtf_logout");
+        this.isAuthenticated = false;
+        useToastStore().addToast("Disconnected from GDTF-Share", ToastType.INFO);
+      } catch {
+        this.isAuthenticated = false;
+      }
+    },
+    async checkInstalled(): Promise<boolean> {
+      try {
+        this.isInstalled = await invoke<boolean>("check_fixtures_installed");
+        return this.isInstalled;
+      } catch {
+        this.isInstalled = true;
+        return true;
+      }
     },
     async init() {
-      const installed = await this.checkInstalled();
-      if (installed) {
-        if (this.manufacturers === undefined) {
-          await this.loadAll();
-        }
-      } else {
-        this.isLoading = false;
+      await this.checkAuthStatus();
+      await this.checkInstalled();
+      if (this.manufacturers === undefined) {
+        await this.loadAll();
       }
     },
-    async loadAll(forceReload = false): Promise<boolean> {
+    async loadAll(): Promise<boolean> {
       const currentSearchId = ++this.searchId;
       this.isLoading = true;
-      this.progress = 0;
-      this.loadingStatus = forceReload ? "Reloading fixtures..." : "Loading fixtures...";
-
-      await this.initEventListener();
 
       try {
-        const results = forceReload
-          ? markRaw(await invoke<Manufacturers>("reload_fixtures"))
-          : await loadManufacturers();
+        const raw = await invoke<GdtfCatalogItem[]>("gdtf_search", {
+          query: this.searchQuery.trim() ? this.searchQuery.trim() : undefined,
+        });
+
         if (currentSearchId !== this.searchId) {
           return false;
         }
-        this.manufacturers = markRaw(results);
-        this.filteredManufacturers = markRaw(filterManufacturersLocally(results, this.searchQuery));
-        this.progress = 100;
-        this.loadingStatus = "Loaded";
+
+        const grouped = catalogItemsToManufacturers(raw);
+        this.manufacturers = markRaw(grouped);
+        this.filteredManufacturers = markRaw(grouped);
         return true;
       } catch (error: unknown) {
         useToastStore().addToast(`Failed to load fixtures: ${String(error)}`, ToastType.ERROR);
@@ -200,58 +155,118 @@ export const useFixtureBrowser = defineStore("fixture-browser", {
         }
       }
     },
-    async refresh() {
-      const success = await this.loadAll(true);
-      if (success) {
-        useToastStore().addToast("Fixture library refreshed.", ToastType.SUCCESS);
-      }
-    },
-    async downloadFixtures() {
-      this.isDownloading = true;
-      this.progress = 0;
-      this.loadingStatus = "Starting download...";
-
-      await this.initDownloadEventListener();
-
-      try {
-        await invoke("download_fixtures");
-        this.isInstalled = true;
-        this.isDownloading = false;
-        await this.loadAll();
-      } catch (error: unknown) {
-        this.isDownloading = false;
-        useToastStore().addToast(`Failed to download fixtures: ${String(error)}`, ToastType.ERROR);
-      }
-    },
-    async search(query?: string) {
-      if (query !== undefined) {
-        this.searchQuery = query;
-      }
-      if (this.manufacturers === undefined) {
-        await this.loadAll();
-        return;
-      }
-      this.filteredManufacturers = markRaw(
-        filterManufacturersLocally(this.manufacturers, this.searchQuery),
-      );
+    async search(query = "") {
+      this.searchQuery = query;
+      await this.loadAll();
     },
     clearSearch() {
       this.searchQuery = "";
-      if (this.manufacturers !== undefined) {
-        this.filteredManufacturers = this.manufacturers;
+      this.loadAll();
+    },
+    async refresh(): Promise<boolean> {
+      try {
+        await invoke("reload_fixtures");
+      } catch {
+        // Tolerated in test / non-Tauri environments
+      }
+      return this.loadAll();
+    },
+    async syncCatalog(): Promise<boolean> {
+      if (!this.isAuthenticated) {
+        useSettings().openModal();
+        useToastStore().addToast(
+          "Please connect your free GDTF-Share account in Settings to sync the online catalog.",
+          ToastType.INFO,
+        );
+        return false;
+      }
+
+      this.isLoading = true;
+      try {
+        const count = await invoke<number>("gdtf_sync_catalog");
+        useToastStore().addToast(`Synced ${count} fixtures from GDTF-Share!`, ToastType.SUCCESS);
+        await this.loadAll();
+        return true;
+      } catch (err) {
+        const errorMsg = String(err);
+        if (errorMsg.includes("authentication required") || errorMsg.includes("401")) {
+          this.isAuthenticated = false;
+          useSettings().openModal();
+        }
+        useToastStore().addToast(`Failed to sync GDTF catalog: ${errorMsg}`, ToastType.ERROR);
+        return false;
+      } finally {
+        this.isLoading = false;
       }
     },
-    getFixture(manufacturerKey: string, fixtureKey: string) {
-      if (this.manufacturers && this.manufacturers[manufacturerKey]?.fixtures[fixtureKey]) {
-        return this.manufacturers[manufacturerKey].fixtures[fixtureKey];
+    getFixture(manufacturerKey: string, fixtureKey: string): FixtureType | null {
+      const source = this.filteredManufacturers?.[manufacturerKey]
+        ? this.filteredManufacturers
+        : this.manufacturers;
+      if (!source) return null;
+      const manufacturer = source[manufacturerKey];
+      if (!manufacturer) return null;
+      return manufacturer.fixtures[fixtureKey] || null;
+    },
+    async fetchMode(
+      fixture: FixtureType,
+      modeName: string,
+      options: { persist?: boolean } = {},
+    ): Promise<ParsedGdtfMode> {
+      const shouldPersist = options.persist ?? true;
+      this.isFetchingMode = true;
+      try {
+        const result = await invoke<ParsedGdtfMode>("gdtf_fetch_mode", {
+          rid: fixture.rid,
+          manufacturer: fixture.manufacturer || fixture.name,
+          fixture: fixture.name,
+          modeName,
+          persist: shouldPersist,
+        });
+        if (shouldPersist) {
+          fixture.isInstalled = true;
+        }
+        const targetMode = fixture.modes.find(
+          (m) => m.name.trim().toLowerCase() === modeName.trim().toLowerCase(),
+        );
+        if (targetMode) {
+          targetMode.channels = result.channels;
+          targetMode.dmxfootprint = result.channelCount;
+        }
+        if (this.manufacturers) {
+          this.manufacturers = { ...this.manufacturers };
+        }
+        if (this.filteredManufacturers) {
+          this.filteredManufacturers = { ...this.filteredManufacturers };
+        }
+        return result;
+      } catch (err) {
+        const errorMsg = String(err);
+        if (
+          shouldPersist &&
+          (errorMsg.includes("authentication required") || errorMsg.includes("401"))
+        ) {
+          this.isAuthenticated = false;
+          useSettings().openModal();
+        }
+        throw err;
+      } finally {
+        this.isFetchingMode = false;
       }
-      if (
-        this.filteredManufacturers &&
-        this.filteredManufacturers[manufacturerKey]?.fixtures[fixtureKey]
-      ) {
-        return this.filteredManufacturers[manufacturerKey].fixtures[fixtureKey];
+    },
+    async importGdtf(filePath: string): Promise<boolean> {
+      try {
+        const item = await invoke<GdtfCatalogItem>("gdtf_import_file", { path: filePath });
+        useToastStore().addToast(
+          `Imported GDTF fixture: ${item.fixture} (${item.manufacturer})`,
+          ToastType.SUCCESS,
+        );
+        await this.loadAll();
+        return true;
+      } catch (err) {
+        useToastStore().addToast(`Failed to import GDTF: ${String(err)}`, ToastType.ERROR);
+        return false;
       }
-      return null;
     },
   },
 });

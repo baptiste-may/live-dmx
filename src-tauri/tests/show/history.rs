@@ -11,6 +11,7 @@ fn mock_snapshot(name: &str) -> ShowSnapshot {
         patch: ShowPatchState::default(),
         groups: PatchGroupsState::default(),
         output: ShowOutputState::default(),
+        fixture_definitions: std::collections::HashMap::new(),
     }
 }
 

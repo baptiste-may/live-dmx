@@ -4,12 +4,14 @@ import { MonitorIcon, MoonIcon, SettingsIcon, SunIcon, XIcon } from "lucide-vue-
 
 import { useSettings } from "@/stores/settings.ts";
 
+import SettingsGdtf from "./settings/SettingsGdtf.vue";
+
 const settings = useSettings();
 </script>
 
 <template>
   <Modal v-if="settings.isModalOpen" v-model="settings.isModalOpen">
-    <ModalBox class="max-w-md">
+    <ModalBox class="max-w-lg">
       <div class="flex items-center justify-between">
         <h3 class="flex items-center gap-2 text-lg font-bold">
           <SettingsIcon class="h-5 w-5" />
@@ -97,6 +99,11 @@ const settings = useSettings();
             </label>
           </div>
         </div>
+
+        <Divider class="my-0" />
+
+        <!-- GDTF-Share Section -->
+        <SettingsGdtf />
       </div>
 
       <ModalAction>

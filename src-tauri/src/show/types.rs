@@ -60,6 +60,34 @@ impl Default for ShowOutputState {
     }
 }
 
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddedGdtfMode {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short_name: Option<String>,
+    pub channel_count: usize,
+    pub channels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddedGdtfDefinition {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short_name: Option<String>,
+    pub manufacturer: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixture_type_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rid: Option<u32>,
+    pub modes: Vec<EmbeddedGdtfMode>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ShowSnapshot {
@@ -68,6 +96,8 @@ pub struct ShowSnapshot {
     pub groups: PatchGroupsState,
     #[serde(default)]
     pub output: ShowOutputState,
+    #[serde(default)]
+    pub fixture_definitions: HashMap<String, EmbeddedGdtfDefinition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +110,8 @@ pub struct ShowFileContent {
     pub groups: PatchGroupsState,
     #[serde(default)]
     pub output: ShowOutputState,
+    #[serde(default)]
+    pub fixture_definitions: HashMap<String, EmbeddedGdtfDefinition>,
 }
 
 fn default_file_version() -> u32 {
@@ -148,6 +180,8 @@ pub struct ShowData {
     pub groups: PatchGroupsState,
     #[serde(default)]
     pub output: ShowOutputState,
+    #[serde(default)]
+    pub fixture_definitions: HashMap<String, EmbeddedGdtfDefinition>,
 }
 
 impl ShowData {
@@ -157,6 +191,7 @@ impl ShowData {
             patch: self.patch.clone(),
             groups: self.groups.clone(),
             output: self.output.clone(),
+            fixture_definitions: self.fixture_definitions.clone(),
         }
     }
 
@@ -165,6 +200,7 @@ impl ShowData {
         self.patch = snapshot.patch;
         self.groups = snapshot.groups;
         self.output = snapshot.output;
+        self.fixture_definitions = snapshot.fixture_definitions;
     }
 }
 

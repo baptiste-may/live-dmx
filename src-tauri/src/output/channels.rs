@@ -30,23 +30,24 @@ pub fn classify_channel(name: &str) -> ChannelType {
     }
     if lower.contains("dimmer") || lower.contains("intensity") {
         ChannelType::Dimmer
-    } else if lower.contains("red") || lower == "r" {
+    } else if lower.contains("red") || lower == "r" || lower.contains("coloradd_r") {
         ChannelType::Red
-    } else if lower.contains("green") || lower == "g" {
+    } else if lower.contains("green") || lower == "g" || lower.contains("coloradd_g") {
         ChannelType::Green
-    } else if lower.contains("blue") || lower == "b" {
+    } else if lower.contains("blue") || lower == "b" || lower.contains("coloradd_b") {
         ChannelType::Blue
-    } else if lower.contains("white") || lower == "w" {
+    } else if lower.contains("white") || lower == "w" || lower.contains("coloradd_w") {
         ChannelType::White
-    } else if lower.contains("amber") || lower == "a" {
+    } else if lower.contains("amber") || lower == "a" || lower.contains("coloradd_a") {
         ChannelType::Amber
-    } else if lower.contains("cyan") || lower == "c" {
+    } else if lower.contains("cyan") || lower == "c" || lower.contains("colorsub_c") {
         ChannelType::Cyan
-    } else if lower.contains("magenta") || lower == "m" {
+    } else if lower.contains("magenta") || lower == "m" || lower.contains("colorsub_m") {
         ChannelType::Magenta
-    } else if lower.contains("yellow") || lower == "y" {
+    } else if lower.contains("yellow") || lower == "y" || lower.contains("colorsub_y") {
         ChannelType::Yellow
-    } else if lower.contains("uv") || lower.contains("ultraviolet") {
+    } else if lower.contains("uv") || lower.contains("ultraviolet") || lower.contains("coloradd_uv")
+    {
         ChannelType::UV
     } else if lower.contains("strobe") || lower.contains("shutter") {
         ChannelType::Strobe

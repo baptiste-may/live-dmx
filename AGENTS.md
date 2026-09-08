@@ -35,12 +35,10 @@ Welcome to the `live-dmx` project. This document provides essential information 
   - `libs/`: Frontend utilities.
   - `types/`: TypeScript type definitions.
 - `src-tauri/`: Rust backend source code.
-  - `src/lib.rs`: Tauri application setup and command handlers.
-  - `src/fixtures/`: Rust logic for handling fixture data and caching (`commands.rs`, `loader.rs`, `types.rs`).
+  - `src/fixtures/`: Rust logic for handling fixture data and caching (`commands.rs`, `parser.rs`, `generic.rs`, `gdtf_share/`).
   - `src/show/`: Show management, patch batching, history tracking, and show serialization (`types.rs`, `state.rs`, `history.rs`, `commands.rs`, `identity.rs`, `recent.rs`, `patch/`).
   - `src/output/`: DMX output engine and command handlers (`engine.rs`, `effects.rs`, `channels.rs`, `colors.rs`, `runner.rs`, `commands.rs`, `types.rs`).
-- `fixtures/`: JSON data files for lighting fixtures (cached in OS AppData directory, or downloaded for development via `download-fixtures.ts`).
-- `download-fixtures.ts`: Script to download fixtures from the Open Fixture Library.
+- `fixtures/`: Cache directory in OS AppData (`<app_data_dir>/fixtures/`) containing downloaded GDTF archives (`.gdtf`). The GDTF-Share catalog index (`gdtf_catalog.json`) is cached directly in `<app_data_dir>/`.
 
 ## Coding Standards & Conventions
 
@@ -89,15 +87,18 @@ Welcome to the `live-dmx` project. This document provides essential information 
 - **Error Handling:** Use `Result` for functions that can fail, especially in Tauri commands.
 - **DMX Logic:** Centralize DMX computation and engine runner in the `output` module.
 
-## DMX Fixtures
+## DMX Fixtures & GDTF Standard
 
-The application relies on fixture definitions from the Open Fixture Library (OFL).
+The application uses the modern DIN SPEC 15800 standard (General Device Type Format / GDTF) for fixture definitions and connects directly to the GDTF-Share open database:
 
-- Fixtures are stored and cached in the native OS AppData directory (`<app_data_dir>/fixtures/`).
-- When the fixture browser is opened and fixtures are not yet installed in AppData, the user is prompted to download the Open Fixture Library on-demand (`download_fixtures` command).
-- Once downloaded or when already present, the backend loads and parses them on-demand (`get_fixtures` command) with progress reporting.
-- New fixtures should be contributed directly to the [Open Fixture Library](https://github.com/OpenLightingProject/open-fixture-library).
-- Refer to `src/types/fixtures.ts` for the expected structure of fixture definitions.
+- **Built-in Generics:** Essential fixtures (Dimmer 1ch, RGB 3ch, RGBW 4ch & 5ch, RGBAW+UV 6ch & 10ch, Strobe 1ch & 2ch, Moving Head Spot 16ch, Moving Head Wash 12ch) are built directly into the application binary, enabling immediate offline usage without any download.
+- **GDTF-Share Browser:** The fixture browser searches thousands of fixtures from GDTF-Share (`gdtf-share.com`) with instant multi-token filtering.
+- **On-Demand GDTF Fetching:** When a user patches a fixture from GDTF-Share, the `.gdtf` archive is fetched on-demand, parsed, and cached locally in `<app_data_dir>/fixtures/`.
+- **Embedded Show Definitions:** Show files (`.ldmx`) embed the parsed GDTF fixture definitions (`show.fixture_definitions`), making shows 100% portable and fully functional on offline systems without external dependencies.
+- **Manual Import:** Users can import any third-party `.gdtf` file directly into their library via the browser's "Import GDTF" button.
+- **DIN SPEC 15800 Parsing:** Backend parser in `src-tauri/src/fixtures/parser.rs` inspects `description.xml` inside `.gdtf` zip archives, resolving multi-byte channel offsets (Coarse, Fine, Ultra) and DIN SPEC 15800 attributes (`ColorAdd_R`, `Pan`, `Dimmer`, etc.).
+- **Authentication & Credentials:** GDTF-Share credentials are saved securely in `<app_data_dir>/gdtf_auth.json` (with user-restricted permissions) to maintain connection across app restarts. Sessions are automatically recovered on-demand or established in the background, and can be cleared via `gdtf_logout`.
+- Refer to `src/types/fixtures.ts` for the frontend structure of GDTF fixture definitions and catalog items.
 
 ## Working with DMX Output
 

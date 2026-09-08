@@ -1,4 +1,4 @@
 mod fixtures {
-    mod loader;
-    mod types;
+    mod catalog;
+    mod parser;
 }

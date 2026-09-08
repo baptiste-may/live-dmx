@@ -379,6 +379,43 @@ describe("patch-form store", () => {
     });
   });
 
+  it("should fetch and persist fixture when patching an uninstalled GDTF fixture", async () => {
+    const showPatch = useShowPatch();
+    vi.spyOn(showPatch, "patchBatch").mockResolvedValue(undefined as never);
+
+    const fixtureBrowser = useFixtureBrowser();
+    const fetchModeSpy = vi.spyOn(fixtureBrowser, "fetchMode").mockResolvedValue({
+      name: "Standard",
+      shortName: "Std",
+      channelCount: 2,
+      channels: ["Pan", "Tilt"],
+    });
+
+    const store = usePatchForm();
+    const fixture = {
+      name: "GDTF Fixture",
+      fixtureKey: "gdtf-fix",
+      manufacturerKey: "manuf",
+      rid: 42,
+      isInstalled: false,
+      modes: [
+        {
+          name: "Standard",
+          channels: ["Channel 1", "Channel 2"],
+          dmxfootprint: 2,
+        },
+      ],
+    };
+    store.selectedFixture = fixture;
+    store.selectedMode = fixture.modes[0];
+
+    await store.patch();
+
+    expect(fetchModeSpy).toHaveBeenCalledWith(fixture, "Standard", {
+      persist: true,
+    });
+  });
+
   it("should do nothing when patch is called without selected fixture", async () => {
     const showPatch = useShowPatch();
     const patchBatchSpy = vi.spyOn(showPatch, "patchBatch");

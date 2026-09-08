@@ -2,7 +2,10 @@ pub mod fixtures;
 pub mod output;
 pub mod show;
 
-use fixtures::{check_fixtures_installed, download_fixtures, get_fixtures, reload_fixtures};
+use fixtures::{
+    check_fixtures_installed, gdtf_fetch_mode, gdtf_get_credentials_status, gdtf_import_file,
+    gdtf_logout, gdtf_search, gdtf_set_credentials, gdtf_sync_catalog, reload_fixtures,
+};
 use output::{
     get_all_dmx_data, get_dmx_data, get_output_interfaces, live_reset_all_buttons,
     live_reset_group_color_effect, live_reset_group_effect, live_set_all_groups_color,
@@ -19,8 +22,8 @@ use show::{
     show_output_add_universe, show_output_get_universes, show_output_remove_universe,
     show_output_set_enabled, show_output_set_target, show_patch_batch, show_patch_fixture,
     show_patch_remove_fixtures, show_patch_toggle_group, show_patch_update_address,
-    show_patch_update_name, show_patch_update_universe, show_redo, show_save, show_undo,
-    show_unload, AppState,
+    show_patch_update_name, show_patch_update_universe, show_redo,
+    show_register_fixture_definition, show_save, show_undo, show_unload, AppState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -34,9 +37,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             check_fixtures_installed,
-            download_fixtures,
-            get_fixtures,
+            gdtf_search,
+            gdtf_set_credentials,
+            gdtf_get_credentials_status,
+            gdtf_logout,
+            gdtf_sync_catalog,
+            gdtf_fetch_mode,
+            gdtf_import_file,
             reload_fixtures,
+            show_register_fixture_definition,
             get_recent_shows,
             save_recent_show,
             remove_recent_show,
