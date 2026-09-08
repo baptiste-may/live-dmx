@@ -113,7 +113,7 @@ fn test_color_fade_speed_simultaneous_fade() {
             fixture_type: serde_json::json!({}),
             mode: serde_json::json!({"channels": ["Red", "Green", "Blue"]}),
             universe: 1,
-            address: ((i - 1) * 3 + 1) as u32,
+            address: (i - 1) * 3 + 1,
         });
     }
 
@@ -161,7 +161,7 @@ fn test_color_fade_left_order_staggered() {
             fixture_type: serde_json::json!({}),
             mode: serde_json::json!({"channels": ["Red", "Green", "Blue"]}),
             universe: 1,
-            address: ((i - 1) * 3 + 1) as u32,
+            address: (i - 1) * 3 + 1,
         });
     }
 
@@ -193,7 +193,7 @@ fn test_color_fade_wing_order_staggered() {
             fixture_type: serde_json::json!({}),
             mode: serde_json::json!({"channels": ["Red", "Green", "Blue"]}),
             universe: 1,
-            address: ((i - 1) * 3 + 1) as u32,
+            address: (i - 1) * 3 + 1,
         });
     }
 
@@ -225,7 +225,7 @@ fn test_color_fade_center_order_staggered() {
             fixture_type: serde_json::json!({}),
             mode: serde_json::json!({"channels": ["Red", "Green", "Blue"]}),
             universe: 1,
-            address: ((i - 1) * 3 + 1) as u32,
+            address: (i - 1) * 3 + 1,
         });
     }
 

@@ -1,6 +1,6 @@
 use live_dmx_lib::show::{
     clean_fixture_type, clean_mode, clean_patched_fixture, FixtureGroup, PatchGroupsState,
-    PatchedFixture, ShowFileContent, ShowIdentityState, ShowPatchState,
+    PatchedFixture, ShowFileContent, ShowIdentityState, ShowOutputState, ShowPatchState,
 };
 
 #[test]
@@ -36,6 +36,7 @@ fn test_show_file_serialization_round_trip() {
                 },
             ],
         },
+        output: ShowOutputState::default(),
     };
 
     let json_str = serde_json::to_string_pretty(&content).unwrap();

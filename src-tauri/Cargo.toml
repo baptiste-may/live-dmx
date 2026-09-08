@@ -28,6 +28,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 ureq = { version = "2.10", features = ["tls"] }
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
+artnet_protocol = "0.4.4"
+serialport = "4.10.0"
+rosc = "0.10.1"
 
 [dev-dependencies]
 tempfile = "3"

@@ -36,10 +36,38 @@ pub struct ShowChangesState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct UniverseOutputConfig {
+    pub universe: u32,
+    pub output: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ShowOutputState {
+    pub universes: Vec<UniverseOutputConfig>,
+}
+
+impl Default for ShowOutputState {
+    fn default() -> Self {
+        Self {
+            universes: vec![UniverseOutputConfig {
+                universe: 1,
+                output: "none".to_string(),
+                enabled: true,
+            }],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ShowSnapshot {
     pub identity: ShowIdentityState,
     pub patch: ShowPatchState,
     pub groups: PatchGroupsState,
+    #[serde(default)]
+    pub output: ShowOutputState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +78,8 @@ pub struct ShowFileContent {
     pub identity: ShowIdentityState,
     pub patch: ShowPatchState,
     pub groups: PatchGroupsState,
+    #[serde(default)]
+    pub output: ShowOutputState,
 }
 
 fn default_file_version() -> u32 {
@@ -116,6 +146,8 @@ pub struct ShowData {
     pub file: ShowChangesState,
     pub patch: ShowPatchState,
     pub groups: PatchGroupsState,
+    #[serde(default)]
+    pub output: ShowOutputState,
 }
 
 impl ShowData {
@@ -124,6 +156,7 @@ impl ShowData {
             identity: self.identity.clone(),
             patch: self.patch.clone(),
             groups: self.groups.clone(),
+            output: self.output.clone(),
         }
     }
 
@@ -131,6 +164,7 @@ impl ShowData {
         self.identity = snapshot.identity;
         self.patch = snapshot.patch;
         self.groups = snapshot.groups;
+        self.output = snapshot.output;
     }
 }
 

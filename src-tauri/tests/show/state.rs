@@ -1,6 +1,6 @@
 use live_dmx_lib::show::{
     AppState, FixtureGroup, PatchGroupsState, PatchRequest, PatchedFixture, ShowChangesState,
-    ShowData, ShowIdentityState, ShowPatchState, ShowSnapshot, ShowStatus,
+    ShowData, ShowIdentityState, ShowOutputState, ShowPatchState, ShowSnapshot, ShowStatus,
 };
 
 #[test]
@@ -109,6 +109,7 @@ fn test_show_data_snapshot_and_restore() {
                 },
             ],
         },
+        output: ShowOutputState::default(),
     };
 
     let snapshot = show.snapshot();
@@ -122,6 +123,7 @@ fn test_show_data_snapshot_and_restore() {
         },
         patch: ShowPatchState::default(),
         groups: PatchGroupsState::default(),
+        output: ShowOutputState::default(),
     };
 
     show.restore_snapshot(new_snapshot);

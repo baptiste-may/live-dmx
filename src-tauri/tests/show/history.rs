@@ -1,6 +1,6 @@
 use live_dmx_lib::show::{
-    PatchGroupsState, ShowHistory, ShowIdentityState, ShowPatchState, ShowSnapshot,
-    MAX_UNDO_STACK_SIZE,
+    PatchGroupsState, ShowHistory, ShowIdentityState, ShowOutputState, ShowPatchState,
+    ShowSnapshot, MAX_UNDO_STACK_SIZE,
 };
 
 fn mock_snapshot(name: &str) -> ShowSnapshot {
@@ -10,6 +10,7 @@ fn mock_snapshot(name: &str) -> ShowSnapshot {
         },
         patch: ShowPatchState::default(),
         groups: PatchGroupsState::default(),
+        output: ShowOutputState::default(),
     }
 }
 

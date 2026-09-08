@@ -25,8 +25,8 @@ fn test_live_engine_white_flash_calculation() {
 
     engine.compute_dmx(&show);
     let buf_flash = engine.universe_buffers.get(&1).unwrap().clone();
-    for i in 0..5 {
-        assert_eq!(buf_flash[i], 255);
+    for val in buf_flash.iter().take(5) {
+        assert_eq!(*val, 255);
     }
     assert_eq!(buf_flash[5], 0); // Pan stays 0
     assert_eq!(buf_flash[6], 0); // Tilt stays 0

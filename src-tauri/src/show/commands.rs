@@ -3,7 +3,7 @@ use tauri::{AppHandle, State};
 use crate::show::state::{emit_show_changed, AppState};
 use crate::show::types::{
     clean_patched_fixture, PatchGroupsState, ShowChangesState, ShowData, ShowFileContent,
-    ShowIdentityState, ShowPatchState, ShowStatus,
+    ShowIdentityState, ShowOutputState, ShowPatchState, ShowStatus,
 };
 
 #[tauri::command]
@@ -22,6 +22,7 @@ pub fn show_create(state: State<'_, AppState>, app: AppHandle) -> Result<ShowDat
         file: ShowChangesState::default(),
         patch: ShowPatchState::default(),
         groups: PatchGroupsState::default(),
+        output: ShowOutputState::default(),
     };
     history.reset_with_saved(show.snapshot());
     show.file.is_dirty = false;
@@ -55,6 +56,7 @@ pub fn show_save(
             fixtures: clean_fixtures,
         },
         groups: show.groups.clone(),
+        output: show.output.clone(),
     };
 
     let json_str = serde_json::to_string_pretty(&content).map_err(|e| e.to_string())?;
@@ -109,6 +111,7 @@ pub fn show_load(
             fixtures: clean_fixtures,
         },
         groups: content.groups,
+        output: content.output,
     };
     history.reset_with_saved(show.snapshot());
     state.reset_live_engine()?;

@@ -75,6 +75,9 @@ Welcome to the `live-dmx` project. This document provides essential information 
 - **Live View (`src/views/Live.vue`):**
   - **Status:** Currently a placeholder.
   - **Goal:** Should implement high-performance, low-latency UI for live control (buttons, faders, playbacks).
+- **Output View (`src/views/Output.vue`):**
+  - Manages universe output routing and lists physical interfaces.
+  - Divided into `OutputUniverses` (universe configuration with None, Physical, and Virtual target selection) and `OutputInterfaces` (hardware physical device listing and discovery).
 
 ### Backend (Rust)
 
@@ -94,7 +97,10 @@ The application relies on fixture definitions from the Open Fixture Library (OFL
 
 ## Working with DMX Output
 
-- The DMX output engine (`LiveEngine`) and continuous background loop (`LiveEngineRunner`) are initialized in `src-tauri/src/output/`.
+- The DMX output engine (`LiveEngine`) and continuous background loop (`LiveEngineRunner`) are initialized in `src-tauri/src/output/runner.rs`.
+- Universe configuration state (`UniverseOutputConfig`: `universe`, `output`, `enabled`) is managed in `src-tauri/src/show/output/` with full undo/redo history and persistent `.ldmx` show serialization.
+- Network DMX protocols (`src-tauri/src/output/protocols/`) support Art-Net (`artnet_protocol` on port 6454), Streaming ACN / sACN (`sacn.rs` on port 5568 with UUID and sequence tracking), Open Sound Control / OSC (`rosc` on port 8000), Philips Color Kinetics KiNET (`kinet.rs` on port 6038), and Open Pixel Control / OPC (`opc.rs` on port 7890).
+- Physical USB DMX interfaces (`src-tauri/src/output/interfaces/`) are discovered cross-platform across Linux (`/dev/ttyUSB*`, `/dev/ttyACM*`), macOS (`/dev/cu.*` callout devices), and Windows (`COM*`). Frames are formatted with Enttec DMX USB Pro framing at 57,600 baud and streamed with automatic reconnection on disconnect.
 - The frontend sends live control updates (`live_set_*`) or direct manual channel updates via `set_dmx_channel` / `set_dmx_data` commands.
 
 ## Quality Assurance & Tooling

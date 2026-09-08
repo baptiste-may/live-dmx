@@ -4,20 +4,22 @@ pub mod show;
 
 use fixtures::{check_fixtures_installed, download_fixtures, get_fixtures};
 use output::{
-    live_reset_all_buttons, live_reset_group_color_effect, live_reset_group_effect,
-    live_set_all_groups_color, live_set_button, live_set_color_effect_bpm,
+    get_output_interfaces, live_reset_all_buttons, live_reset_group_color_effect,
+    live_reset_group_effect, live_set_all_groups_color, live_set_button, live_set_color_effect_bpm,
     live_set_color_fade_order, live_set_color_fade_speed, live_set_effect_bpm, live_set_flash,
     live_set_group_color, live_set_group_color_effect, live_set_group_effect,
     live_set_group_master, live_set_group_secondary_color, live_set_random_strobe_rate,
-    live_set_simple_flash_fade, live_set_strobe_rate, live_set_white_flash_fade, set_dmx_channel,
-    set_dmx_data,
+    live_set_simple_flash_fade, live_set_strobe_rate, live_set_white_flash_fade,
+    scan_output_interfaces, set_dmx_channel, set_dmx_data,
 };
 use show::{
     get_recent_shows, remove_recent_show, save_recent_show, show_create, show_get_data,
     show_group_create, show_group_remove, show_group_rename, show_identity_update, show_load,
-    show_patch_batch, show_patch_fixture, show_patch_remove_fixtures, show_patch_toggle_group,
-    show_patch_update_address, show_patch_update_name, show_patch_update_universe, show_redo,
-    show_save, show_undo, show_unload, AppState,
+    show_output_add_universe, show_output_get_universes, show_output_remove_universe,
+    show_output_set_enabled, show_output_set_target, show_patch_batch, show_patch_fixture,
+    show_patch_remove_fixtures, show_patch_toggle_group, show_patch_update_address,
+    show_patch_update_name, show_patch_update_universe, show_redo, show_save, show_undo,
+    show_unload, AppState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,6 +56,13 @@ pub fn run() {
             show_group_create,
             show_group_remove,
             show_group_rename,
+            show_output_get_universes,
+            show_output_set_target,
+            show_output_set_enabled,
+            show_output_add_universe,
+            show_output_remove_universe,
+            get_output_interfaces,
+            scan_output_interfaces,
             live_set_flash,
             live_set_button,
             live_set_group_effect,

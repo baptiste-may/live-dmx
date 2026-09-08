@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 
+import type { UniverseOutputConfig } from "@/types/output.ts";
+
 import { useLiveButtons } from "../live/live-buttons.ts";
+import { useOutputUniverses } from "../output/output-universes.ts";
 import { usePatchForm } from "../patch/patch-form.ts";
 import { usePatchGroups } from "../patch/patch-groups.ts";
 import { ToastType, useToastStore } from "../toast.ts";
@@ -16,6 +19,9 @@ export type ShowData = {
   file: ReturnType<typeof useShowChanges>["$state"];
   patch: ReturnType<typeof useShowPatch>["$state"];
   groups: ReturnType<typeof useShowGroups>["$state"];
+  output?: {
+    universes: UniverseOutputConfig[];
+  };
 };
 
 export const defaultShow: ShowData = {
@@ -119,6 +125,14 @@ export const useShow = defineStore("show", {
                   }
                 }
               }
+              if (event.payload.output) {
+                const outputPayload = event.payload.output as {
+                  universes?: UniverseOutputConfig[];
+                };
+                if (outputPayload.universes) {
+                  useOutputUniverses().universes = outputPayload.universes;
+                }
+              }
               if (
                 typeof event.payload.status === "string" &&
                 Object.values(ShowStatus).includes(event.payload.status as ShowStatus)
@@ -155,6 +169,11 @@ export const useShow = defineStore("show", {
       if (data.groups?.groups) {
         this.groups.groups = data.groups.groups;
       }
+      if (data.output?.universes) {
+        useOutputUniverses().universes = data.output.universes;
+      } else {
+        useOutputUniverses().$reset();
+      }
       this.state = ShowStatus.LOADED;
       useLiveButtons().$reset();
       invoke("show_create").catch((error: unknown) => {
@@ -167,6 +186,7 @@ export const useShow = defineStore("show", {
       this.patch.$reset();
       this.groups.$reset();
       usePatchGroups().$reset();
+      useOutputUniverses().$reset();
       useLiveButtons().$reset();
       this.state = ShowStatus.NOT_LOADED;
       invoke("show_unload").catch((error: unknown) => {
