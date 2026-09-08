@@ -578,6 +578,17 @@ impl LiveEngine {
     }
 
     pub fn compute_dmx(&mut self, show_data: &ShowData) {
+        for u_cfg in &show_data.output.universes {
+            self.universe_buffers
+                .entry(u_cfg.universe as u16)
+                .or_insert_with(|| vec![0u8; 512]);
+        }
+        for f in &show_data.patch.fixtures {
+            self.universe_buffers
+                .entry(f.universe as u16)
+                .or_insert_with(|| vec![0u8; 512]);
+        }
+
         for buf in self.universe_buffers.values_mut() {
             buf.fill(0);
         }
@@ -635,9 +646,11 @@ impl LiveEngine {
 
         for (&(universe, channel), &val) in &self.manual_channels {
             if universe >= 1 && (1..=512).contains(&channel) {
-                if let Some(buf) = self.universe_buffers.get_mut(&universe) {
-                    buf[(channel - 1) as usize] = val;
-                }
+                let buf = self
+                    .universe_buffers
+                    .entry(universe)
+                    .or_insert_with(|| vec![0u8; 512]);
+                buf[(channel - 1) as usize] = val;
             }
         }
 

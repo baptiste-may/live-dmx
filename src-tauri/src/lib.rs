@@ -4,13 +4,14 @@ pub mod show;
 
 use fixtures::{check_fixtures_installed, download_fixtures, get_fixtures};
 use output::{
-    get_output_interfaces, live_reset_all_buttons, live_reset_group_color_effect,
-    live_reset_group_effect, live_set_all_groups_color, live_set_button, live_set_color_effect_bpm,
-    live_set_color_fade_order, live_set_color_fade_speed, live_set_effect_bpm, live_set_flash,
-    live_set_group_color, live_set_group_color_effect, live_set_group_effect,
-    live_set_group_master, live_set_group_secondary_color, live_set_random_strobe_rate,
-    live_set_simple_flash_fade, live_set_strobe_rate, live_set_white_flash_fade,
-    scan_output_interfaces, set_dmx_channel, set_dmx_data,
+    get_all_dmx_data, get_dmx_data, get_output_interfaces, live_reset_all_buttons,
+    live_reset_group_color_effect, live_reset_group_effect, live_set_all_groups_color,
+    live_set_button, live_set_color_effect_bpm, live_set_color_fade_order,
+    live_set_color_fade_speed, live_set_effect_bpm, live_set_flash, live_set_group_color,
+    live_set_group_color_effect, live_set_group_effect, live_set_group_master,
+    live_set_group_secondary_color, live_set_random_strobe_rate, live_set_simple_flash_fade,
+    live_set_strobe_rate, live_set_white_flash_fade, scan_output_interfaces, set_dmx_channel,
+    set_dmx_data,
 };
 use show::{
     get_recent_shows, remove_recent_show, save_recent_show, show_create, show_get_data,
@@ -84,6 +85,8 @@ pub fn run() {
             live_reset_all_buttons,
             set_dmx_channel,
             set_dmx_data,
+            get_dmx_data,
+            get_all_dmx_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

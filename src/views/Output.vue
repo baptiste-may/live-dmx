@@ -4,6 +4,7 @@ import { onMounted } from "vue";
 import { useOutputInterfaces } from "@/stores/output/output-interfaces.ts";
 import { useOutputUniverses } from "@/stores/output/output-universes.ts";
 
+import OutputDmxMonitor from "./output/dmx/OutputDmxMonitor.vue";
 import OutputInterfaces from "./output/OutputInterfaces.vue";
 import OutputUniverses from "./output/OutputUniverses.vue";
 
@@ -17,8 +18,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="text-base-content grid h-full w-full grid-cols-1 gap-4 p-4 lg:grid-cols-[1fr_auto]">
-    <OutputUniverses />
-    <OutputInterfaces />
+  <div class="text-base-content flex h-full w-full flex-col gap-4 overflow-hidden p-4">
+    <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
+      <OutputUniverses />
+      <OutputInterfaces />
+    </div>
+    <OutputDmxMonitor class="shrink-0" />
   </div>
 </template>

@@ -223,3 +223,42 @@ fn test_live_engine_rainbow_color_effect() {
     assert_eq!(buf[0], 255);
     assert!(buf[1] > 0 || buf[2] > 0 || buf[3] > 0);
 }
+
+#[test]
+fn test_live_engine_universe_buffers_auto_create_and_get_dmx() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    // Add universe 5 to output configuration
+    show.output
+        .universes
+        .push(live_dmx_lib::show::UniverseOutputConfig {
+            universe: 5,
+            output: "none".to_string(),
+            enabled: true,
+        });
+
+    // Add a fixture patched to universe 6
+    show.patch.fixtures.push(PatchedFixture {
+        id: 42,
+        groups: vec![1],
+        name: "Univ 6 Dimmer".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 6,
+        address: 10,
+    });
+
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.compute_dmx(&show);
+
+    // Universe 5 should exist and be 512 bytes of 0
+    let u5_buf = engine.universe_buffers.get(&5);
+    assert!(u5_buf.is_some());
+    assert_eq!(u5_buf.unwrap().len(), 512);
+
+    // Universe 6 should exist and channel 10 (idx 9) should be 255
+    let u6_buf = engine.universe_buffers.get(&6);
+    assert!(u6_buf.is_some());
+    assert_eq!(u6_buf.unwrap()[9], 255);
+}

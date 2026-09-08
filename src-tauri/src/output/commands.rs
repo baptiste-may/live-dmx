@@ -204,3 +204,21 @@ pub fn set_dmx_data(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub fn get_dmx_data(state: State<'_, AppState>, universe: u16) -> Result<Vec<u8>, String> {
+    let live = state.output.engine.lock().map_err(|e| e.to_string())?;
+    Ok(live
+        .universe_buffers
+        .get(&universe)
+        .cloned()
+        .unwrap_or_else(|| vec![0u8; 512]))
+}
+
+#[tauri::command]
+pub fn get_all_dmx_data(
+    state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<u16, Vec<u8>>, String> {
+    let live = state.output.engine.lock().map_err(|e| e.to_string())?;
+    Ok(live.universe_buffers.clone())
+}
