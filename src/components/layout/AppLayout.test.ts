@@ -13,6 +13,7 @@ describe("AppLayout.vue", () => {
     navStore.currentPage = PageId.PATCH;
 
     expect(screen.getByText("Show")).toBeInTheDocument();
-    expect(screen.getByText("Windows")).toBeInTheDocument();
+    expect(screen.getByText("Setup")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
   });
 });

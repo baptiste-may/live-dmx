@@ -67,17 +67,21 @@ Welcome to the `live-dmx` project. This document provides essential information 
 ### View-Specific Logic
 
 - **Patch View (`src/views/Patch.vue`):**
-  - Handles the inventory of fixtures and their DMX addressing.
-  - Uses `PatchForm` for fixture search and batch adding, `PatchVisualizer` for universe grids, and `PatchGroups` for group organization.
-  - Interactions focus on speed: quick searching of manufacturers and easy adding of fixtures.
-- **Configure View (`src/views/Configure.vue`):**
-  - Manages fixture parameters like Dimmer, Pan/Tilt limits, and inversions.
-- **Live View (`src/views/Live.vue`):**
-  - **Status:** Currently a placeholder.
-  - **Goal:** Should implement high-performance, low-latency UI for live control (buttons, faders, playbacks).
-- **Output View (`src/views/Output.vue`):**
-  - Manages universe output routing and lists physical interfaces.
-  - Divided into `OutputUniverses` (universe configuration with None, Physical, and Virtual target selection) and `OutputInterfaces` (hardware physical device listing and discovery).
+- **Setup Views:**
+  - **Input View (`src/views/Input.vue`):** Input triggers and controllers mapping.
+  - **Output View (`src/views/Output.vue`):**
+    - Manages universe output routing and lists physical interfaces.
+    - Divided into `OutputUniverses` (universe configuration with None, Physical, and Virtual target selection) and `OutputInterfaces` (hardware physical device listing and discovery).
+  - **Patch View (`src/views/Patch.vue`):**
+    - Handles the inventory of fixtures and their DMX addressing.
+    - Uses `PatchForm` for fixture search and batch adding, `PatchVisualizer` for universe grids, and `PatchGroups` for group organization.
+    - Interactions focus on speed: quick searching of manufacturers and easy adding of fixtures.
+  - **Configure View (`src/views/Configure.vue`):**
+    - Manages fixture parameters like Dimmer, Pan/Tilt limits, and inversions.
+- **Live Views (`src/views/live/pages/`):**
+  - Navigated directly via the sidebar's "Live" section (Intensity, Colors).
+  - **Intensity (`LiveIntensity.vue`):** Live intensity control including effects, flash buttons, and master faders.
+  - **Colors (`LiveColors.vue`):** Live color control including color tables, fades, and color effects.
 
 ### Backend (Rust)
 

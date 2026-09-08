@@ -5,7 +5,7 @@ import LiveIntensityMasters from "@/views/live/pages/intensity/LiveIntensityMast
 </script>
 
 <template>
-  <div class="grid h-full min-h-0 grid-cols-[1fr_auto] gap-4">
+  <div class="grid h-full min-h-0 grid-cols-[1fr_auto] gap-4 p-4">
     <div class="grid min-h-0 w-full grid-rows-[2fr_3fr] gap-4">
       <LiveIntensityEffects class="min-h-0" />
       <LiveIntensityMasters class="min-h-0" />

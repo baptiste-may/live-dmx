@@ -114,6 +114,11 @@ describe("AppSidebar.vue", () => {
     await user.click(patchPageLink);
 
     expect(navStore.navigate).toHaveBeenCalledWith("patch");
+
+    const intensityPageLink = screen.getByText("Intensity");
+    await user.click(intensityPageLink);
+
+    expect(navStore.navigate).toHaveBeenCalledWith("intensity");
   });
 
   it("should allow editing and saving show name", async () => {
@@ -174,7 +179,8 @@ describe("AppSidebar.vue", () => {
     // Initially expanded
     expect(screen.getByText("My Stage Show")).toBeInTheDocument();
     expect(screen.getByText("Show")).toBeInTheDocument();
-    expect(screen.getByText("Windows")).toBeInTheDocument();
+    expect(screen.getByText("Setup")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.getByText("New show")).toBeInTheDocument();
     const hideBtn = screen.getByRole("button", { name: "Hide sidebar" });
     expect(hideBtn).toBeInTheDocument();
@@ -185,7 +191,8 @@ describe("AppSidebar.vue", () => {
     // Labels and titles should be hidden
     expect(screen.queryByText("My Stage Show")).not.toBeInTheDocument();
     expect(screen.queryByText("Show")).not.toBeInTheDocument();
-    expect(screen.queryByText("Windows")).not.toBeInTheDocument();
+    expect(screen.queryByText("Setup")).not.toBeInTheDocument();
+    expect(screen.queryByText("Live")).not.toBeInTheDocument();
     expect(screen.queryByText("New show")).not.toBeInTheDocument();
     expect(screen.queryByText("Hide")).not.toBeInTheDocument();
 
@@ -203,7 +210,8 @@ describe("AppSidebar.vue", () => {
     // Labels and titles are visible again
     expect(screen.getByText("My Stage Show")).toBeInTheDocument();
     expect(screen.getByText("Show")).toBeInTheDocument();
-    expect(screen.getByText("Windows")).toBeInTheDocument();
+    expect(screen.getByText("Setup")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.getByText("New show")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hide sidebar" })).toBeInTheDocument();
   });

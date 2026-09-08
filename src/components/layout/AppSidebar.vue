@@ -15,7 +15,7 @@ import { computed, ref } from "vue";
 
 import TextForm from "@/components/inputs/TextForm.vue";
 import { useApp } from "@/stores/app";
-import { EVERY_PAGES, useNavigation } from "@/stores/navigation";
+import { NAVIGATION_SECTIONS, useNavigation } from "@/stores/navigation";
 import { useShow } from "@/stores/show/show";
 import { useShowChanges } from "@/stores/show/show-changes";
 import { useShowIdentity } from "@/stores/show/show-identity.ts";
@@ -94,10 +94,10 @@ const showActions = computed(() => [
 
 <template>
   <Menu
-    class="bg-base-200 rounded-r-box flex h-full flex-col transition-[width] duration-200"
+    class="bg-base-200 rounded-r-box flex h-full flex-col px-0 transition-[width] duration-200"
     :class="isCollapsed ? 'w-16' : 'w-64'"
   >
-    <MenuTitle v-if="!isCollapsed" class="flex flex-col gap-0 pr-6">
+    <MenuTitle v-if="!isCollapsed" class="mx-1 flex flex-col gap-0 pr-8">
       <span
         v-if="!identity.nameForm.isEditing"
         class="text-base-content flex items-center gap-2 text-2xl whitespace-nowrap"
@@ -118,12 +118,12 @@ const showActions = computed(() => [
       </span>
     </MenuTitle>
 
-    <MenuTitle v-if="!isCollapsed" class="mt-2">Show</MenuTitle>
+    <MenuTitle v-if="!isCollapsed" class="mx-2 mt-2">Show</MenuTitle>
     <MenuItem
       v-for="action in showActions"
       :key="action.label"
       :disabled="action.disabled"
-      :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
+      :class="['px-2', { 'tooltip tooltip-right w-full': isCollapsed }]"
       :data-tip="isCollapsed ? action.label : undefined"
     >
       <button
@@ -138,30 +138,32 @@ const showActions = computed(() => [
       </button>
     </MenuItem>
 
-    <MenuTitle v-if="!isCollapsed" class="mt-4">Windows</MenuTitle>
-    <li v-if="isCollapsed" class="border-base-content/10 my-1 border-t" aria-hidden="true" />
-    <MenuItem
-      v-for="{ id, name, icon } in EVERY_PAGES"
-      :key="id"
-      :class="[
-        { 'menu-active': id === navigation.currentPage },
-        { 'tooltip tooltip-right w-full': isCollapsed },
-      ]"
-      :data-tip="isCollapsed ? name : undefined"
-    >
-      <button
-        type="button"
-        :class="[{ active: id === navigation.currentPage }, { 'justify-center': isCollapsed }]"
-        :aria-label="name"
-        @click="navigation.navigate(id)"
+    <template v-for="section in NAVIGATION_SECTIONS" :key="section.title">
+      <MenuTitle v-if="!isCollapsed" class="mx-2 mt-4">{{ section.title }}</MenuTitle>
+      <li v-if="isCollapsed" class="border-base-content/10 my-1 border-t" aria-hidden="true" />
+      <MenuItem
+        v-for="{ id, name, icon } in section.pages"
+        :key="id"
+        :class="['px-2', { 'tooltip tooltip-right w-full': isCollapsed }]"
+        :data-tip="isCollapsed ? name : undefined"
       >
-        <component :is="icon" class="h-4 w-4 shrink-0" />
-        <span v-if="!isCollapsed">{{ name }}</span>
-      </button>
-    </MenuItem>
+        <button
+          type="button"
+          :class="[
+            { 'menu-active': id === navigation.currentPage },
+            { 'justify-center': isCollapsed },
+          ]"
+          :aria-label="name"
+          @click="navigation.navigate(id)"
+        >
+          <component :is="icon" class="h-4 w-4 shrink-0" />
+          <span v-if="!isCollapsed">{{ name }}</span>
+        </button>
+      </MenuItem>
+    </template>
 
     <MenuItem
-      class="mt-auto"
+      class="mt-auto px-2"
       :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
       :data-tip="isCollapsed ? 'Show sidebar' : undefined"
     >
