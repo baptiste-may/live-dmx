@@ -750,6 +750,12 @@ impl LiveEngine {
 
         let current_rgb_f = self.get_fixture_current_rgb_f32(fixture.id, selected_color_str);
 
+        let cur_r = current_rgb_f.0.round().clamp(0.0, 255.0) as u8;
+        let cur_g = current_rgb_f.1.round().clamp(0.0, 255.0) as u8;
+        let cur_b = current_rgb_f.2.round().clamp(0.0, 255.0) as u8;
+        self.fixture_last_colors
+            .insert(fixture.id, (cur_r, cur_g, cur_b));
+
         let secondary_color_str = fixture
             .groups
             .iter()
@@ -799,8 +805,6 @@ impl LiveEngine {
         let r = r_f.round().clamp(0.0, 255.0) as u8;
         let g = g_f.round().clamp(0.0, 255.0) as u8;
         let b = b_f.round().clamp(0.0, 255.0) as u8;
-
-        self.fixture_last_colors.insert(fixture.id, (r, g, b));
 
         let w = if r >= 200 && g >= 200 && b >= 200 {
             255

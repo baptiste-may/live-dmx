@@ -262,3 +262,121 @@ fn test_live_engine_universe_buffers_auto_create_and_get_dmx() {
     assert!(u6_buf.is_some());
     assert_eq!(u6_buf.unwrap()[9], 255);
 }
+
+#[test]
+fn test_live_engine_color_effect_does_not_get_stuck_on_secondary_color() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "RGB Par 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Red", "Green", "Blue"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    // Primary color = Blue, Secondary color = Red
+    engine.set_group_color(1, Some("blue".to_string()), Some(&show));
+    engine.set_group_secondary_color(1, Some("red".to_string()));
+
+    // Activate sine color effect
+    engine.set_group_color_effect(1, Some("sine".to_string()), None, false);
+    engine.set_color_effect_bpm(60);
+
+    // Run multiple frames of compute_dmx and observe that secondary color (Red) is actively mixed
+    let mut observed_secondary = false;
+    for _ in 0..20 {
+        engine.compute_dmx(&show);
+        let buf = engine.universe_buffers.get(&1).unwrap();
+        if buf[1] > 0 {
+            observed_secondary = true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(15));
+    }
+    assert!(
+        observed_secondary,
+        "Effect should actively mix secondary color"
+    );
+
+    // Now reset color effect: must return to 100% primary color (Blue), NOT stuck on secondary color (Red)!
+    engine.reset_group_color_effect(1);
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255); // Dimmer
+    assert_eq!(buf[1], 0); // Red must be 0 (not stuck on secondary!)
+    assert_eq!(buf[2], 0); // Green
+    assert_eq!(buf[3], 255); // Blue must be 255 (primary color preserved!)
+}
+
+#[test]
+fn test_red_blue_pulse_channels() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "RGBAW Par 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": [
+            "Dimmer",
+            "Red",
+            "Green",
+            "Blue",
+            "White",
+            "Amber",
+            "Yellow"
+        ]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color(1, Some("red".to_string()), Some(&show));
+    engine.set_group_secondary_color(1, Some("blue".to_string()));
+    engine.set_group_color_effect(1, Some("pulse".to_string()), None, false);
+    engine.set_color_effect_bpm(120);
+
+    // Track red and blue values across pulse cycle
+    let mut min_blue = 255u8;
+    let mut max_blue = 0u8;
+
+    // Compute across multiple frames: Red and Blue should blend only between R and B.
+    // Green, White, Amber, and Yellow channels must strictly remain 0.
+    for _ in 0..30 {
+        engine.compute_dmx(&show);
+        let buf = engine.universe_buffers.get(&1).unwrap();
+        assert_eq!(buf[0], 255); // Dimmer
+
+        let b = buf[3];
+        if b < min_blue {
+            min_blue = b;
+        }
+        if b > max_blue {
+            max_blue = b;
+        }
+
+        assert_eq!(buf[2], 0, "Green channel must be 0 for red and blue pulse");
+        assert_eq!(buf[4], 0, "White channel must be 0 for red and blue pulse");
+        assert_eq!(buf[5], 0, "Amber channel must be 0 for red and blue pulse");
+        assert_eq!(buf[6], 0, "Yellow channel must be 0 for red and blue pulse");
+
+        std::thread::sleep(std::time::Duration::from_millis(15));
+    }
+
+    assert!(
+        max_blue > 0,
+        "Pulse effect should modulate secondary blue channel"
+    );
+    assert_eq!(
+        min_blue, 0,
+        "Pulse effect should return to pure primary red channel"
+    );
+}
