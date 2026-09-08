@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { defineStore } from "pinia";
 
+import { groupHasColorCapability } from "@/libs/fixture.ts";
+import { useShowPatch } from "@/stores/show/show-patch.ts";
+
 export type FixtureGroup = {
   id: number;
   name: string;
@@ -23,6 +26,20 @@ export const useShowGroups = defineStore("showGroups", {
   state: (): ShowGroupsState => ({
     groups: [...defaultShowGroupsState.groups],
   }),
+  getters: {
+    colorGroups: (state): FixtureGroup[] => {
+      const showPatch = useShowPatch();
+      return state.groups.filter(
+        (g) => g.id !== 0 && groupHasColorCapability(g.id, showPatch.fixtures),
+      );
+    },
+    hasColorCapability:
+      () =>
+      (groupId: number): boolean => {
+        const showPatch = useShowPatch();
+        return groupHasColorCapability(groupId, showPatch.fixtures);
+      },
+  },
   actions: {
     async create(name: string): Promise<number> {
       return await invoke<number>("show_group_create", { name });

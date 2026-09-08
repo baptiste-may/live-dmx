@@ -7,7 +7,7 @@ import { useLiveButtons } from "@/stores/live/live-buttons.ts";
 import { useShowGroups } from "@/stores/show/show-groups.ts";
 import LiveColorsEffectsRow from "@/views/live/pages/colors/effects/LiveColorsEffectsRow.vue";
 
-const { groups } = storeToRefs(useShowGroups());
+const { colorGroups } = storeToRefs(useShowGroups());
 const liveButtons = useLiveButtons();
 </script>
 
@@ -28,11 +28,7 @@ const liveButtons = useLiveButtons();
       <div class="min-h-0 flex-1 overflow-auto">
         <Table sm class="w-auto">
           <tbody>
-            <LiveColorsEffectsRow
-              v-for="group in groups.filter((g) => g.id !== 0)"
-              :key="group.id"
-              :group="group"
-            />
+            <LiveColorsEffectsRow v-for="group in colorGroups" :key="group.id" :group="group" />
           </tbody>
         </Table>
       </div>

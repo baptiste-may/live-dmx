@@ -4,16 +4,40 @@ import { describe, expect, it } from "vitest";
 
 import { useLiveButtons } from "@/stores/live/live-buttons";
 import { useShowGroups } from "@/stores/show/show-groups";
+import { useShowPatch } from "@/stores/show/show-patch";
 
 import LiveColorsEffects from "./LiveColorsEffects.vue";
 
 describe("LiveColorsEffects.vue", () => {
-  it("renders card, BPM knob, and rows for non-zero groups", () => {
+  it("renders card, BPM knob, and rows for color-capable groups only", () => {
     const showGroups = useShowGroups();
+    const showPatch = useShowPatch();
+
     showGroups.groups = [
       { id: 0, name: "All" },
       { id: 1, name: "Spots" },
       { id: 2, name: "Beams" },
+    ];
+
+    showPatch.fixtures = [
+      {
+        id: 1,
+        groups: [1],
+        name: "Spot 1",
+        universe: 1,
+        address: 1,
+        fixtureType: { name: "Dimmer" },
+        mode: { name: "1ch", channels: ["Dimmer"] },
+      },
+      {
+        id: 2,
+        groups: [2],
+        name: "Beam 1",
+        universe: 1,
+        address: 10,
+        fixtureType: { name: "RGB" },
+        mode: { name: "3ch", channels: ["Red", "Green", "Blue"] },
+      },
     ];
 
     render(LiveColorsEffects);
@@ -21,7 +45,7 @@ describe("LiveColorsEffects.vue", () => {
     expect(screen.getByRole("heading", { name: "Effects" })).toBeInTheDocument();
     expect(screen.getByText(/BPM/i)).toBeInTheDocument();
     expect(screen.queryByText("All :")).not.toBeInTheDocument();
-    expect(screen.getByText("Spots :")).toBeInTheDocument();
+    expect(screen.queryByText("Spots :")).not.toBeInTheDocument();
     expect(screen.getByText("Beams :")).toBeInTheDocument();
   });
 

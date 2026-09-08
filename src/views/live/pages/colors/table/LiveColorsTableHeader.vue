@@ -7,10 +7,10 @@ import { useShowGroups } from "@/stores/show/show-groups.ts";
 import { colors } from "@/types/live.ts";
 
 const liveButtons = useLiveButtons();
-const { groups } = storeToRefs(useShowGroups());
+const { colorGroups } = storeToRefs(useShowGroups());
 
 function handleSelectAll(colorKey: string) {
-  const groupIds = groups.value.map((g) => g.id);
+  const groupIds = colorGroups.value.map((g) => g.id);
   liveButtons.setAllGroupsColor(colorKey, groupIds);
 }
 </script>

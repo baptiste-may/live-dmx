@@ -6,7 +6,7 @@ import { useShowGroups } from "@/stores/show/show-groups.ts";
 import LiveColorsTableHeader from "@/views/live/pages/colors/table/LiveColorsTableHeader.vue";
 import LiveColorsTableRow from "@/views/live/pages/colors/table/LiveColorsTableRow.vue";
 
-const { groups } = storeToRefs(useShowGroups());
+const { colorGroups } = storeToRefs(useShowGroups());
 </script>
 
 <template>
@@ -19,11 +19,7 @@ const { groups } = storeToRefs(useShowGroups());
             <LiveColorsTableHeader />
           </thead>
           <tbody>
-            <LiveColorsTableRow
-              v-for="group in groups.filter((g) => g.id !== 0)"
-              :key="group.id"
-              :group="group"
-            />
+            <LiveColorsTableRow v-for="group in colorGroups" :key="group.id" :group="group" />
           </tbody>
         </Table>
       </div>

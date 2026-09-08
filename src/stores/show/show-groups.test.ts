@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defaultShowGroupsState, useShowGroups } from "./show-groups";
+import { useShowPatch } from "./show-patch";
 
 describe("show-groups store", () => {
   beforeEach(() => {
@@ -74,5 +75,44 @@ describe("show-groups store", () => {
 
     expect(store.get(1)).toEqual({ id: 1, name: "Back Truss" });
     expect(store.get(999)).toBeUndefined();
+  });
+
+  it("should return only non-zero groups with color capability in colorGroups", () => {
+    const groupsStore = useShowGroups();
+    const patchStore = useShowPatch();
+
+    groupsStore.groups = [
+      { id: 0, name: "All" },
+      { id: 1, name: "Spots (Dimmer)" },
+      { id: 2, name: "Wash (RGB)" },
+      { id: 3, name: "Empty Group" },
+    ];
+
+    patchStore.fixtures = [
+      {
+        id: 1,
+        groups: [1],
+        name: "Spot 1",
+        universe: 1,
+        address: 1,
+        fixtureType: { name: "Dimmer" },
+        mode: { name: "1ch", channels: ["Dimmer"] },
+      },
+      {
+        id: 2,
+        groups: [2],
+        name: "Wash 1",
+        universe: 1,
+        address: 10,
+        fixtureType: { name: "RGB" },
+        mode: { name: "3ch", channels: ["Red", "Green", "Blue"] },
+      },
+    ];
+
+    expect(groupsStore.colorGroups).toEqual([{ id: 2, name: "Wash (RGB)" }]);
+    expect(groupsStore.hasColorCapability(2)).toBe(true);
+    expect(groupsStore.hasColorCapability(1)).toBe(false);
+    expect(groupsStore.hasColorCapability(3)).toBe(false);
+    expect(groupsStore.hasColorCapability(0)).toBe(false);
   });
 });
