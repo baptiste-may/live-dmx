@@ -20,7 +20,7 @@ function handleSelectAll(colorKey: string) {
     <th></th>
     <td v-for="(color, key) in colors" :key="key" class="px-1">
       <button
-        class="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg text-black transition-opacity hover:opacity-80"
+        class="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg text-black outline outline-black transition-opacity hover:opacity-80"
         :style="{ backgroundColor: color }"
         :title="`Apply ${key} to all groups`"
         @click="handleSelectAll(key as string)"

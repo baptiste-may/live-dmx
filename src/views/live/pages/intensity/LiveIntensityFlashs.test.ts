@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/vue";
 import { describe, expect, it } from "vitest";
 
 import { useLiveButtons } from "@/stores/live/live-buttons";
+import { useSettings } from "@/stores/settings.ts";
 import { useShowGroups } from "@/stores/show/show-groups";
 
 import LiveIntensityFlashs from "./LiveIntensityFlashs.vue";
@@ -83,5 +84,14 @@ describe("LiveIntensityFlashs.vue", () => {
     expect(liveButtons.isFlashActive(1, "randomStrobe")).toBe(true);
     await fireEvent.mouseUp(randomBtn);
     expect(liveButtons.isFlashActive(1, "randomStrobe")).toBe(false);
+  });
+
+  it("hides section title when showSectionTitles is false in settings", () => {
+    const settings = useSettings();
+    settings.live.showSectionTitles = false;
+
+    render(LiveIntensityFlashs);
+
+    expect(screen.queryByRole("heading", { name: "Flashs" })).not.toBeInTheDocument();
   });
 });

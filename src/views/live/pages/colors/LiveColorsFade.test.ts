@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/vue";
 import { describe, expect, it } from "vitest";
 
 import { useLiveButtons } from "@/stores/live/live-buttons";
+import { useSettings } from "@/stores/settings.ts";
 
 import LiveColorsFade from "./LiveColorsFade.vue";
 
@@ -55,5 +56,14 @@ describe("LiveColorsFade.vue", () => {
 
     await user.click(centerBtn);
     expect(liveButtons.colorFadeOrder).toBeNull();
+  });
+
+  it("hides section title when showSectionTitles is false in settings", () => {
+    const settings = useSettings();
+    settings.live.showSectionTitles = false;
+
+    render(LiveColorsFade);
+
+    expect(screen.queryByRole("heading", { name: "Fade" })).not.toBeInTheDocument();
   });
 });

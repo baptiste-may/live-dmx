@@ -6,16 +6,18 @@ import { storeToRefs } from "pinia";
 import FlashButton from "@/components/inputs/FlashButton.vue";
 import Knob from "@/components/inputs/Knob.vue";
 import { useLiveButtons } from "@/stores/live/live-buttons.ts";
+import { useSettings } from "@/stores/settings.ts";
 import { useShowGroups } from "@/stores/show/show-groups.ts";
 
 const { groups } = storeToRefs(useShowGroups());
 const liveButtons = useLiveButtons();
+const settings = useSettings();
 </script>
 
 <template>
   <Card class="bg-base-200 h-full overflow-hidden">
     <CardBody class="flex h-full min-h-0 flex-col gap-4">
-      <CardTitle is="h2" bold size="2xl">Flashs</CardTitle>
+      <CardTitle is="h2" v-if="settings.live.showSectionTitles" bold size="2xl">Flashs</CardTitle>
       <div class="min-h-0 flex-1 overflow-auto">
         <Table sm>
           <thead>

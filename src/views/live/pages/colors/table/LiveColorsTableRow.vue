@@ -27,7 +27,7 @@ function handleSecondaryColorSelect(colorKey: string, active: boolean) {
         <ToggleButton
           cell
           :color="color"
-          class="h-12 w-12"
+          class="h-12 w-12 outline outline-black"
           :label="`${group.name} primary ${key}`"
           :model-value="liveButtons.getGroupColor(group.id) === key"
           @update:model-value="handleColorSelect(key as string, $event)"
@@ -35,7 +35,7 @@ function handleSecondaryColorSelect(colorKey: string, active: boolean) {
         <ToggleButton
           cell
           :color="color"
-          class="h-8 w-8"
+          class="h-8 w-8 outline outline-black"
           :label="`${group.name} secondary ${key}`"
           :model-value="liveButtons.getGroupSecondaryColor(group.id) === key"
           @update:model-value="handleSecondaryColorSelect(key as string, $event)"

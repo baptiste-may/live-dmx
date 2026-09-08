@@ -3,6 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/vue";
 import { SunIcon } from "lucide-vue-next";
 import { describe, expect, it } from "vitest";
 
+import { useSettings } from "@/stores/settings.ts";
+
 import ToggleButton from "./ToggleButton.vue";
 
 describe("ToggleButton.vue", () => {
@@ -138,6 +140,7 @@ describe("ToggleButton.vue", () => {
     const button = screen.getByRole("button", { name: "Green Cell" });
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button).toHaveClass("outline", "outline-black");
   });
 
   it("applies bg-warning in cell mode when color is not provided", () => {
@@ -169,5 +172,40 @@ describe("ToggleButton.vue", () => {
 
     await fireEvent.mouseUp(button);
     expect(emitted("update:modelValue")).toContainEqual([false]);
+  });
+
+  it("enlarges icon to h-6 w-6 when showButtonLabels is disabled in settings", () => {
+    const settings = useSettings();
+    settings.live.showButtonLabels = false;
+
+    const { container } = render(ToggleButton, {
+      props: {
+        icon: SunIcon,
+        label: "Expanded Icon",
+      },
+    });
+
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveClass("h-6", "w-6");
+    expect(svg).not.toHaveClass("h-4", "w-4");
+
+    const srOnlyLabel = screen.getByText("Expanded Icon");
+    expect(srOnlyLabel).toHaveClass("sr-only");
+  });
+
+  it("keeps icon as h-4 w-4 when showButtonLabels is enabled", () => {
+    const settings = useSettings();
+    settings.live.showButtonLabels = true;
+
+    const { container } = render(ToggleButton, {
+      props: {
+        icon: SunIcon,
+        label: "Normal Icon",
+      },
+    });
+
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveClass("h-4", "w-4");
+    expect(svg).not.toHaveClass("h-6", "w-6");
   });
 });

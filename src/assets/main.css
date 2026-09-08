@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @source "../../node_modules/daisy-ui-kit";
 @plugin "daisyui" {
-  themes: forest --default;
+  themes:
+    forest --default,
+    cupcake;
 }
 
 * {

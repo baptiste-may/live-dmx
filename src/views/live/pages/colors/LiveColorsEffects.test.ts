@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/vue";
 import { describe, expect, it } from "vitest";
 
 import { useLiveButtons } from "@/stores/live/live-buttons";
+import { useSettings } from "@/stores/settings.ts";
 import { useShowGroups } from "@/stores/show/show-groups";
 import { useShowPatch } from "@/stores/show/show-patch";
 
@@ -60,5 +61,15 @@ describe("LiveColorsEffects.vue", () => {
     await user.keyboard("{ArrowUp}");
 
     expect(liveButtons.colorEffectBpm).toBe(61);
+  });
+
+  it("hides section title when showSectionTitles is false in settings", () => {
+    const settings = useSettings();
+    settings.live.showSectionTitles = false;
+
+    render(LiveColorsEffects);
+
+    expect(screen.queryByRole("heading", { name: "Effects" })).not.toBeInTheDocument();
+    expect(screen.getByText(/BPM/i)).toBeInTheDocument();
   });
 });

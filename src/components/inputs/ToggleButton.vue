@@ -2,6 +2,9 @@
 import { Button } from "daisy-ui-kit";
 import { CheckIcon } from "lucide-vue-next";
 import type { Component } from "vue";
+import { computed } from "vue";
+
+import { useSettings } from "@/stores/settings.ts";
 
 const props = withDefaults(
   defineProps<{
@@ -23,6 +26,8 @@ const props = withDefaults(
 );
 
 const modelValue = defineModel<boolean>({ default: false });
+const settings = useSettings();
+const showLabel = computed(() => Boolean(props.label && settings.live.showButtonLabels));
 
 function handleClick() {
   if (props.mode !== "momentary") {
@@ -72,7 +77,7 @@ function handleKeyUp(event: KeyboardEvent) {
     square
     :size="size || (cell ? 'sm' : 'lg')"
     class="rounded-lg border-0"
-    :class="[cell && !color ? 'bg-warning' : '']"
+    :class="[cell && !color ? 'bg-warning' : '', cell && color ? 'outline outline-black' : '']"
     :style="cell && color ? { backgroundColor: color } : undefined"
     @click="handleClick"
     @mousedown="handlePointerDown"
@@ -96,7 +101,7 @@ function handleKeyUp(event: KeyboardEvent) {
         aria-hidden="true"
         class="shrink-0"
         :class="[
-          label
+          showLabel
             ? size === 'xl'
               ? 'h-5 w-5'
               : 'h-4 w-4'
@@ -106,13 +111,13 @@ function handleKeyUp(event: KeyboardEvent) {
         ]"
       />
       <span
-        v-if="label"
+        v-if="showLabel"
         class="line-clamp-2 max-w-full text-center text-[10px] leading-tight font-medium wrap-break-word whitespace-normal"
       >
         {{ label }}
       </span>
-      <span v-else-if="$attrs['aria-label']" class="sr-only">
-        {{ $attrs["aria-label"] }}
+      <span v-else-if="label || $attrs['aria-label']" class="sr-only">
+        {{ label || $attrs["aria-label"] }}
       </span>
     </div>
   </Button>

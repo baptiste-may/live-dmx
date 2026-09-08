@@ -23,6 +23,7 @@ describe("LiveColorsTableHeader.vue", () => {
     const expectedCount = Object.keys(colors).length;
     const colorButtons = screen.getAllByRole("button");
     expect(colorButtons).toHaveLength(expectedCount);
+    expect(colorButtons[0]).toHaveClass("outline", "outline-black");
   });
 
   it("applies color to color-capable groups when clicked", async () => {

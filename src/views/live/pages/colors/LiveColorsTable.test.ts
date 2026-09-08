@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/vue";
 import { describe, expect, it } from "vitest";
 
+import { useSettings } from "@/stores/settings.ts";
 import { useShowGroups } from "@/stores/show/show-groups";
 import { useShowPatch } from "@/stores/show/show-patch";
 
@@ -46,5 +47,14 @@ describe("LiveColorsTable.vue", () => {
     expect(screen.queryByText("Spots :")).not.toBeInTheDocument();
     expect(screen.queryByText("Empty :")).not.toBeInTheDocument();
     expect(screen.getByText("Wash :")).toBeInTheDocument();
+  });
+
+  it("hides section title when showSectionTitles is false in settings", () => {
+    const settings = useSettings();
+    settings.live.showSectionTitles = false;
+
+    render(LiveColorsTable);
+
+    expect(screen.queryByRole("heading", { name: "Colors" })).not.toBeInTheDocument();
   });
 });

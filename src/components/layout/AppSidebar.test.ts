@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApp } from "@/stores/app.ts";
 import { useNavigation } from "@/stores/navigation.ts";
+import { useSettings } from "@/stores/settings.ts";
 import { ShowStatus, useShow } from "@/stores/show/show.ts";
 import { useShowChanges } from "@/stores/show/show-changes.ts";
 import { useShowIdentity } from "@/stores/show/show-identity.ts";
@@ -194,6 +195,7 @@ describe("AppSidebar.vue", () => {
     expect(screen.queryByText("Setup")).not.toBeInTheDocument();
     expect(screen.queryByText("Live")).not.toBeInTheDocument();
     expect(screen.queryByText("New show")).not.toBeInTheDocument();
+    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
     expect(screen.queryByText("Hide")).not.toBeInTheDocument();
 
     // Buttons are still present and functional
@@ -213,6 +215,7 @@ describe("AppSidebar.vue", () => {
     expect(screen.getByText("Setup")).toBeInTheDocument();
     expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.getByText("New show")).toBeInTheDocument();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hide sidebar" })).toBeInTheDocument();
   });
 
@@ -233,5 +236,19 @@ describe("AppSidebar.vue", () => {
     await user.click(hideBtn);
 
     expect(identityStore.nameForm.isEditing).toBe(false);
+  });
+
+  it("should open settings modal when Settings button is clicked", async () => {
+    const user = userEvent.setup();
+    const settingsStore = useSettings();
+
+    render(AppSidebar);
+
+    const settingsBtn = screen.getByRole("button", { name: "Settings" });
+    expect(settingsBtn).toBeInTheDocument();
+
+    await user.click(settingsBtn);
+
+    expect(settingsStore.openModal).toHaveBeenCalledTimes(1);
   });
 });

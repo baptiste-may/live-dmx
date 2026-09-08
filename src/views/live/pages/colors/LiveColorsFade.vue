@@ -11,9 +11,11 @@ import { storeToRefs } from "pinia";
 import Knob from "@/components/inputs/Knob.vue";
 import ToggleButton from "@/components/inputs/ToggleButton.vue";
 import { useLiveButtons } from "@/stores/live/live-buttons.ts";
+import { useSettings } from "@/stores/settings.ts";
 import type { ColorFadeOrder } from "@/types/live.ts";
 
 const liveButtons = useLiveButtons();
+const settings = useSettings();
 const { colorFadeSpeed, colorFadeOrder } = storeToRefs(liveButtons);
 
 function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
@@ -24,7 +26,7 @@ function handleOrderSelect(order: ColorFadeOrder, active: boolean) {
 <template>
   <Card class="bg-base-200 h-full overflow-hidden">
     <CardBody class="flex h-full min-h-0 flex-col gap-4">
-      <CardTitle is="h2" bold size="2xl">Fade</CardTitle>
+      <CardTitle is="h2" v-if="settings.live.showSectionTitles" bold size="2xl">Fade</CardTitle>
       <Table sm>
         <tbody>
           <tr>

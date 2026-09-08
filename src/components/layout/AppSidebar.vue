@@ -8,6 +8,7 @@ import {
   PlusIcon,
   RedoIcon,
   SaveIcon,
+  SettingsIcon,
   UndoIcon,
   XIcon,
 } from "lucide-vue-next";
@@ -16,6 +17,7 @@ import { computed, ref } from "vue";
 import TextForm from "@/components/inputs/TextForm.vue";
 import { useApp } from "@/stores/app";
 import { NAVIGATION_SECTIONS, useNavigation } from "@/stores/navigation";
+import { useSettings } from "@/stores/settings.ts";
 import { useShow } from "@/stores/show/show";
 import { useShowChanges } from "@/stores/show/show-changes";
 import { useShowIdentity } from "@/stores/show/show-identity.ts";
@@ -25,6 +27,7 @@ const show = useShow();
 const changes = useShowChanges();
 const identity = useShowIdentity();
 const navigation = useNavigation();
+const settings = useSettings();
 
 const isCollapsed = ref(false);
 
@@ -164,6 +167,22 @@ const showActions = computed(() => [
 
     <MenuItem
       class="mt-auto px-2"
+      :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
+      :data-tip="isCollapsed ? 'Settings' : undefined"
+    >
+      <button
+        type="button"
+        :class="{ 'justify-center': isCollapsed }"
+        aria-label="Settings"
+        @click="settings.openModal"
+      >
+        <SettingsIcon class="h-4 w-4 shrink-0" />
+        <span v-if="!isCollapsed">Settings</span>
+      </button>
+    </MenuItem>
+
+    <MenuItem
+      class="px-2"
       :class="{ 'tooltip tooltip-right w-full': isCollapsed }"
       :data-tip="isCollapsed ? 'Show sidebar' : undefined"
     >
