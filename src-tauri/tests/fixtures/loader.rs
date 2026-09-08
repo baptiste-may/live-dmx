@@ -168,6 +168,25 @@ fn test_filter_and_sort_fixtures_no_match() {
 }
 
 #[test]
+fn test_filter_and_sort_fixtures_multi_token_and_category() {
+    let data = create_mock_fixtures();
+
+    // Multi-token: manufacturer + fixture name keyword
+    let multi = filter_and_sort_fixtures(&data, Some("chauvet slimpar"));
+    assert_eq!(multi.len(), 1);
+    assert!(multi.contains_key("chauvet"));
+    assert_eq!(multi["chauvet"].fixtures.len(), 1);
+    assert!(multi["chauvet"].fixtures.contains_key("slimpar-64"));
+
+    // Multi-token: category + manufacturer keyword
+    let cat_man = filter_and_sort_fixtures(&data, Some("American Color"));
+    assert_eq!(cat_man.len(), 1);
+    assert!(cat_man.contains_key("adj"));
+    assert_eq!(cat_man["adj"].fixtures.len(), 1);
+    assert!(cat_man["adj"].fixtures.contains_key("mega-par-profile"));
+}
+
+#[test]
 fn test_deserialize_all_fixtures() {
     let fixtures_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures");
     if !fixtures_dir.exists() {

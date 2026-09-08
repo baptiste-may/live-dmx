@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 import { markRaw } from "vue";
 
-import type { Manufacturers } from "@/types/fixtures";
+import type { FixtureType, Manufacturers } from "@/types/fixtures";
 
 import { ToastType, useToastStore } from "./toast.ts";
 
@@ -25,6 +25,61 @@ export async function checkFixturesInstalled(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export function filterManufacturersLocally(
+  manufacturers: Manufacturers,
+  query?: string,
+): Manufacturers {
+  const trimmed = (query ?? "").trim().toLowerCase();
+  if (!trimmed) {
+    return manufacturers;
+  }
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return manufacturers;
+  }
+
+  const result: Manufacturers = {};
+
+  for (const [manId, manufacturer] of Object.entries(manufacturers)) {
+    const manNameLower = manufacturer.name.toLowerCase();
+    const manIdLower = manId.toLowerCase();
+
+    const matchingFixtures: Record<string, FixtureType> = {};
+
+    for (const [fixId, fixture] of Object.entries(manufacturer.fixtures)) {
+      const fixNameLower = fixture.name.toLowerCase();
+      const fixIdLower = fixId.toLowerCase();
+      const shortNameLower = (fixture.shortName || "").toLowerCase();
+      const categories = (fixture.categories || []).map((c) => c.toLowerCase());
+      const modeNames = (fixture.modes || []).map((m) => m.name.toLowerCase());
+
+      const allTokensMatch = tokens.every(
+        (token) =>
+          manNameLower.includes(token) ||
+          manIdLower.includes(token) ||
+          fixNameLower.includes(token) ||
+          fixIdLower.includes(token) ||
+          shortNameLower.includes(token) ||
+          categories.some((cat) => cat.includes(token)) ||
+          modeNames.some((mode) => mode.includes(token)),
+      );
+
+      if (allTokensMatch) {
+        matchingFixtures[fixId] = fixture;
+      }
+    }
+
+    if (Object.keys(matchingFixtures).length > 0) {
+      result[manId] = {
+        ...manufacturer,
+        fixtures: matchingFixtures,
+      };
+    }
+  }
+
+  return result;
 }
 
 export async function loadManufacturers(query?: string): Promise<Manufacturers> {
@@ -110,10 +165,45 @@ export const useFixtureBrowser = defineStore("fixture-browser", {
       const installed = await this.checkInstalled();
       if (installed) {
         if (this.manufacturers === undefined) {
-          await this.search();
+          await this.loadAll();
         }
       } else {
         this.isLoading = false;
+      }
+    },
+    async loadAll(forceReload = false): Promise<boolean> {
+      const currentSearchId = ++this.searchId;
+      this.isLoading = true;
+      this.progress = 0;
+      this.loadingStatus = forceReload ? "Reloading fixtures..." : "Loading fixtures...";
+
+      await this.initEventListener();
+
+      try {
+        const results = forceReload
+          ? markRaw(await invoke<Manufacturers>("reload_fixtures"))
+          : await loadManufacturers();
+        if (currentSearchId !== this.searchId) {
+          return false;
+        }
+        this.manufacturers = markRaw(results);
+        this.filteredManufacturers = markRaw(filterManufacturersLocally(results, this.searchQuery));
+        this.progress = 100;
+        this.loadingStatus = "Loaded";
+        return true;
+      } catch (error: unknown) {
+        useToastStore().addToast(`Failed to load fixtures: ${String(error)}`, ToastType.ERROR);
+        return false;
+      } finally {
+        if (currentSearchId === this.searchId) {
+          this.isLoading = false;
+        }
+      }
+    },
+    async refresh() {
+      const success = await this.loadAll(true);
+      if (success) {
+        useToastStore().addToast("Fixture library refreshed.", ToastType.SUCCESS);
       }
     },
     async downloadFixtures() {
@@ -127,7 +217,7 @@ export const useFixtureBrowser = defineStore("fixture-browser", {
         await invoke("download_fixtures");
         this.isInstalled = true;
         this.isDownloading = false;
-        await this.search();
+        await this.loadAll();
       } catch (error: unknown) {
         this.isDownloading = false;
         useToastStore().addToast(`Failed to download fixtures: ${String(error)}`, ToastType.ERROR);
@@ -137,35 +227,19 @@ export const useFixtureBrowser = defineStore("fixture-browser", {
       if (query !== undefined) {
         this.searchQuery = query;
       }
-      const currentSearchId = ++this.searchId;
-      this.isLoading = true;
-      this.progress = 0;
-      this.loadingStatus = "Loading fixtures...";
-
-      await this.initEventListener();
-
-      try {
-        const q = this.searchQuery.trim();
-        const results = await loadManufacturers(q);
-        if (currentSearchId !== this.searchId) {
-          return;
-        }
-        this.filteredManufacturers = markRaw(results);
-
-        if (this.manufacturers === undefined || !q) {
-          this.manufacturers = markRaw(results);
-        }
-        this.progress = 100;
-        this.loadingStatus = "Loaded";
-      } finally {
-        if (currentSearchId === this.searchId) {
-          this.isLoading = false;
-        }
+      if (this.manufacturers === undefined) {
+        await this.loadAll();
+        return;
       }
+      this.filteredManufacturers = markRaw(
+        filterManufacturersLocally(this.manufacturers, this.searchQuery),
+      );
     },
     clearSearch() {
       this.searchQuery = "";
-      return this.search();
+      if (this.manufacturers !== undefined) {
+        this.filteredManufacturers = this.manufacturers;
+      }
     },
     getFixture(manufacturerKey: string, fixtureKey: string) {
       if (this.manufacturers && this.manufacturers[manufacturerKey]?.fixtures[fixtureKey]) {

@@ -23,22 +23,44 @@ pub async fn download_fixtures(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn reload_fixtures(app: tauri::AppHandle) -> Result<Fixtures, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = FIXTURE_LOAD_LOCK.lock().map_err(|e| e.to_string())?;
+        let loaded = load_fixtures_sync(&app)?;
+        let mut write_guard = CACHED_FIXTURES.write().map_err(|e| e.to_string())?;
+        *write_guard = Some(loaded);
+
+        let fixtures = write_guard.as_ref().unwrap();
+        Ok(fixtures.clone())
+    })
+    .await
+    .map_err(|e| format!("Failed to run background task: {:?}", e))?
+}
+
+#[tauri::command]
 pub async fn get_fixtures(
     app: tauri::AppHandle,
     query: Option<String>,
+    reload: Option<bool>,
 ) -> Result<Fixtures, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        if let Ok(guard) = CACHED_FIXTURES.read() {
-            if let Some(cached) = guard.as_ref() {
-                return Ok(filter_and_sort_fixtures(cached, query.as_deref()));
+        let force_reload = reload.unwrap_or(false);
+
+        if !force_reload {
+            if let Ok(guard) = CACHED_FIXTURES.read() {
+                if let Some(cached) = guard.as_ref() {
+                    return Ok(filter_and_sort_fixtures(cached, query.as_deref()));
+                }
             }
         }
 
         let _guard = FIXTURE_LOAD_LOCK.lock().map_err(|e| e.to_string())?;
 
-        if let Ok(guard) = CACHED_FIXTURES.read() {
-            if let Some(cached) = guard.as_ref() {
-                return Ok(filter_and_sort_fixtures(cached, query.as_deref()));
+        if !force_reload {
+            if let Ok(guard) = CACHED_FIXTURES.read() {
+                if let Some(cached) = guard.as_ref() {
+                    return Ok(filter_and_sort_fixtures(cached, query.as_deref()));
+                }
             }
         }
 

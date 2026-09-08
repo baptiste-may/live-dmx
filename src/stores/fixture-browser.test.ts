@@ -22,37 +22,62 @@ describe("fixture-browser store", () => {
     expect(store.isLoading).toBe(true);
   });
 
-  it("should fetch manufacturers and perform search filtering via backend", async () => {
-    mockInvoke.mockResolvedValue({
-      chauvet: {
-        name: "Chauvet DJ",
-        fixtures: {
-          "slimpar-64": mockFixturesData.chauvet.fixtures["slimpar-64"],
-        },
-      },
-    });
+  it("should fetch manufacturers and perform search filtering", async () => {
+    mockInvoke.mockResolvedValue(mockFixturesData);
 
     const store = useFixtureBrowser();
-    await store.search("SlimPAR");
+    await store.loadAll();
 
     expect(store.isLoading).toBe(false);
+    expect(store.manufacturers).toEqual(mockFixturesData);
+
+    await store.search("SlimPAR");
     expect(store.searchQuery).toBe("SlimPAR");
-    expect(mockInvoke).toHaveBeenCalledWith("get_fixtures", { query: "SlimPAR" });
     expect(Object.keys(store.filteredManufacturers)).toEqual(["chauvet"]);
     expect(store.filteredManufacturers.chauvet.fixtures).toHaveProperty("slimpar-64");
+
+    // Multi-token search
+    await store.search("American mega");
+    expect(Object.keys(store.filteredManufacturers)).toEqual(["adj"]);
+    expect(store.filteredManufacturers.adj.fixtures).toHaveProperty("mega-par-profile");
   });
 
   it("should clear search query when clearSearch is called", async () => {
     mockInvoke.mockResolvedValue(mockFixturesData);
 
     const store = useFixtureBrowser();
+    await store.loadAll();
+
     await store.search("gig");
     expect(store.searchQuery).toBe("gig");
-    expect(mockInvoke).toHaveBeenCalledWith("get_fixtures", { query: "gig" });
+    expect(Object.keys(store.filteredManufacturers.chauvet.fixtures)).toEqual(["gig-bar-2"]);
 
-    await store.clearSearch();
+    store.clearSearch();
     expect(store.searchQuery).toBe("");
-    expect(mockInvoke).toHaveBeenCalledWith("get_fixtures", { query: undefined });
+    expect(store.filteredManufacturers).toEqual(mockFixturesData);
+  });
+
+  it("should reload fixtures when refresh is called", async () => {
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reload_fixtures") return mockFixturesData;
+      return {};
+    });
+
+    const store = useFixtureBrowser();
+    await store.refresh();
+
+    expect(mockInvoke).toHaveBeenCalledWith("reload_fixtures");
+    expect(store.manufacturers).toEqual(mockFixturesData);
+    expect(store.isLoading).toBe(false);
+  });
+
+  it("should handle error when refresh fails", async () => {
+    mockInvoke.mockRejectedValue(new Error("Reload failure"));
+
+    const store = useFixtureBrowser();
+    await store.refresh();
+
+    expect(store.isLoading).toBe(false);
   });
 
   it("should get fixture by manufacturer key and fixture key", async () => {

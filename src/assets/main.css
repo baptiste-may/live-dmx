@@ -9,3 +9,28 @@
 * {
   @apply select-none;
 }
+
+/* Strip DaisyUI popover background, padding, arrow and max-width when hosting a fixture tooltip card */
+.tooltip-popover:has(.fixture-tooltip) {
+  background: transparent !important;
+  padding: 0 !important;
+  max-width: none !important;
+}
+
+.tooltip-popover:has(.fixture-tooltip)::before {
+  display: none !important;
+}
+
+/* Prevent DaisyUI menu from styling the tooltip-wrapper intermediate div */
+.menu li.mode-item > :not(ul, details, .menu-title) {
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  display: block !important;
+}
+
+.menu li.mode-item > :not(ul, details, .menu-title):hover,
+.menu li.mode-item > :not(ul, details, .menu-title):focus,
+.menu li.mode-item > :not(ul, details, .menu-title):active {
+  background: transparent !important;
+}

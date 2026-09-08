@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDebounceFn } from "@vueuse/core";
 import {
   Badge,
   Button,
@@ -20,8 +21,8 @@ import {
   TooltipContent,
   TooltipTarget,
 } from "daisy-ui-kit";
-import { DownloadIcon, SearchIcon } from "lucide-vue-next";
-import { onMounted, ref } from "vue";
+import { DownloadIcon, RotateCwIcon, SearchIcon, XIcon } from "lucide-vue-next";
+import { onMounted, ref, watch } from "vue";
 
 import { FixtureIcon } from "@/components/icons";
 import { useFixtureBrowser } from "@/stores/fixture-browser";
@@ -34,8 +35,19 @@ const patchForm = usePatchForm();
 
 const openManufacturerId = ref<string | null>(null);
 const openFixtureKeys = ref<Record<string, boolean>>({});
+const searchInput = ref(browser.searchQuery);
+
+const debouncedSearch = useDebounceFn((val: string) => {
+  browser.search(val);
+}, 150);
+
+function onSearchInput(val: string) {
+  searchInput.value = val;
+  debouncedSearch(val);
+}
 
 function handleCleanButton() {
+  searchInput.value = "";
   browser.clearSearch();
   patchForm.reset();
 }
@@ -44,6 +56,28 @@ function toggleFixture(key: string, event: Event) {
   const target = event.target as HTMLDetailsElement;
   openFixtureKeys.value[key] = target.open;
 }
+
+watch(
+  () => browser.searchQuery,
+  (val) => {
+    if (searchInput.value !== val) {
+      searchInput.value = val;
+    }
+  },
+);
+
+watch(
+  () => browser.filteredManufacturers,
+  (filtered) => {
+    const keys = Object.keys(filtered);
+    if (keys.length === 1) {
+      openManufacturerId.value = keys[0];
+    } else if (openManufacturerId.value && !filtered[openManufacturerId.value]) {
+      openManufacturerId.value = null;
+    }
+  },
+  { immediate: true },
+);
 
 onMounted(browser.init);
 </script>
@@ -76,18 +110,36 @@ onMounted(browser.init);
           <SearchIcon v-else class="h-[1em] opacity-50" />
           <Input
             placeholder="Search fixtures..."
-            :model-value="browser.searchQuery"
-            :disabled="browser.isLoading || browser.isDownloading"
-            @update:model-value="browser.search"
+            :model-value="searchInput"
+            :disabled="browser.isDownloading"
+            @update:model-value="onSearchInput"
+            @keydown.esc="handleCleanButton"
+            @keydown.enter="browser.search(searchInput)"
           />
+          <button
+            v-if="searchInput"
+            type="button"
+            class="cursor-pointer opacity-50 hover:opacity-100"
+            title="Clear search"
+            aria-label="Clear search"
+            @click="handleCleanButton"
+          >
+            <XIcon class="h-3.5 w-3.5" />
+          </button>
         </Label>
-        <Button
-          error
-          join
-          :disabled="browser.isLoading || browser.isDownloading"
-          @click="handleCleanButton"
-        >
+        <Button error join :disabled="browser.isDownloading" @click="handleCleanButton">
           Clear
+        </Button>
+        <Button
+          secondary
+          join
+          square
+          title="Refresh fixtures library"
+          aria-label="Refresh fixtures"
+          :disabled="browser.isLoading || browser.isDownloading"
+          @click="browser.refresh"
+        >
+          <RotateCwIcon class="h-4 w-4" :class="[browser.isLoading ? 'animate-spin' : '']" />
         </Button>
       </Join>
       <Flex v-if="browser.isLoading || browser.isDownloading" col class="mt-2 mb-1 w-full">
@@ -98,7 +150,7 @@ onMounted(browser.init);
         <Progress :value="browser.progress" :max="100" primary class="mt-1 h-2 w-full rounded" />
       </Flex>
       <div class="mt-2 grow overflow-y-auto pr-2">
-        <Flex v-if="browser.isLoading || browser.isDownloading" col gap-2 h-full>
+        <Flex v-if="browser.isLoading || browser.isDownloading" col gap-2 class="h-full">
           <div
             v-for="i in 6"
             :key="i"
@@ -131,7 +183,13 @@ onMounted(browser.init);
           class="text-base-content/50 h-48 gap-2"
         >
           <SearchIcon class="h-8 w-8 opacity-40" />
-          <Text size="sm">No fixtures found matching "{{ browser.searchQuery }}"</Text>
+          <Text size="sm">
+            {{
+              browser.searchQuery
+                ? 'No fixtures found matching "' + browser.searchQuery + '"'
+                : "No fixtures available"
+            }}
+          </Text>
         </Flex>
         <Collapse
           v-for="(
@@ -148,13 +206,13 @@ onMounted(browser.init);
             name="fixtures-accordion"
             :value="manufacturerId"
           />
-          <CollapseTitle class="font-semibold">
-            {{ manufacturerName }}
+          <CollapseTitle class="flex items-center justify-between pr-8 font-semibold">
+            <span>{{ manufacturerName }}</span>
+            <Badge v-if="browser.searchQuery.trim()" xs ghost>
+              {{ Object.keys(fixtures).length }}
+            </Badge>
           </CollapseTitle>
-          <CollapseContent
-            v-if="openManufacturerId === manufacturerId || Boolean(browser.searchQuery.trim())"
-            class="p-0 px-2 pb-2"
-          >
+          <CollapseContent v-if="openManufacturerId === manufacturerId" class="p-0 px-2 pb-2">
             <Menu class="bg-base-100 w-full">
               <MenuItem v-for="(fixture, fixtureId) in fixtures" :key="fixtureId">
                 <details @toggle="toggleFixture(manufacturerId + ':' + fixtureId, $event)">
@@ -167,29 +225,36 @@ onMounted(browser.init);
                     <span>{{ fixture.name }}</span>
                   </summary>
                   <ul v-if="openFixtureKeys[manufacturerId + ':' + fixtureId]">
-                    <MenuItem v-for="({ name, channels }, modeId) in fixture.modes" :key="modeId">
+                    <li
+                      v-for="({ name, channels }, modeId) in fixture.modes"
+                      :key="modeId"
+                      class="mode-item block w-full"
+                    >
                       <Tooltip position="right" class="block w-full">
                         <TooltipTarget class="block w-full">
                           <button
                             type="button"
                             :class="[
                               patchForm.selectedFixture?.manufacturerKey === manufacturerId &&
-                                patchForm.selectedFixture?.fixtureKey === fixtureId &&
-                                patchForm.selectedMode?.name === name &&
-                                'menu-active',
-                              'flex w-full items-center gap-2 text-left',
+                              patchForm.selectedFixture?.fixtureKey === fixtureId &&
+                              patchForm.selectedMode?.name === name
+                                ? 'bg-primary text-primary-content font-semibold shadow-xs'
+                                : 'text-base-content/80 hover:bg-base-content/10 hover:text-base-content',
+                              'flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors',
                             ]"
                             @click="patchForm.select(manufacturerId, fixtureId, modeId)"
                           >
-                            <span>{{ name }}</span>
-                            <Badge xs secondary soft> {{ channels?.length || 0 }} ch </Badge>
+                            <span class="truncate">{{ name }}</span>
+                            <Badge xs secondary soft class="shrink-0">
+                              {{ channels?.length || 0 }} ch
+                            </Badge>
                           </button>
                         </TooltipTarget>
                         <TooltipContent>
                           <PatchFormTooltip :fixture="fixture" :mode="modeId" />
                         </TooltipContent>
                       </Tooltip>
-                    </MenuItem>
+                    </li>
                   </ul>
                 </details>
               </MenuItem>

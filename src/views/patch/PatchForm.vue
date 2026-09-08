@@ -7,7 +7,7 @@ import PatchFormBrowser from "./form/PatchFormBrowser.vue";
 
 <template>
   <Card class="bg-base-200 h-full w-sm overflow-hidden">
-    <CardBody class="flex h-full flex-col gap-4">
+    <CardBody class="flex h-full min-h-0 flex-col gap-4">
       <Text is="h2" bold size="2xl">Fixtures</Text>
       <PatchFormBrowser />
       <PatchFormAdder />

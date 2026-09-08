@@ -25,6 +25,7 @@ describe("PatchFormTooltip.vue", () => {
 
     expect(screen.getByText("Cameo")).toBeInTheDocument();
     expect(screen.getByText(/Mini Spot/)).toBeInTheDocument();
+    expect(screen.getByText("Spot")).toBeInTheDocument();
     expect(screen.getByText(/7 channels/)).toBeInTheDocument();
     expect(screen.getByText("Dimmer")).toBeInTheDocument();
   });

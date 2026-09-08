@@ -2,7 +2,7 @@ pub mod fixtures;
 pub mod output;
 pub mod show;
 
-use fixtures::{check_fixtures_installed, download_fixtures, get_fixtures};
+use fixtures::{check_fixtures_installed, download_fixtures, get_fixtures, reload_fixtures};
 use output::{
     get_all_dmx_data, get_dmx_data, get_output_interfaces, live_reset_all_buttons,
     live_reset_group_color_effect, live_reset_group_effect, live_set_all_groups_color,
@@ -36,6 +36,7 @@ pub fn run() {
             check_fixtures_installed,
             download_fixtures,
             get_fixtures,
+            reload_fixtures,
             get_recent_shows,
             save_recent_show,
             remove_recent_show,

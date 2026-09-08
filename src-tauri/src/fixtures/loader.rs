@@ -385,20 +385,44 @@ pub fn filter_and_sort_fixtures(fixtures: &Fixtures, query: Option<&str>) -> Fix
         return fixtures.clone();
     }
 
+    let tokens: Vec<&str> = q.split_whitespace().collect();
+    if tokens.is_empty() {
+        return fixtures.clone();
+    }
+
     let mut filtered = BTreeMap::new();
 
     for (man_id, manufacturer) in fixtures {
         let man_name_lower = manufacturer.name.to_lowercase();
         let man_id_lower = man_id.to_lowercase();
-        let man_match = man_name_lower.contains(&q) || man_id_lower.contains(&q);
 
         let matching_fixtures: BTreeMap<String, Fixture> = manufacturer
             .fixtures
             .iter()
             .filter(|(fix_id, fixture)| {
-                man_match
-                    || fixture.name.to_lowercase().contains(&q)
-                    || fix_id.to_lowercase().contains(&q)
+                let fix_name_lower = fixture.name.to_lowercase();
+                let fix_id_lower = fix_id.to_lowercase();
+                let short_name_lower = fixture
+                    .short_name
+                    .as_deref()
+                    .unwrap_or_default()
+                    .to_lowercase();
+
+                tokens.iter().all(|token| {
+                    man_name_lower.contains(token)
+                        || man_id_lower.contains(token)
+                        || fix_name_lower.contains(token)
+                        || fix_id_lower.contains(token)
+                        || short_name_lower.contains(token)
+                        || fixture
+                            .categories
+                            .iter()
+                            .any(|cat| cat.to_lowercase().contains(token))
+                        || fixture
+                            .modes
+                            .iter()
+                            .any(|m| m.name.to_lowercase().contains(token))
+                })
             })
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();

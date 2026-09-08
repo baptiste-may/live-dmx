@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen } from "@testing-library/vue";
+import { fireEvent, render, screen } from "@testing-library/vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useFixtureBrowser } from "@/stores/fixture-browser.ts";
@@ -46,5 +46,60 @@ describe("PatchFormBrowser.vue", () => {
 
     expect(browser.clearSearch).toHaveBeenCalled();
     expect(patchForm.reset).toHaveBeenCalled();
+  });
+
+  it("should call browser.refresh when refresh button is clicked", async () => {
+    const user = userEvent.setup();
+    const browser = useFixtureBrowser();
+    browser.isInstalled = true;
+    browser.isLoading = false;
+
+    render(PatchFormBrowser);
+
+    const refreshButton = screen.getByRole("button", { name: "Refresh fixtures" });
+    expect(refreshButton).toBeInTheDocument();
+
+    await user.click(refreshButton);
+    expect(browser.refresh).toHaveBeenCalled();
+  });
+
+  it("should render manufacturer accordion and allow selecting fixture mode", async () => {
+    const user = userEvent.setup();
+    const browser = useFixtureBrowser();
+    browser.isInstalled = true;
+    browser.isLoading = false;
+    browser.searchQuery = "SlimPAR";
+    const fixtures = {
+      chauvet: {
+        name: "Chauvet DJ",
+        fixtures: {
+          "slimpar-64": {
+            name: "SlimPAR 64",
+            fixtureKey: "slimpar-64",
+            manufacturerKey: "chauvet",
+            categories: ["Color Changer"],
+            modes: [{ name: "7 Channel", channels: ["Red", "Green", "Blue"] }],
+          },
+        },
+      },
+    };
+    browser.manufacturers = fixtures;
+    browser.filteredManufacturers = fixtures;
+
+    render(PatchFormBrowser);
+
+    expect(screen.getByText("Chauvet DJ")).toBeInTheDocument();
+    const fixtureSummary = screen.getByText("SlimPAR 64");
+    expect(fixtureSummary).toBeInTheDocument();
+
+    const details = fixtureSummary.closest("details")!;
+    details.open = true;
+    await fireEvent(details, new Event("toggle"));
+
+    const patchForm = usePatchForm();
+    const modeButton = screen.getByRole("button", { name: /7 Channel/i });
+    await user.click(modeButton);
+
+    expect(patchForm.select).toHaveBeenCalledWith("chauvet", "slimpar-64", 0);
   });
 });
