@@ -10,6 +10,7 @@ const props = withDefaults(
     disabled?: boolean;
     readonly?: boolean;
     label?: string;
+    ariaLabel?: string;
     unit?: string;
     showValue?: boolean;
     color?:
@@ -32,6 +33,7 @@ const props = withDefaults(
     disabled: false,
     readonly: false,
     label: undefined,
+    ariaLabel: undefined,
     unit: "",
     showValue: true,
     color: "primary",
@@ -77,7 +79,12 @@ const sizeInPx = computed(() => {
 });
 
 const textSizeClass = computed(() => {
-  if (sizeInPx.value <= 40) return "text-[10px]";
+  if (sizeInPx.value <= 40) {
+    if (props.unit && String(props.modelValue).length >= 3) {
+      return "text-[9px]";
+    }
+    return "text-[10px]";
+  }
   if (sizeInPx.value <= 52) return "text-xs";
   return "text-sm";
 });
@@ -239,7 +246,7 @@ function onDblClick() {
     <div
       tabindex="0"
       role="slider"
-      :aria-label="label || 'Knob control'"
+      :aria-label="ariaLabel || label || 'Knob control'"
       :aria-valuenow="modelValue"
       :aria-valuemin="min"
       :aria-valuemax="max"

@@ -56,6 +56,8 @@ export type LiveButtonsState = {
   whiteFlashFade: number;
   effectBpm: number;
   colorEffectBpm: number;
+  effectWidth: number;
+  colorEffectWidth: number;
   colorFadeSpeed: number;
   colorFadeOrder: ColorFadeOrder | null;
 };

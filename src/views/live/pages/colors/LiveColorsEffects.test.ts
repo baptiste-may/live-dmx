@@ -45,6 +45,7 @@ describe("LiveColorsEffects.vue", () => {
 
     expect(screen.getByRole("heading", { name: "Effects" })).toBeInTheDocument();
     expect(screen.getByText(/BPM/i)).toBeInTheDocument();
+    expect(screen.getByText(/Width/i)).toBeInTheDocument();
     expect(screen.queryByText("All :")).not.toBeInTheDocument();
     expect(screen.queryByText("Spots :")).not.toBeInTheDocument();
     expect(screen.getByText("Beams :")).toBeInTheDocument();
@@ -56,11 +57,24 @@ describe("LiveColorsEffects.vue", () => {
 
     render(LiveColorsEffects);
 
-    const knob = screen.getByRole("slider");
+    const knob = screen.getByRole("slider", { name: "BPM" });
     knob.focus();
     await user.keyboard("{ArrowUp}");
 
     expect(liveButtons.colorEffectBpm).toBe(61);
+  });
+
+  it("updates color Width on knob keyboard navigation", async () => {
+    const user = userEvent.setup();
+    const liveButtons = useLiveButtons();
+
+    render(LiveColorsEffects);
+
+    const knob = screen.getByRole("slider", { name: "Width" });
+    knob.focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(liveButtons.colorEffectWidth).toBe(99);
   });
 
   it("hides section title when showSectionTitles is false in settings", () => {
@@ -71,5 +85,6 @@ describe("LiveColorsEffects.vue", () => {
 
     expect(screen.queryByRole("heading", { name: "Effects" })).not.toBeInTheDocument();
     expect(screen.getByText(/BPM/i)).toBeInTheDocument();
+    expect(screen.getByText(/Width/i)).toBeInTheDocument();
   });
 });

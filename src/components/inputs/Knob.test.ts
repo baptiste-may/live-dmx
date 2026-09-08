@@ -26,6 +26,23 @@ describe("Knob.vue", () => {
     expect(screen.getByText("50%")).toBeInTheDocument();
   });
 
+  it("renders with custom ariaLabel without visible label", () => {
+    render(Knob, {
+      props: {
+        modelValue: 100,
+        min: 0,
+        max: 100,
+        ariaLabel: "Width",
+        unit: "%",
+      },
+    });
+
+    const slider = screen.getByRole("slider", { name: "Width" });
+    expect(slider).toBeInTheDocument();
+    expect(screen.queryByText("Width")).not.toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
   it("emits update:modelValue on keyboard navigation", async () => {
     const user = userEvent.setup();
     const { emitted } = render(Knob, {

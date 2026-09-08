@@ -51,6 +51,8 @@ pub struct LiveEngine {
     pub flash_fade_transitions: HashMap<(u32, String), FlashFadeTransition>,
     pub effect_bpm: u16,
     pub color_effect_bpm: u16,
+    pub effect_width: u8,
+    pub color_effect_width: u8,
     pub color_fade_speed: f32,
     pub color_fade_order: Option<String>,
     pub fixture_color_transitions: HashMap<u32, FixtureColorTransition>,
@@ -93,6 +95,8 @@ impl LiveEngine {
             flash_fade_transitions: HashMap::new(),
             effect_bpm: 60,
             color_effect_bpm: 60,
+            effect_width: 100,
+            color_effect_width: 100,
             color_fade_speed: 1.0,
             color_fade_order: None,
             fixture_color_transitions: HashMap::new(),
@@ -200,6 +204,14 @@ impl LiveEngine {
 
     pub fn set_color_effect_bpm(&mut self, bpm: u16) {
         self.color_effect_bpm = bpm;
+    }
+
+    pub fn set_effect_width(&mut self, width: u8) {
+        self.effect_width = width.min(100);
+    }
+
+    pub fn set_color_effect_width(&mut self, width: u8) {
+        self.color_effect_width = width.min(100);
     }
 
     pub fn set_color_fade_speed(&mut self, speed: f32) {
@@ -433,6 +445,8 @@ impl LiveEngine {
         self.flash_fade_transitions.clear();
         self.effect_bpm = 60;
         self.color_effect_bpm = 60;
+        self.effect_width = 100;
+        self.color_effect_width = 100;
         self.color_fade_speed = 1.0;
         self.color_fade_order = None;
         self.fixture_color_transitions.clear();
@@ -720,6 +734,7 @@ impl LiveEngine {
             group_count,
             fixture.id,
             self.effect_bpm,
+            self.effect_width,
         );
 
         let intensity_level = ((raw_intensity as f32) * master_multiplier).clamp(0.0, 255.0) as u8;
@@ -781,7 +796,12 @@ impl LiveEngine {
                 fixture.id,
                 self.color_effect_bpm,
             ) {
-                hsv_to_rgb(fract, 1.0, 1.0)
+                let w = (self.color_effect_width as f32 / 100.0).clamp(0.0, 1.0);
+                if w <= 0.0 || fract >= w {
+                    current_rgb_f
+                } else {
+                    hsv_to_rgb(fract / w, 1.0, 1.0)
+                }
             } else {
                 current_rgb_f
             }
@@ -793,6 +813,7 @@ impl LiveEngine {
                 color_group_count,
                 fixture.id,
                 self.color_effect_bpm,
+                self.color_effect_width,
             );
 
             (

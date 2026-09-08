@@ -134,6 +134,47 @@ fn test_live_engine_effect_bpm() {
     // Resetting all sets bpm back to default 60
     engine.reset_all();
     assert_eq!(engine.effect_bpm, 60);
+    assert_eq!(engine.effect_width, 100);
+}
+
+#[test]
+fn test_live_engine_effect_width() {
+    let mut engine = LiveEngine::new();
+    assert_eq!(engine.effect_width, 100);
+    assert_eq!(engine.color_effect_width, 100);
+
+    engine.set_effect_width(50);
+    assert_eq!(engine.effect_width, 50);
+
+    engine.set_color_effect_width(75);
+    assert_eq!(engine.color_effect_width, 75);
+
+    // Cannot exceed 100
+    engine.set_effect_width(150);
+    assert_eq!(engine.effect_width, 100);
+
+    let mut show = ShowData::default();
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Spot 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_group_effect(1, Some("pulse".to_string()), None, false);
+
+    // With 0 width, effect produces 0 intensity
+    engine.effect_width = 0;
+    engine.compute_dmx(&show);
+    let buf_zero = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf_zero[0], 0);
+
+    engine.reset_all();
+    assert_eq!(engine.effect_width, 100);
+    assert_eq!(engine.color_effect_width, 100);
 }
 
 #[test]
@@ -144,7 +185,7 @@ fn test_calculate_effect_intensity_types() {
         bounce: false,
     };
     assert_eq!(
-        calculate_effect_intensity(&state_none, 0.0, 0, 1, 1, 120),
+        calculate_effect_intensity(&state_none, 0.0, 0, 1, 1, 120, 100),
         0
     );
 
@@ -153,7 +194,10 @@ fn test_calculate_effect_intensity_types() {
         alignment: None,
         bounce: false,
     };
-    assert_eq!(calculate_effect_intensity(&state_off, 0.0, 0, 1, 1, 120), 0);
+    assert_eq!(
+        calculate_effect_intensity(&state_off, 0.0, 0, 1, 1, 120, 100),
+        0
+    );
 
     let state_full = GroupEffectState {
         effect: Some("full".to_string()),
@@ -161,7 +205,7 @@ fn test_calculate_effect_intensity_types() {
         bounce: false,
     };
     assert_eq!(
-        calculate_effect_intensity(&state_full, 0.0, 0, 1, 1, 120),
+        calculate_effect_intensity(&state_full, 0.0, 0, 1, 1, 120, 100),
         255
     );
 
@@ -170,7 +214,7 @@ fn test_calculate_effect_intensity_types() {
         alignment: Some("left".to_string()),
         bounce: false,
     };
-    let intensity = calculate_effect_intensity(&state_chase, 0.25, 0, 4, 1, 60);
+    let intensity = calculate_effect_intensity(&state_chase, 0.25, 0, 4, 1, 60, 100);
     assert!(intensity == 0 || intensity == 255);
 
     let state_ramp_up = GroupEffectState {
@@ -178,7 +222,7 @@ fn test_calculate_effect_intensity_types() {
         alignment: None,
         bounce: false,
     };
-    let intensity_ramp = calculate_effect_intensity(&state_ramp_up, 0.5, 0, 1, 1, 60);
+    let intensity_ramp = calculate_effect_intensity(&state_ramp_up, 0.5, 0, 1, 1, 60, 100);
     assert!(intensity_ramp > 0);
 
     let state_ramp_down = GroupEffectState {
@@ -186,7 +230,7 @@ fn test_calculate_effect_intensity_types() {
         alignment: None,
         bounce: false,
     };
-    let intensity_down = calculate_effect_intensity(&state_ramp_down, 0.5, 0, 1, 1, 60);
+    let intensity_down = calculate_effect_intensity(&state_ramp_down, 0.5, 0, 1, 1, 60, 100);
     assert!(intensity_down > 0);
 }
 
@@ -197,7 +241,7 @@ fn test_calculate_effect_factor() {
         alignment: None,
         bounce: false,
     };
-    let factor = calculate_effect_factor(&state_chase, 0.25, 0, 1, 1, 60);
+    let factor = calculate_effect_factor(&state_chase, 0.25, 0, 1, 1, 60, 100);
     assert!(factor == 0.0 || factor == 1.0);
 
     let state_pulse = GroupEffectState {
@@ -205,8 +249,33 @@ fn test_calculate_effect_factor() {
         alignment: None,
         bounce: false,
     };
-    let factor_pulse = calculate_effect_factor(&state_pulse, 0.25, 0, 1, 1, 60);
+    let factor_pulse = calculate_effect_factor(&state_pulse, 0.25, 0, 1, 1, 60, 100);
     assert!((0.0..=1.0).contains(&factor_pulse));
+}
+
+#[test]
+fn test_calculate_effect_factor_width() {
+    let state_pulse = GroupEffectState {
+        effect: Some("pulse".to_string()),
+        alignment: None,
+        bounce: false,
+    };
+    // At elapsed 0.75 with 50% width, fixture is in inactive portion (> 0.5) -> 0.0
+    let factor_50_late = calculate_effect_factor(&state_pulse, 0.75, 0, 1, 1, 60, 50);
+    assert_eq!(factor_50_late, 0.0);
+
+    // With 0% width, factor is 0.0
+    let factor_0 = calculate_effect_factor(&state_pulse, 0.25, 0, 1, 1, 60, 0);
+    assert_eq!(factor_0, 0.0);
+
+    // With dip effect and 0% width, it never dips (stays 1.0)
+    let state_dip = GroupEffectState {
+        effect: Some("dip".to_string()),
+        alignment: None,
+        bounce: false,
+    };
+    let factor_dip_0 = calculate_effect_factor(&state_dip, 0.25, 0, 1, 1, 60, 0);
+    assert_eq!(factor_dip_0, 1.0);
 }
 
 #[test]
@@ -222,11 +291,11 @@ fn test_calculate_effect_factor_sine_triangle_dip() {
         bounce: false,
     };
     // At elapsed 0.0 with 60 BPM (cycle 1.0s), t = 0.0, sin(0) = 0, factor = 0.5
-    let factor_sine = calculate_effect_factor(&state_sine, 0.0, 0, 1, 1, 60);
+    let factor_sine = calculate_effect_factor(&state_sine, 0.0, 0, 1, 1, 60, 100);
     assert!((factor_sine - 0.5).abs() < 0.01);
 
     // At elapsed 0.25 with 60 BPM, t = PI/2, sin(PI/2) = 1.0, factor = 1.0
-    let factor_sine_peak = calculate_effect_factor(&state_sine, 0.25, 0, 1, 1, 60);
+    let factor_sine_peak = calculate_effect_factor(&state_sine, 0.25, 0, 1, 1, 60, 100);
     assert!((factor_sine_peak - 1.0).abs() < 0.01);
 
     let state_triangle = GroupEffectState {
@@ -235,15 +304,15 @@ fn test_calculate_effect_factor_sine_triangle_dip() {
         bounce: false,
     };
     // At elapsed 0.0, fract = 0.0 -> factor = 0.0
-    let factor_tri_0 = calculate_effect_factor(&state_triangle, 0.0, 0, 1, 1, 60);
+    let factor_tri_0 = calculate_effect_factor(&state_triangle, 0.0, 0, 1, 1, 60, 100);
     assert!((factor_tri_0 - 0.0).abs() < 0.01);
 
     // At elapsed 0.5, fract = 0.5 -> factor = 1.0
-    let factor_tri_half = calculate_effect_factor(&state_triangle, 0.5, 0, 1, 1, 60);
+    let factor_tri_half = calculate_effect_factor(&state_triangle, 0.5, 0, 1, 1, 60, 100);
     assert!((factor_tri_half - 1.0).abs() < 0.01);
 
     // At elapsed 0.25, fract = 0.25 -> factor = 0.5
-    let factor_tri_q = calculate_effect_factor(&state_triangle, 0.25, 0, 1, 1, 60);
+    let factor_tri_q = calculate_effect_factor(&state_triangle, 0.25, 0, 1, 1, 60, 100);
     assert!((factor_tri_q - 0.5).abs() < 0.01);
 
     let state_dip = GroupEffectState {
@@ -252,11 +321,11 @@ fn test_calculate_effect_factor_sine_triangle_dip() {
         bounce: false,
     };
     // At elapsed 0.25 (sin > 0.5), dip should be 0.0
-    let factor_dip_off = calculate_effect_factor(&state_dip, 0.25, 0, 1, 1, 60);
+    let factor_dip_off = calculate_effect_factor(&state_dip, 0.25, 0, 1, 1, 60, 100);
     assert_eq!(factor_dip_off, 0.0);
 
     // At elapsed 0.75 (sin < 0), dip should be 1.0
-    let factor_dip_on = calculate_effect_factor(&state_dip, 0.75, 0, 1, 1, 60);
+    let factor_dip_on = calculate_effect_factor(&state_dip, 0.75, 0, 1, 1, 60, 100);
     assert_eq!(factor_dip_on, 1.0);
 }
 

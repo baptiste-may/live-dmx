@@ -63,6 +63,7 @@ pub fn calculate_effect_factor(
     group_count: usize,
     fixture_id: u32,
     bpm: u16,
+    width: u8,
 ) -> f32 {
     let effect_type = match effect_state.effect.as_deref() {
         Some(e) if e != "none" && e != "off" => e,
@@ -84,7 +85,13 @@ pub fn calculate_effect_factor(
         return 0.0;
     };
 
-    let t = effective_fract * 2.0 * std::f32::consts::PI;
+    let w = (width as f32 / 100.0).clamp(0.0, 1.0);
+    if w <= 0.0 || effective_fract >= w {
+        return if effect_type == "dip" { 1.0 } else { 0.0 };
+    }
+
+    let active_fract = effective_fract / w;
+    let t = active_fract * 2.0 * std::f32::consts::PI;
 
     let val = match effect_type {
         "pulse" => {
@@ -98,14 +105,14 @@ pub fn calculate_effect_factor(
                 0.0
             }
         }
-        "ramp_up" => effective_fract,
-        "ramp_down" => 1.0 - effective_fract,
+        "ramp_up" => active_fract,
+        "ramp_down" => 1.0 - active_fract,
         "sine" => (t.sin() + 1.0) * 0.5,
         "triangle" => {
-            if effective_fract < 0.5 {
-                effective_fract * 2.0
+            if active_fract < 0.5 {
+                active_fract * 2.0
             } else {
-                (1.0 - effective_fract) * 2.0
+                (1.0 - active_fract) * 2.0
             }
         }
         "dip" if t.sin() > 0.5 => 0.0,
@@ -122,6 +129,7 @@ pub fn calculate_effect_intensity(
     group_count: usize,
     fixture_id: u32,
     bpm: u16,
+    width: u8,
 ) -> u8 {
     (calculate_effect_factor(
         effect_state,
@@ -130,6 +138,7 @@ pub fn calculate_effect_intensity(
         group_count,
         fixture_id,
         bpm,
+        width,
     ) * 255.0)
         .round()
         .clamp(0.0, 255.0) as u8
