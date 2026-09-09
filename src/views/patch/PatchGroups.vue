@@ -6,7 +6,7 @@ import PatchGroupsTable from "@/views/patch/groups/PatchGroupsTable.vue";
 </script>
 
 <template>
-  <Card class="bg-base-200 h-full w-full overflow-hidden">
+  <Card class="bg-base-200 h-full w-full min-w-0 overflow-hidden">
     <CardBody class="flex h-full min-h-0 flex-col gap-4">
       <Text is="h2" bold size="2xl">Groups</Text>
       <PatchGroupsList />

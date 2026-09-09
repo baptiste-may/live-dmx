@@ -46,8 +46,8 @@ function handleUpdateSelection(fixtureId: number, checked: boolean) {
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-4">
-    <div class="min-h-0 flex-1 overflow-y-auto">
-      <Table class="w-full">
+    <div class="min-h-0 flex-1 overflow-auto">
+      <Table class="w-full min-w-[42rem]">
         <thead class="bg-base-200 sticky top-0 z-10">
           <tr>
             <th>

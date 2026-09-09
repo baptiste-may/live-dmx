@@ -33,13 +33,15 @@ const groupsData = computed(() => patch.groups.map((groupId) => showGroups.get(g
       />
     </td>
     <td>{{ patch.id }}</td>
-    <td>{{ patch.name }}</td>
-    <td>{{ patch.fixtureType.name }}</td>
+    <td class="max-w-[200px] truncate whitespace-nowrap">{{ patch.name }}</td>
+    <td class="max-w-[200px] truncate whitespace-nowrap">{{ patch.fixtureType.name }}</td>
     <td>{{ patch.universe }}.{{ patchNumberFormat.format(patch.address) }}</td>
-    <td class="flex flex-wrap gap-1">
-      <Badge v-for="group in groupsData" :key="group?.id" xs primary>
-        {{ group?.name }}
-      </Badge>
+    <td>
+      <div class="flex flex-wrap gap-1">
+        <Badge v-for="group in groupsData" :key="group?.id" xs primary>
+          {{ group?.name }}
+        </Badge>
+      </div>
     </td>
     <td>
       <PatchGroupsTableActions :selected-fixtures="[patch.id]" />

@@ -78,8 +78,12 @@ const sections = computed(
 <template>
   <div
     ref="grid"
-    class="relative grid h-full min-h-0 w-full gap-0.5 overflow-hidden"
-    :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, max-content))` }"
+    class="relative grid h-full min-h-0 w-full min-w-[26rem] gap-0.5 overflow-auto"
+    :style="{
+      gridTemplateColumns: `repeat(${columns}, ${ITEM_HEIGHT_PX}px)`,
+      gridAutoRows: `${ITEM_HEIGHT_PX}px`,
+      alignContent: 'start',
+    }"
   >
     <Badge
       v-for="i in TOTAL_ITEMS"
