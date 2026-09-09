@@ -98,6 +98,7 @@ The application uses the modern DIN SPEC 15800 standard (General Device Type For
 - **Manual Import:** Users can import any third-party `.gdtf` file directly into their library via the browser's "Import GDTF" button.
 - **DIN SPEC 15800 Parsing:** Backend parser in `src-tauri/src/fixtures/parser.rs` inspects `description.xml` inside `.gdtf` zip archives, resolving multi-byte channel offsets (Coarse, Fine, Ultra) and DIN SPEC 15800 attributes (`ColorAdd_R`, `Pan`, `Dimmer`, etc.).
 - **Authentication & Credentials:** GDTF-Share credentials are saved securely in `<app_data_dir>/gdtf_auth.json` (with user-restricted permissions) to maintain connection across app restarts. Sessions are automatically recovered on-demand or established in the background, and can be cleared via `gdtf_logout`.
+- **MVR Import (DIN SPEC 15801):** Shows can be created directly from My Virtual Rig archives (`.mvr`) via the "Import from MVR" button on the home page or `show_import_mvr` command. The backend parser (`src-tauri/src/show/mvr.rs`) inspects `GeneralSceneDescription.xml`, unpacks embedded `.gdtf` archives into show fixture definitions, maps layers to fixture groups, assigns DMX universe/addresses, and configures output universes.
 - Refer to `src/types/fixtures.ts` for the frontend structure of GDTF fixture definitions and catalog items.
 
 ## Working with DMX Output

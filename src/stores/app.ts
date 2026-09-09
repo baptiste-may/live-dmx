@@ -59,6 +59,46 @@ export const useApp = defineStore("app", {
         }
       });
     },
+    async askImportMvr() {
+      const changes = useShowChanges();
+      return changes.confirmWithSaveGuard(async () => {
+        try {
+          const selected = await openDialog({
+            multiple: false,
+            directory: false,
+            filters: [
+              {
+                name: "My Virtual Rig",
+                extensions: ["mvr"],
+              },
+            ],
+          });
+          if (selected && typeof selected === "string") {
+            await this.importMvr(selected);
+          }
+        } catch {
+          // Ignored in non-Tauri / test environments
+        }
+      });
+    },
+    async importMvr(path: string) {
+      const changes = useShowChanges();
+      return changes.confirmWithSaveGuard(async () => {
+        const previousState = this.show.state;
+        this.show.state = ShowStatus.LOADING;
+        try {
+          await invoke("show_import_mvr", { path });
+          this.show.file.path = undefined;
+          this.show.file.isDirty = true;
+          this.show.state = ShowStatus.LOADED;
+          await useLiveButtons().resetAll();
+          useToastStore().addToast("Show imported from MVR successfully", ToastType.SUCCESS);
+        } catch (error: unknown) {
+          this.show.state = previousState;
+          useToastStore().addToast(`Failed to import MVR: ${String(error)}`, ToastType.ERROR);
+        }
+      });
+    },
     async loadShow(path: string) {
       const changes = useShowChanges();
       return changes.confirmWithSaveGuard(async () => {

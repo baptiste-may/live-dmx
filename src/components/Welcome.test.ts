@@ -18,6 +18,7 @@ describe("Welcome.vue", () => {
     expect(screen.getByText("Live DMX")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New show" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Load show" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import from MVR" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Exit" })).toBeInTheDocument();
   });
 
@@ -39,6 +40,16 @@ describe("Welcome.vue", () => {
     await user.click(screen.getByRole("button", { name: "Load show" }));
 
     expect(appStore.askLoadShow).toHaveBeenCalledTimes(1);
+  });
+
+  it("should call askImportMvr when Import from MVR button is clicked", async () => {
+    const user = userEvent.setup();
+    render(Welcome);
+
+    const appStore = useApp();
+    await user.click(screen.getByRole("button", { name: "Import from MVR" }));
+
+    expect(appStore.askImportMvr).toHaveBeenCalledTimes(1);
   });
 
   it("should close window when Exit button is clicked", async () => {

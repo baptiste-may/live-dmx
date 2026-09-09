@@ -1,6 +1,7 @@
 mod show {
     mod history;
     mod identity;
+    mod mvr;
     mod output;
     mod patch {
         mod batch;

@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod history;
 pub mod identity;
+pub mod mvr;
 pub mod output;
 pub mod patch;
 pub mod recent;
@@ -10,6 +11,7 @@ pub mod types;
 pub use commands::*;
 pub use history::*;
 pub use identity::*;
+pub use mvr::*;
 pub use output::*;
 pub use patch::*;
 pub use recent::*;

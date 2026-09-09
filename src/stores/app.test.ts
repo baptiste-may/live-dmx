@@ -106,4 +106,59 @@ describe("app store", () => {
     expect(mockOpenDialog).toHaveBeenCalledTimes(1);
     expect(show.isLoaded).toBe(false);
   });
+
+  it("should open dialog and import MVR when file is selected in askImportMvr", async () => {
+    const app = useApp();
+    const show = useShow();
+    const liveButtons = useLiveButtons();
+
+    liveButtons.strobeRate = 80;
+    liveButtons.effectBpm = 120;
+
+    mockOpenDialog.mockResolvedValueOnce("/path/to/stage.mvr");
+
+    await app.askImportMvr();
+
+    expect(mockOpenDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: expect.arrayContaining([
+          expect.objectContaining({
+            name: "My Virtual Rig",
+            extensions: ["mvr"],
+          }),
+        ]),
+      }),
+    );
+    expect(mockInvoke).toHaveBeenCalledWith("show_import_mvr", { path: "/path/to/stage.mvr" });
+    expect(show.isLoaded).toBe(true);
+    expect(show.file.path).toBeUndefined();
+    expect(show.file.isDirty).toBe(true);
+    expect(liveButtons.strobeRate).toBe(50);
+    expect(liveButtons.effectBpm).toBe(60);
+    expect(mockInvoke).toHaveBeenCalledWith("live_reset_all_buttons");
+  });
+
+  it("should do nothing when dialog is cancelled in askImportMvr", async () => {
+    const app = useApp();
+    const show = useShow();
+
+    mockOpenDialog.mockResolvedValueOnce(null);
+
+    await app.askImportMvr();
+
+    expect(mockOpenDialog).toHaveBeenCalledTimes(1);
+    expect(show.isLoaded).toBe(false);
+  });
+
+  it("should import MVR directly from path", async () => {
+    const app = useApp();
+    const show = useShow();
+
+    await app.importMvr("/path/to/rig.mvr");
+
+    expect(mockInvoke).toHaveBeenCalledWith("show_import_mvr", { path: "/path/to/rig.mvr" });
+    expect(show.isLoaded).toBe(true);
+    expect(show.file.path).toBeUndefined();
+    expect(show.file.isDirty).toBe(true);
+  });
 });

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Button, Card, CardBody } from "daisy-ui-kit";
-import { PlusIcon, UploadIcon, XIcon } from "lucide-vue-next";
+import { FolderInputIcon, PlusIcon, UploadIcon, XIcon } from "lucide-vue-next";
 
 import { useApp } from "@/stores/app";
 
@@ -24,6 +24,10 @@ const appWindow = getCurrentWindow();
         <Button primary @click="app.askLoadShow">
           <UploadIcon />
           Load show
+        </Button>
+        <Button outline primary @click="app.askImportMvr">
+          <FolderInputIcon />
+          Import from MVR
         </Button>
 
         <RecentShowsList />

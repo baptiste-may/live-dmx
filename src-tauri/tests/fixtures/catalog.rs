@@ -54,7 +54,7 @@ fn test_catalog_manager_save_and_retrieve_online_catalog() {
     };
 
     manager
-        .save_online_catalog(&[test_item.clone()])
+        .save_online_catalog(std::slice::from_ref(&test_item))
         .expect("Should save catalog cache");
 
     let results = manager.search(Some("Mega Wash"));

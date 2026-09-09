@@ -124,6 +124,24 @@ pub fn show_load(
 }
 
 #[tauri::command]
+pub fn show_import_mvr(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    path: String,
+) -> Result<ShowData, String> {
+    let imported = crate::show::mvr::import_mvr_file(&path, Some(&app))?;
+    let mut show = state.show.lock().map_err(|e| e.to_string())?;
+    let mut history = state.history.lock().map_err(|e| e.to_string())?;
+
+    *show = imported;
+    history.reset_empty();
+    state.reset_live_engine()?;
+
+    emit_show_changed(&app, &show);
+    Ok(show.clone())
+}
+
+#[tauri::command]
 pub fn show_unload(state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
     let mut history = state.history.lock().map_err(|e| e.to_string())?;
