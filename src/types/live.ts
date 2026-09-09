@@ -8,10 +8,8 @@ import {
   FlipHorizontal2Icon,
   FoldHorizontalIcon,
   RainbowIcon,
-  SquareMinusIcon,
   SquareSplitHorizontalIcon,
   SunIcon,
-  TriangleIcon,
   WavesIcon,
 } from "lucide-vue-next";
 import type { Component } from "vue";
@@ -20,7 +18,7 @@ import { FourIcon, ThreeIcon, TwoIcon } from "@/components/icons";
 
 export type FlashType = "simple" | "white" | "strobe" | "randomStrobe" | "master";
 
-export type EffectType = "pulse" | "chase" | "ramp_up" | "ramp_down" | "sine" | "triangle" | "dip";
+export type EffectType = "pulse" | "chase" | "ramp_up" | "ramp_down" | "sine";
 
 export type IntensityEffectType = "full" | EffectType;
 
@@ -88,14 +86,6 @@ export const effects: Record<
   sine: {
     label: "Sine",
     icon: WavesIcon,
-  },
-  triangle: {
-    label: "Triangle",
-    icon: TriangleIcon,
-  },
-  dip: {
-    label: "Dip",
-    icon: SquareMinusIcon,
   },
 };
 

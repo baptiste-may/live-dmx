@@ -19,7 +19,7 @@ const settings = useSettings();
     <CardBody class="flex h-full min-h-0 flex-col gap-4">
       <CardTitle is="h2" v-if="settings.live.showSectionTitles" bold size="2xl">Flashs</CardTitle>
       <div class="min-h-0 flex-1 overflow-auto">
-        <Table sm>
+        <Table sm class="w-auto">
           <thead>
             <tr>
               <th></th>
@@ -82,7 +82,9 @@ const settings = useSettings();
           </thead>
           <tbody>
             <tr v-for="group in groups" :key="group.id">
-              <th class="text-end">{{ group.name }} :</th>
+              <th class="max-w-48 truncate px-2 text-end whitespace-nowrap" :title="group.name">
+                {{ group.name }} :
+              </th>
               <td>
                 <FlashButton
                   :icon="SunIcon"

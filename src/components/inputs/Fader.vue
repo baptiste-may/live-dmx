@@ -14,7 +14,7 @@ const { height } = useElementSize(faderBox);
 </script>
 
 <template>
-  <div ref="fader-box" class="relative h-full w-8">
+  <div ref="fader-box" class="relative min-h-0 w-8 flex-1">
     <Range
       v-model="modelValue"
       v-bind="$attrs"

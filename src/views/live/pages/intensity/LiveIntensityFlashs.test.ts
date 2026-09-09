@@ -94,4 +94,15 @@ describe("LiveIntensityFlashs.vue", () => {
 
     expect(screen.queryByRole("heading", { name: "Flashs" })).not.toBeInTheDocument();
   });
+
+  it("renders group header with title attribute and truncate classes for long names", () => {
+    const showGroups = useShowGroups();
+    showGroups.groups = [{ id: 1, name: "A Very Long Fixture Group Name" }];
+
+    render(LiveIntensityFlashs);
+
+    const header = screen.getByTitle("A Very Long Fixture Group Name");
+    expect(header).toBeInTheDocument();
+    expect(header).toHaveClass("truncate", "whitespace-nowrap");
+  });
 });

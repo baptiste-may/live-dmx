@@ -25,7 +25,9 @@ const emit = defineEmits<{
 
 <template>
   <tr>
-    <th class="px-2 text-end">{{ groupName }} :</th>
+    <th class="max-w-48 truncate px-2 text-end whitespace-nowrap" :title="groupName">
+      {{ groupName }} :
+    </th>
     <td v-for="(effect, key) in effects" :key="key" class="px-1">
       <ToggleButton
         :icon="effect.icon"

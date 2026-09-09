@@ -43,4 +43,18 @@ describe("LiveIntensityMasters.vue", () => {
 
     expect(screen.queryByRole("heading", { name: "Masters" })).not.toBeInTheDocument();
   });
+
+  it("renders badge with title attribute and truncate classes for group names", () => {
+    const showGroups = useShowGroups();
+    showGroups.groups = [
+      { id: 0, name: "All" },
+      { id: 1, name: "Very Long Fixture Group Name" },
+    ];
+
+    render(LiveIntensityMasters);
+
+    const badge = screen.getByTitle("Very Long Fixture Group Name");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass("truncate", "whitespace-nowrap");
+  });
 });

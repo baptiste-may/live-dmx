@@ -267,15 +267,6 @@ fn test_calculate_effect_factor_width() {
     // With 0% width, factor is 0.0
     let factor_0 = calculate_effect_factor(&state_pulse, 0.25, 0, 1, 1, 60, 0);
     assert_eq!(factor_0, 0.0);
-
-    // With dip effect and 0% width, it never dips (stays 1.0)
-    let state_dip = GroupEffectState {
-        effect: Some("dip".to_string()),
-        alignment: None,
-        bounce: false,
-    };
-    let factor_dip_0 = calculate_effect_factor(&state_dip, 0.25, 0, 1, 1, 60, 0);
-    assert_eq!(factor_dip_0, 1.0);
 }
 
 #[test]
@@ -284,7 +275,7 @@ fn test_compute_random_strobe_active() {
 }
 
 #[test]
-fn test_calculate_effect_factor_sine_triangle_dip() {
+fn test_calculate_effect_factor_sine() {
     let state_sine = GroupEffectState {
         effect: Some("sine".to_string()),
         alignment: None,
@@ -297,36 +288,6 @@ fn test_calculate_effect_factor_sine_triangle_dip() {
     // At elapsed 0.25 with 60 BPM, t = PI/2, sin(PI/2) = 1.0, factor = 1.0
     let factor_sine_peak = calculate_effect_factor(&state_sine, 0.25, 0, 1, 1, 60, 100);
     assert!((factor_sine_peak - 1.0).abs() < 0.01);
-
-    let state_triangle = GroupEffectState {
-        effect: Some("triangle".to_string()),
-        alignment: None,
-        bounce: false,
-    };
-    // At elapsed 0.0, fract = 0.0 -> factor = 0.0
-    let factor_tri_0 = calculate_effect_factor(&state_triangle, 0.0, 0, 1, 1, 60, 100);
-    assert!((factor_tri_0 - 0.0).abs() < 0.01);
-
-    // At elapsed 0.5, fract = 0.5 -> factor = 1.0
-    let factor_tri_half = calculate_effect_factor(&state_triangle, 0.5, 0, 1, 1, 60, 100);
-    assert!((factor_tri_half - 1.0).abs() < 0.01);
-
-    // At elapsed 0.25, fract = 0.25 -> factor = 0.5
-    let factor_tri_q = calculate_effect_factor(&state_triangle, 0.25, 0, 1, 1, 60, 100);
-    assert!((factor_tri_q - 0.5).abs() < 0.01);
-
-    let state_dip = GroupEffectState {
-        effect: Some("dip".to_string()),
-        alignment: None,
-        bounce: false,
-    };
-    // At elapsed 0.25 (sin > 0.5), dip should be 0.0
-    let factor_dip_off = calculate_effect_factor(&state_dip, 0.25, 0, 1, 1, 60, 100);
-    assert_eq!(factor_dip_off, 0.0);
-
-    // At elapsed 0.75 (sin < 0), dip should be 1.0
-    let factor_dip_on = calculate_effect_factor(&state_dip, 0.75, 0, 1, 1, 60, 100);
-    assert_eq!(factor_dip_on, 1.0);
 }
 
 #[test]

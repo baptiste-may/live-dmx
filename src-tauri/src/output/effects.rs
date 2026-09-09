@@ -87,7 +87,7 @@ pub fn calculate_effect_factor(
 
     let w = (width as f32 / 100.0).clamp(0.0, 1.0);
     if w <= 0.0 || effective_fract >= w {
-        return if effect_type == "dip" { 1.0 } else { 0.0 };
+        return 0.0;
     }
 
     let active_fract = effective_fract / w;
@@ -108,14 +108,6 @@ pub fn calculate_effect_factor(
         "ramp_up" => active_fract,
         "ramp_down" => 1.0 - active_fract,
         "sine" => (t.sin() + 1.0) * 0.5,
-        "triangle" => {
-            if active_fract < 0.5 {
-                active_fract * 2.0
-            } else {
-                (1.0 - active_fract) * 2.0
-            }
-        }
-        "dip" if t.sin() > 0.5 => 0.0,
         _ => 1.0,
     };
 

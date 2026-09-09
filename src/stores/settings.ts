@@ -10,17 +10,23 @@ export interface LiveSettings {
 export interface SettingsState {
   isModalOpen: boolean;
   theme: ThemeMode;
+  scale: number;
   live: LiveSettings;
 }
 
 export const SETTINGS_STORAGE_KEY = "live-dmx-settings";
+export const DEFAULT_UI_SCALE = 100;
+export const MIN_UI_SCALE = 50;
+export const MAX_UI_SCALE = 150;
 
 function getStoredSettings(): {
   theme: ThemeMode;
+  scale: number;
   live: LiveSettings;
 } {
-  const defaults: { theme: ThemeMode; live: LiveSettings } = {
+  const defaults: { theme: ThemeMode; scale: number; live: LiveSettings } = {
     theme: "system",
+    scale: DEFAULT_UI_SCALE,
     live: {
       showButtonLabels: true,
       showSectionTitles: true,
@@ -37,6 +43,13 @@ function getStoredSettings(): {
             ? parsed.theme
             : defaults.theme;
 
+        const scale =
+          typeof parsed.scale === "number" &&
+          parsed.scale >= MIN_UI_SCALE &&
+          parsed.scale <= MAX_UI_SCALE
+            ? parsed.scale
+            : defaults.scale;
+
         const live: LiveSettings = {
           showButtonLabels:
             typeof parsed.live?.showButtonLabels === "boolean"
@@ -48,7 +61,7 @@ function getStoredSettings(): {
               : defaults.live.showSectionTitles,
         };
 
-        return { theme, live };
+        return { theme, scale, live };
       }
     }
   } catch {
@@ -58,13 +71,14 @@ function getStoredSettings(): {
   return defaults;
 }
 
-function persistSettings(theme: ThemeMode, live: LiveSettings) {
+function persistSettings(theme: ThemeMode, scale: number, live: LiveSettings) {
   try {
     if (typeof window !== "undefined" && window.localStorage) {
       window.localStorage.setItem(
         SETTINGS_STORAGE_KEY,
         JSON.stringify({
           theme,
+          scale,
           live,
         }),
       );
@@ -89,6 +103,7 @@ export const useSettings = defineStore("settings", {
     return {
       isModalOpen: false,
       theme: stored.theme,
+      scale: stored.scale,
       live: stored.live,
     };
   },
@@ -109,24 +124,39 @@ export const useSettings = defineStore("settings", {
     },
     setTheme(theme: ThemeMode) {
       this.theme = theme;
-      persistSettings(this.theme, this.live);
+      persistSettings(this.theme, this.scale, this.live);
       this.applyTheme();
+    },
+    setScale(scale: number) {
+      const num = Number(scale);
+      this.scale = Math.min(
+        Math.max(Number.isFinite(num) ? num : DEFAULT_UI_SCALE, MIN_UI_SCALE),
+        MAX_UI_SCALE,
+      );
+      persistSettings(this.theme, this.scale, this.live);
+      this.applyScale();
     },
     setShowButtonLabels(show: boolean) {
       this.live.showButtonLabels = Boolean(show);
-      persistSettings(this.theme, this.live);
+      persistSettings(this.theme, this.scale, this.live);
     },
     setShowSectionTitles(show: boolean) {
       this.live.showSectionTitles = Boolean(show);
-      persistSettings(this.theme, this.live);
+      persistSettings(this.theme, this.scale, this.live);
     },
     applyTheme() {
       if (typeof document !== "undefined" && document.documentElement) {
         document.documentElement.setAttribute("data-theme", this.resolvedTheme);
       }
     },
+    applyScale() {
+      if (typeof document !== "undefined" && document.documentElement) {
+        document.documentElement.style.zoom = `${this.scale / 100}`;
+      }
+    },
     initTheme() {
       this.applyTheme();
+      this.applyScale();
 
       if (
         typeof window !== "undefined" &&

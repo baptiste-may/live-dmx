@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen } from "@testing-library/vue";
+import { fireEvent, render, screen } from "@testing-library/vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSettings } from "@/stores/settings.ts";
@@ -33,8 +33,47 @@ describe("SettingsModal.vue", () => {
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Scale" })).toBeInTheDocument();
+    expect(screen.getAllByText("100%")).toHaveLength(2);
     expect(screen.getByRole("checkbox", { name: "Show button labels" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Show section titles" })).toBeInTheDocument();
+  });
+
+  it("updates scale via slider and resets scale to 100% via reset button", async () => {
+    const user = userEvent.setup();
+    const settings = useSettings();
+    settings.isModalOpen = true;
+
+    render(SettingsModal);
+
+    const slider = screen.getByRole("slider", { name: "Scale" });
+    expect(slider).toHaveValue("100");
+
+    await fireEvent.update(slider, "125");
+    expect(settings.scale).toBe(125);
+    expect(screen.getAllByText("125%")).toHaveLength(2);
+
+    const resetBtn = screen.getByRole("button", { name: "Reset scale" });
+    await user.click(resetBtn);
+    expect(settings.scale).toBe(100);
+    expect(screen.getAllByText("100%")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Reset scale" })).not.toBeInTheDocument();
+  });
+
+  it("updates scale when clicking ruler labels", async () => {
+    const user = userEvent.setup();
+    const settings = useSettings();
+    settings.isModalOpen = true;
+
+    render(SettingsModal);
+
+    const mark75 = screen.getByText("75%");
+    await user.click(mark75);
+    expect(settings.scale).toBe(75);
+
+    const mark150 = screen.getByText("150%");
+    await user.click(mark150);
+    expect(settings.scale).toBe(150);
   });
 
   it("changes theme when clicking theme buttons", async () => {

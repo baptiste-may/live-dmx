@@ -28,8 +28,8 @@ describe("LiveIntensityEffectsRow.vue", () => {
     expect(screen.getByRole("button", { name: /Ramp up/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ramp down/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sine/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Triangle/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Dip/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Triangle/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Dip/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Center/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Bounce/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reset/i })).toBeInTheDocument();

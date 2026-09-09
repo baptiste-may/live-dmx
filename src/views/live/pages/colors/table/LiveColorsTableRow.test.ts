@@ -46,4 +46,12 @@ describe("LiveColorsTableRow.vue", () => {
     await user.click(secondaryBtn);
     expect(liveButtons.getGroupSecondaryColor(1)).toBe(firstColorKey);
   });
+
+  it("renders group header with title attribute and truncate classes for long names", () => {
+    renderRow({ id: 1, name: "A Very Long Fixture Group Name" });
+
+    const header = screen.getByTitle("A Very Long Fixture Group Name");
+    expect(header).toBeInTheDocument();
+    expect(header).toHaveClass("truncate", "whitespace-nowrap");
+  });
 });

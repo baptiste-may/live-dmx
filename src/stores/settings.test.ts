@@ -14,8 +14,29 @@ describe("settings store", () => {
 
     expect(settings.isModalOpen).toBe(false);
     expect(settings.theme).toBe("system");
+    expect(settings.scale).toBe(100);
     expect(settings.live.showButtonLabels).toBe(true);
     expect(settings.live.showSectionTitles).toBe(true);
+  });
+
+  it("updates scale, persists to localStorage, and sets documentElement zoom", () => {
+    const settings = useSettings();
+
+    settings.setScale(120);
+    expect(settings.scale).toBe(120);
+    expect(document.documentElement.style.zoom).toBe("1.2");
+
+    const saved = JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) || "{}");
+    expect(saved.scale).toBe(120);
+
+    // Clamps between min (50) and max (150)
+    settings.setScale(20);
+    expect(settings.scale).toBe(50);
+    expect(document.documentElement.style.zoom).toBe("0.5");
+
+    settings.setScale(200);
+    expect(settings.scale).toBe(150);
+    expect(document.documentElement.style.zoom).toBe("1.5");
   });
 
   it("opens and closes the settings modal", () => {

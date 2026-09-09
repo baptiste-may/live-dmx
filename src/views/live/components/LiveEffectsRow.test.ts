@@ -70,4 +70,12 @@ describe("LiveEffectsRow.vue", () => {
     await user.click(resetButton);
     expect(emitted()["reset"]).toBeTruthy();
   });
+
+  it("renders group header with title attribute and truncate classes for long names", () => {
+    renderRow({ groupName: "A Very Long Fixture Group Name" });
+
+    const header = screen.getByTitle("A Very Long Fixture Group Name");
+    expect(header).toBeInTheDocument();
+    expect(header).toHaveClass("truncate", "whitespace-nowrap");
+  });
 });

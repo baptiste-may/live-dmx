@@ -21,7 +21,9 @@ function handleSecondaryColorSelect(colorKey: string, active: boolean) {
 
 <template>
   <tr>
-    <th class="px-2 text-end">{{ group.name }} :</th>
+    <th class="max-w-48 truncate px-2 text-end whitespace-nowrap" :title="group.name">
+      {{ group.name }} :
+    </th>
     <td v-for="(color, key) in colors" :key="key" class="px-1">
       <div class="flex flex-col items-center gap-2">
         <ToggleButton

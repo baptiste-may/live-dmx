@@ -20,7 +20,7 @@ const settings = useSettings();
         <div
           v-for="group in groups"
           :key="group.id"
-          class="flex h-full flex-col items-center gap-2"
+          class="flex h-full min-w-16 shrink-0 flex-col items-center gap-2 pb-1"
         >
           <Fader
             :model-value="liveButtons.getGroupMaster(group.id)"
@@ -28,7 +28,11 @@ const settings = useSettings();
             :error="group.id === 0"
             @update:model-value="liveButtons.setGroupMaster(group.id, $event)"
           />
-          <Badge neutral>
+          <Badge
+            neutral
+            class="max-w-32 truncate whitespace-nowrap"
+            :title="group.id === 0 ? 'Grand Master' : group.name"
+          >
             {{ group.id === 0 ? "Grand Master" : group.name }}
           </Badge>
         </div>
