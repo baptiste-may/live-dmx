@@ -21,7 +21,7 @@ describe("LiveIntensityEffects.vue", () => {
 
     expect(screen.getByRole("heading", { name: "Effects" })).toBeInTheDocument();
     expect(screen.getByText(/BPM/i)).toBeInTheDocument();
-    expect(screen.getByText(/Width/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("slider", { name: "Width" })).toHaveLength(2);
     expect(screen.queryByText("All :")).not.toBeInTheDocument();
     expect(screen.getByText("Spots :")).toBeInTheDocument();
     expect(screen.getByText("Beams :")).toBeInTheDocument();
@@ -40,8 +40,13 @@ describe("LiveIntensityEffects.vue", () => {
     expect(liveButtons.effectBpm).toBe(61);
   });
 
-  it("updates Width on knob keyboard navigation", async () => {
+  it("updates row Width on knob keyboard navigation", async () => {
     const user = userEvent.setup();
+    const showGroups = useShowGroups();
+    showGroups.groups = [
+      { id: 0, name: "All" },
+      { id: 1, name: "Spots" },
+    ];
     const liveButtons = useLiveButtons();
 
     render(LiveIntensityEffects);
@@ -50,7 +55,7 @@ describe("LiveIntensityEffects.vue", () => {
     knob.focus();
     await user.keyboard("{ArrowDown}");
 
-    expect(liveButtons.effectWidth).toBe(99);
+    expect(liveButtons.getGroupEffect(1).width).toBe(99);
   });
 
   it("hides section title when showSectionTitles is false in settings", () => {
@@ -61,6 +66,5 @@ describe("LiveIntensityEffects.vue", () => {
 
     expect(screen.queryByRole("heading", { name: "Effects" })).not.toBeInTheDocument();
     expect(screen.getByText(/BPM/i)).toBeInTheDocument();
-    expect(screen.getByText(/Width/i)).toBeInTheDocument();
   });
 });

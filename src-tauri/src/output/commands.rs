@@ -166,16 +166,24 @@ pub fn live_set_color_effect_bpm(state: State<'_, AppState>, bpm: u16) -> Result
 }
 
 #[tauri::command]
-pub fn live_set_effect_width(state: State<'_, AppState>, width: u8) -> Result<(), String> {
+pub fn live_set_group_effect_width(
+    state: State<'_, AppState>,
+    group_id: u32,
+    width: u8,
+) -> Result<(), String> {
     let mut live = state.output.engine.lock().map_err(|e| e.to_string())?;
-    live.set_effect_width(width);
+    live.set_group_effect_width(group_id, width);
     Ok(())
 }
 
 #[tauri::command]
-pub fn live_set_color_effect_width(state: State<'_, AppState>, width: u8) -> Result<(), String> {
+pub fn live_set_group_color_effect_width(
+    state: State<'_, AppState>,
+    group_id: u32,
+    width: u8,
+) -> Result<(), String> {
     let mut live = state.output.engine.lock().map_err(|e| e.to_string())?;
-    live.set_color_effect_width(width);
+    live.set_group_color_effect_width(group_id, width);
     Ok(())
 }
 

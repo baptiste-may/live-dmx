@@ -51,8 +51,6 @@ pub struct LiveEngine {
     pub flash_fade_transitions: HashMap<(u32, String), FlashFadeTransition>,
     pub effect_bpm: u16,
     pub color_effect_bpm: u16,
-    pub effect_width: u8,
-    pub color_effect_width: u8,
     pub color_fade_speed: f32,
     pub color_fade_order: Option<String>,
     pub fixture_color_transitions: HashMap<u32, FixtureColorTransition>,
@@ -95,8 +93,6 @@ impl LiveEngine {
             flash_fade_transitions: HashMap::new(),
             effect_bpm: 60,
             color_effect_bpm: 60,
-            effect_width: 100,
-            color_effect_width: 100,
             color_fade_speed: 1.0,
             color_fade_order: None,
             fixture_color_transitions: HashMap::new(),
@@ -180,14 +176,15 @@ impl LiveEngine {
         alignment: Option<String>,
         bounce: bool,
     ) {
-        self.group_effects.insert(
-            group_id,
-            GroupEffectState {
-                effect,
-                alignment,
-                bounce,
-            },
-        );
+        let entry = self.group_effects.entry(group_id).or_default();
+        entry.effect = effect;
+        entry.alignment = alignment;
+        entry.bounce = bounce;
+    }
+
+    pub fn set_group_effect_width(&mut self, group_id: u32, width: u8) {
+        let entry = self.group_effects.entry(group_id).or_default();
+        entry.width = width.min(100);
     }
 
     pub fn set_group_master(&mut self, group_id: u32, level: u8) {
@@ -204,14 +201,6 @@ impl LiveEngine {
 
     pub fn set_color_effect_bpm(&mut self, bpm: u16) {
         self.color_effect_bpm = bpm;
-    }
-
-    pub fn set_effect_width(&mut self, width: u8) {
-        self.effect_width = width.min(100);
-    }
-
-    pub fn set_color_effect_width(&mut self, width: u8) {
-        self.color_effect_width = width.min(100);
     }
 
     pub fn set_color_fade_speed(&mut self, speed: f32) {
@@ -402,14 +391,15 @@ impl LiveEngine {
         alignment: Option<String>,
         bounce: bool,
     ) {
-        self.group_color_effects.insert(
-            group_id,
-            GroupEffectState {
-                effect,
-                alignment,
-                bounce,
-            },
-        );
+        let entry = self.group_color_effects.entry(group_id).or_default();
+        entry.effect = effect;
+        entry.alignment = alignment;
+        entry.bounce = bounce;
+    }
+
+    pub fn set_group_color_effect_width(&mut self, group_id: u32, width: u8) {
+        let entry = self.group_color_effects.entry(group_id).or_default();
+        entry.width = width.min(100);
     }
 
     pub fn get_group_color_effect(&self, group_id: u32) -> GroupEffectState {
@@ -445,8 +435,6 @@ impl LiveEngine {
         self.flash_fade_transitions.clear();
         self.effect_bpm = 60;
         self.color_effect_bpm = 60;
-        self.effect_width = 100;
-        self.color_effect_width = 100;
         self.color_fade_speed = 1.0;
         self.color_fade_order = None;
         self.fixture_color_transitions.clear();
@@ -734,7 +722,6 @@ impl LiveEngine {
             group_count,
             fixture.id,
             self.effect_bpm,
-            self.effect_width,
         );
 
         let intensity_level = ((raw_intensity as f32) * master_multiplier).clamp(0.0, 255.0) as u8;
@@ -796,7 +783,7 @@ impl LiveEngine {
                 fixture.id,
                 self.color_effect_bpm,
             ) {
-                let w = (self.color_effect_width as f32 / 100.0).clamp(0.0, 1.0);
+                let w = (color_effect_state.width as f32 / 100.0).clamp(0.0, 1.0);
                 if w <= 0.0 || fract >= w {
                     current_rgb_f
                 } else {
@@ -813,7 +800,6 @@ impl LiveEngine {
                 color_group_count,
                 fixture.id,
                 self.color_effect_bpm,
-                self.color_effect_width,
             );
 
             (

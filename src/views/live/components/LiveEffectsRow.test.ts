@@ -30,13 +30,14 @@ describe("LiveEffectsRow.vue", () => {
     });
   };
 
-  it("renders group name, effect buttons, and action buttons", () => {
+  it("renders group name, effect buttons, width knob, and action buttons", () => {
     renderRow();
 
     expect(screen.getByText("Test Group :")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pulse" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Full" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Bounce" })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Width" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
   });
 
@@ -69,6 +70,17 @@ describe("LiveEffectsRow.vue", () => {
     const resetButton = screen.getByRole("button", { name: "Reset" });
     await user.click(resetButton);
     expect(emitted()["reset"]).toBeTruthy();
+  });
+
+  it("emits set-width when knob value changes", async () => {
+    const user = userEvent.setup();
+    const { emitted } = renderRow({ width: 100 });
+
+    const knob = screen.getByRole("slider", { name: "Width" });
+    knob.focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(emitted()["set-width"]).toEqual([[99]]);
   });
 
   it("renders group header with title attribute and truncate classes for long names", () => {

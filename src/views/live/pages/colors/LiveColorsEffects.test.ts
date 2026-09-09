@@ -45,7 +45,7 @@ describe("LiveColorsEffects.vue", () => {
 
     expect(screen.getByRole("heading", { name: "Effects" })).toBeInTheDocument();
     expect(screen.getByText(/BPM/i)).toBeInTheDocument();
-    expect(screen.getByText(/Width/i)).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Width" })).toBeInTheDocument();
     expect(screen.queryByText("All :")).not.toBeInTheDocument();
     expect(screen.queryByText("Spots :")).not.toBeInTheDocument();
     expect(screen.getByText("Beams :")).toBeInTheDocument();
@@ -64,8 +64,28 @@ describe("LiveColorsEffects.vue", () => {
     expect(liveButtons.colorEffectBpm).toBe(61);
   });
 
-  it("updates color Width on knob keyboard navigation", async () => {
+  it("updates row color Width on knob keyboard navigation", async () => {
     const user = userEvent.setup();
+    const showGroups = useShowGroups();
+    const showPatch = useShowPatch();
+
+    showGroups.groups = [
+      { id: 0, name: "All" },
+      { id: 2, name: "Beams" },
+    ];
+
+    showPatch.fixtures = [
+      {
+        id: 2,
+        groups: [2],
+        name: "Beam 1",
+        universe: 1,
+        address: 10,
+        fixtureType: { name: "RGB" },
+        mode: { name: "3ch", channels: ["Red", "Green", "Blue"] },
+      },
+    ];
+
     const liveButtons = useLiveButtons();
 
     render(LiveColorsEffects);
@@ -74,7 +94,7 @@ describe("LiveColorsEffects.vue", () => {
     knob.focus();
     await user.keyboard("{ArrowDown}");
 
-    expect(liveButtons.colorEffectWidth).toBe(99);
+    expect(liveButtons.getGroupColorEffect(2).width).toBe(99);
   });
 
   it("hides section title when showSectionTitles is false in settings", () => {
@@ -85,6 +105,5 @@ describe("LiveColorsEffects.vue", () => {
 
     expect(screen.queryByRole("heading", { name: "Effects" })).not.toBeInTheDocument();
     expect(screen.getByText(/BPM/i)).toBeInTheDocument();
-    expect(screen.getByText(/Width/i)).toBeInTheDocument();
   });
 });

@@ -62,6 +62,7 @@ describe("live-buttons store", () => {
       effect: null,
       alignment: null,
       bounce: false,
+      width: 100,
     });
 
     await liveButtons.setGroupEffectType(1, "chase");
@@ -120,10 +121,13 @@ describe("live-buttons store", () => {
     expect(liveButtons.effectBpm).toBe(140);
     expect(mockInvoke).toHaveBeenCalledWith("live_set_effect_bpm", { bpm: 140 });
 
-    expect(liveButtons.effectWidth).toBe(100);
-    await liveButtons.setEffectWidth(50);
-    expect(liveButtons.effectWidth).toBe(50);
-    expect(mockInvoke).toHaveBeenCalledWith("live_set_effect_width", { width: 50 });
+    expect(liveButtons.getGroupEffect(1).width).toBe(100);
+    await liveButtons.setGroupEffectWidth(1, 50);
+    expect(liveButtons.getGroupEffect(1).width).toBe(50);
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_effect_width", {
+      groupId: 1,
+      width: 50,
+    });
   });
 
   it("should manage group colors and invoke tauri command", async () => {
@@ -205,6 +209,7 @@ describe("live-buttons store", () => {
       effect: null,
       alignment: null,
       bounce: false,
+      width: 100,
     });
 
     await liveButtons.setGroupColorEffectType(1, "pulse");
@@ -239,6 +244,7 @@ describe("live-buttons store", () => {
       effect: null,
       alignment: null,
       bounce: false,
+      width: 100,
     });
     expect(mockInvoke).toHaveBeenCalledWith("live_reset_group_color_effect", { groupId: 1 });
 
@@ -248,7 +254,7 @@ describe("live-buttons store", () => {
     expect(liveButtons.getGroupColorEffect(1).alignment).toBe("center");
   });
 
-  it("should manage color effect bpm and width", async () => {
+  it("should manage color effect bpm and group color effect width", async () => {
     const liveButtons = useLiveButtons();
 
     expect(liveButtons.colorEffectBpm).toBe(60);
@@ -256,22 +262,27 @@ describe("live-buttons store", () => {
     expect(liveButtons.colorEffectBpm).toBe(120);
     expect(mockInvoke).toHaveBeenCalledWith("live_set_color_effect_bpm", { bpm: 120 });
 
-    expect(liveButtons.colorEffectWidth).toBe(100);
-    await liveButtons.setColorEffectWidth(75);
-    expect(liveButtons.colorEffectWidth).toBe(75);
-    expect(mockInvoke).toHaveBeenCalledWith("live_set_color_effect_width", { width: 75 });
+    expect(liveButtons.getGroupColorEffect(1).width).toBe(100);
+    await liveButtons.setGroupColorEffectWidth(1, 75);
+    expect(liveButtons.getGroupColorEffect(1).width).toBe(75);
+    expect(mockInvoke).toHaveBeenCalledWith("live_set_group_color_effect_width", {
+      groupId: 1,
+      width: 75,
+    });
   });
 
   it("should reset group effect", async () => {
     const liveButtons = useLiveButtons();
 
     await liveButtons.setGroupEffectType(1, "pulse");
+    await liveButtons.setGroupEffectWidth(1, 40);
     await liveButtons.resetGroupEffect(1);
 
     expect(liveButtons.getGroupEffect(1)).toEqual({
       effect: null,
       alignment: null,
       bounce: false,
+      width: 100,
     });
     expect(mockInvoke).toHaveBeenCalledWith("live_reset_group_effect", { groupId: 1 });
   });
@@ -304,8 +315,8 @@ describe("live-buttons store", () => {
     await liveButtons.setSimpleFlashFade(1.2);
     await liveButtons.setWhiteFlashFade(0.8);
     await liveButtons.setColorEffectBpm(140);
-    await liveButtons.setEffectWidth(30);
-    await liveButtons.setColorEffectWidth(45);
+    await liveButtons.setGroupEffectWidth(1, 30);
+    await liveButtons.setGroupColorEffectWidth(1, 45);
     await liveButtons.setColorFadeSpeed(2.5);
     await liveButtons.setColorFadeOrder("right");
     await liveButtons.resetAll();
@@ -317,12 +328,12 @@ describe("live-buttons store", () => {
     expect(liveButtons.getGroupColor(1)).toBe("white");
     expect(liveButtons.getGroupSecondaryColor(1)).toBeNull();
     expect(liveButtons.getGroupColorEffect(1).effect).toBeNull();
+    expect(liveButtons.getGroupEffect(1).width).toBe(100);
+    expect(liveButtons.getGroupColorEffect(1).width).toBe(100);
     expect(liveButtons.simpleFlashFade).toBe(0);
     expect(liveButtons.whiteFlashFade).toBe(0);
     expect(liveButtons.effectBpm).toBe(60);
     expect(liveButtons.colorEffectBpm).toBe(60);
-    expect(liveButtons.effectWidth).toBe(100);
-    expect(liveButtons.colorEffectWidth).toBe(100);
     expect(liveButtons.colorFadeSpeed).toBe(1);
     expect(liveButtons.colorFadeOrder).toBeNull();
     expect(mockInvoke).toHaveBeenCalledWith("live_reset_all_buttons");

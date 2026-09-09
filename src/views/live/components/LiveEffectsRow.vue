@@ -3,22 +3,30 @@ import { Button, Divider } from "daisy-ui-kit";
 import { VolleyballIcon } from "lucide-vue-next";
 import type { Component } from "vue";
 
+import Knob from "@/components/inputs/Knob.vue";
 import ToggleButton from "@/components/inputs/ToggleButton.vue";
 import type { AlignmentType } from "@/types/live";
 import { alignments } from "@/types/live";
 
-defineProps<{
-  groupName: string;
-  effects: Record<string, { label: string; icon: Component }>;
-  currentEffect: string | null;
-  currentAlignment: AlignmentType | null;
-  isBounce: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    groupName: string;
+    effects: Record<string, { label: string; icon: Component }>;
+    currentEffect: string | null;
+    currentAlignment: AlignmentType | null;
+    isBounce: boolean;
+    width?: number;
+  }>(),
+  {
+    width: 100,
+  },
+);
 
 const emit = defineEmits<{
   (e: "select-effect", effect: string | null): void;
   (e: "select-alignment", alignment: AlignmentType | null): void;
   (e: "toggle-bounce", bounce: boolean): void;
+  (e: "set-width", width: number): void;
   (e: "reset"): void;
 }>();
 </script>
@@ -59,6 +67,24 @@ const emit = defineEmits<{
         color="success"
         @update:model-value="emit('toggle-bounce', $event)"
       />
+    </td>
+    <td class="px-1">
+      <Divider neutral horizontal class="mx-1 h-6 w-auto" />
+    </td>
+    <td class="px-1">
+      <div class="flex items-center justify-center">
+        <Knob
+          aria-label="Width"
+          title="Width"
+          size="sm"
+          unit="%"
+          :model-value="width"
+          :min="0"
+          :max="100"
+          :default-value="100"
+          @update:model-value="emit('set-width', $event)"
+        />
+      </div>
     </td>
     <td class="px-1">
       <Divider neutral horizontal class="mx-1 h-6 w-auto" />

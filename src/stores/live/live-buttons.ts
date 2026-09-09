@@ -17,6 +17,7 @@ export const getDefaultGroupEffectState = (): GroupEffectState => ({
   effect: null,
   alignment: null,
   bounce: false,
+  width: 100,
 });
 
 export const defaultGroupEffectState: GroupEffectState = getDefaultGroupEffectState();
@@ -25,6 +26,7 @@ export const getDefaultGroupColorEffectState = (): GroupColorEffectState => ({
   effect: null,
   alignment: null,
   bounce: false,
+  width: 100,
 });
 
 export const defaultGroupColorEffectState: GroupColorEffectState =
@@ -44,8 +46,6 @@ export const getDefaultLiveButtonsState = (): LiveButtonsState => ({
   whiteFlashFade: 0,
   effectBpm: 60,
   colorEffectBpm: 60,
-  effectWidth: 100,
-  colorEffectWidth: 100,
   colorFadeSpeed: 1,
   colorFadeOrder: null,
 });
@@ -380,23 +380,25 @@ export const useLiveButtons = defineStore("live-buttons", {
         handleActionError(error);
       }
     },
-    async setEffectWidth(width: number) {
-      const prev = this.effectWidth;
-      this.effectWidth = width;
+    async setGroupEffectWidth(groupId: number, width: number) {
+      const current = this.ensureGroupEffect(groupId);
+      const prev = current.width;
+      current.width = width;
       try {
-        await invoke("live_set_effect_width", { width });
+        await invoke("live_set_group_effect_width", { groupId, width });
       } catch (error) {
-        this.effectWidth = prev;
+        current.width = prev;
         handleActionError(error);
       }
     },
-    async setColorEffectWidth(width: number) {
-      const prev = this.colorEffectWidth;
-      this.colorEffectWidth = width;
+    async setGroupColorEffectWidth(groupId: number, width: number) {
+      const current = this.ensureGroupColorEffect(groupId);
+      const prev = current.width;
+      current.width = width;
       try {
-        await invoke("live_set_color_effect_width", { width });
+        await invoke("live_set_group_color_effect_width", { groupId, width });
       } catch (error) {
-        this.colorEffectWidth = prev;
+        current.width = prev;
         handleActionError(error);
       }
     },
@@ -449,8 +451,6 @@ export const useLiveButtons = defineStore("live-buttons", {
         whiteFlashFade: this.whiteFlashFade,
         effectBpm: this.effectBpm,
         colorEffectBpm: this.colorEffectBpm,
-        effectWidth: this.effectWidth,
-        colorEffectWidth: this.colorEffectWidth,
         colorFadeSpeed: this.colorFadeSpeed,
         colorFadeOrder: this.colorFadeOrder,
       };
@@ -471,8 +471,6 @@ export const useLiveButtons = defineStore("live-buttons", {
         this.whiteFlashFade = prev.whiteFlashFade;
         this.effectBpm = prev.effectBpm;
         this.colorEffectBpm = prev.colorEffectBpm;
-        this.effectWidth = prev.effectWidth;
-        this.colorEffectWidth = prev.colorEffectWidth;
         this.colorFadeSpeed = prev.colorFadeSpeed;
         this.colorFadeOrder = prev.colorFadeOrder;
         handleActionError(error);

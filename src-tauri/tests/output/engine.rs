@@ -187,18 +187,19 @@ fn test_live_engine_color_effects_and_secondary_colors() {
     // Test color effect BPM and Width
     engine.set_color_effect_bpm(130);
     assert_eq!(engine.color_effect_bpm, 130);
-    engine.set_color_effect_width(75);
-    assert_eq!(engine.color_effect_width, 75);
+    engine.set_group_color_effect_width(1, 75);
+    assert_eq!(engine.get_group_color_effect(1).width, 75);
 
     // Reset color effect
     engine.reset_group_color_effect(1);
     assert_eq!(engine.get_group_color_effect(1).effect, None);
+    assert_eq!(engine.get_group_color_effect(1).width, 100);
 
     // Reset all
     engine.reset_all();
     assert_eq!(engine.get_group_secondary_color(1), None);
     assert_eq!(engine.color_effect_bpm, 60);
-    assert_eq!(engine.color_effect_width, 100);
+    assert_eq!(engine.get_group_color_effect(1).width, 100);
 }
 
 #[test]

@@ -134,24 +134,24 @@ fn test_live_engine_effect_bpm() {
     // Resetting all sets bpm back to default 60
     engine.reset_all();
     assert_eq!(engine.effect_bpm, 60);
-    assert_eq!(engine.effect_width, 100);
+    assert_eq!(engine.get_group_effect(1).width, 100);
 }
 
 #[test]
 fn test_live_engine_effect_width() {
     let mut engine = LiveEngine::new();
-    assert_eq!(engine.effect_width, 100);
-    assert_eq!(engine.color_effect_width, 100);
+    assert_eq!(engine.get_group_effect(1).width, 100);
+    assert_eq!(engine.get_group_color_effect(1).width, 100);
 
-    engine.set_effect_width(50);
-    assert_eq!(engine.effect_width, 50);
+    engine.set_group_effect_width(1, 50);
+    assert_eq!(engine.get_group_effect(1).width, 50);
 
-    engine.set_color_effect_width(75);
-    assert_eq!(engine.color_effect_width, 75);
+    engine.set_group_color_effect_width(1, 75);
+    assert_eq!(engine.get_group_color_effect(1).width, 75);
 
     // Cannot exceed 100
-    engine.set_effect_width(150);
-    assert_eq!(engine.effect_width, 100);
+    engine.set_group_effect_width(1, 150);
+    assert_eq!(engine.get_group_effect(1).width, 100);
 
     let mut show = ShowData::default();
     show.patch.fixtures.push(PatchedFixture {
@@ -167,14 +167,14 @@ fn test_live_engine_effect_width() {
     engine.set_group_effect(1, Some("pulse".to_string()), None, false);
 
     // With 0 width, effect produces 0 intensity
-    engine.effect_width = 0;
+    engine.set_group_effect_width(1, 0);
     engine.compute_dmx(&show);
     let buf_zero = engine.universe_buffers.get(&1).unwrap();
     assert_eq!(buf_zero[0], 0);
 
     engine.reset_all();
-    assert_eq!(engine.effect_width, 100);
-    assert_eq!(engine.color_effect_width, 100);
+    assert_eq!(engine.get_group_effect(1).width, 100);
+    assert_eq!(engine.get_group_color_effect(1).width, 100);
 }
 
 #[test]
@@ -183,9 +183,10 @@ fn test_calculate_effect_intensity_types() {
         effect: None,
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
     assert_eq!(
-        calculate_effect_intensity(&state_none, 0.0, 0, 1, 1, 120, 100),
+        calculate_effect_intensity(&state_none, 0.0, 0, 1, 1, 120),
         0
     );
 
@@ -193,19 +194,18 @@ fn test_calculate_effect_intensity_types() {
         effect: Some("off".to_string()),
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
-    assert_eq!(
-        calculate_effect_intensity(&state_off, 0.0, 0, 1, 1, 120, 100),
-        0
-    );
+    assert_eq!(calculate_effect_intensity(&state_off, 0.0, 0, 1, 1, 120), 0);
 
     let state_full = GroupEffectState {
         effect: Some("full".to_string()),
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
     assert_eq!(
-        calculate_effect_intensity(&state_full, 0.0, 0, 1, 1, 120, 100),
+        calculate_effect_intensity(&state_full, 0.0, 0, 1, 1, 120),
         255
     );
 
@@ -213,24 +213,27 @@ fn test_calculate_effect_intensity_types() {
         effect: Some("chase".to_string()),
         alignment: Some("left".to_string()),
         bounce: false,
+        ..Default::default()
     };
-    let intensity = calculate_effect_intensity(&state_chase, 0.25, 0, 4, 1, 60, 100);
+    let intensity = calculate_effect_intensity(&state_chase, 0.25, 0, 4, 1, 60);
     assert!(intensity == 0 || intensity == 255);
 
     let state_ramp_up = GroupEffectState {
         effect: Some("ramp_up".to_string()),
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
-    let intensity_ramp = calculate_effect_intensity(&state_ramp_up, 0.5, 0, 1, 1, 60, 100);
+    let intensity_ramp = calculate_effect_intensity(&state_ramp_up, 0.5, 0, 1, 1, 60);
     assert!(intensity_ramp > 0);
 
     let state_ramp_down = GroupEffectState {
         effect: Some("ramp_down".to_string()),
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
-    let intensity_down = calculate_effect_intensity(&state_ramp_down, 0.5, 0, 1, 1, 60, 100);
+    let intensity_down = calculate_effect_intensity(&state_ramp_down, 0.5, 0, 1, 1, 60);
     assert!(intensity_down > 0);
 }
 
@@ -240,16 +243,18 @@ fn test_calculate_effect_factor() {
         effect: Some("chase".to_string()),
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
-    let factor = calculate_effect_factor(&state_chase, 0.25, 0, 1, 1, 60, 100);
+    let factor = calculate_effect_factor(&state_chase, 0.25, 0, 1, 1, 60);
     assert!(factor == 0.0 || factor == 1.0);
 
     let state_pulse = GroupEffectState {
         effect: Some("pulse".to_string()),
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
-    let factor_pulse = calculate_effect_factor(&state_pulse, 0.25, 0, 1, 1, 60, 100);
+    let factor_pulse = calculate_effect_factor(&state_pulse, 0.25, 0, 1, 1, 60);
     assert!((0.0..=1.0).contains(&factor_pulse));
 }
 
@@ -259,13 +264,20 @@ fn test_calculate_effect_factor_width() {
         effect: Some("pulse".to_string()),
         alignment: None,
         bounce: false,
+        width: 50,
     };
     // At elapsed 0.75 with 50% width, fixture is in inactive portion (> 0.5) -> 0.0
-    let factor_50_late = calculate_effect_factor(&state_pulse, 0.75, 0, 1, 1, 60, 50);
+    let factor_50_late = calculate_effect_factor(&state_pulse, 0.75, 0, 1, 1, 60);
     assert_eq!(factor_50_late, 0.0);
 
     // With 0% width, factor is 0.0
-    let factor_0 = calculate_effect_factor(&state_pulse, 0.25, 0, 1, 1, 60, 0);
+    let state_pulse_0 = GroupEffectState {
+        effect: Some("pulse".to_string()),
+        alignment: None,
+        bounce: false,
+        width: 0,
+    };
+    let factor_0 = calculate_effect_factor(&state_pulse_0, 0.25, 0, 1, 1, 60);
     assert_eq!(factor_0, 0.0);
 }
 
@@ -280,13 +292,14 @@ fn test_calculate_effect_factor_sine() {
         effect: Some("sine".to_string()),
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
     // At elapsed 0.0 with 60 BPM (cycle 1.0s), t = 0.0, sin(0) = 0, factor = 0.5
-    let factor_sine = calculate_effect_factor(&state_sine, 0.0, 0, 1, 1, 60, 100);
+    let factor_sine = calculate_effect_factor(&state_sine, 0.0, 0, 1, 1, 60);
     assert!((factor_sine - 0.5).abs() < 0.01);
 
     // At elapsed 0.25 with 60 BPM, t = PI/2, sin(PI/2) = 1.0, factor = 1.0
-    let factor_sine_peak = calculate_effect_factor(&state_sine, 0.25, 0, 1, 1, 60, 100);
+    let factor_sine_peak = calculate_effect_factor(&state_sine, 0.25, 0, 1, 1, 60);
     assert!((factor_sine_peak - 1.0).abs() < 0.01);
 }
 
@@ -296,6 +309,7 @@ fn test_center_alignment_and_calculate_effective_fract() {
         effect: Some("pulse".to_string()),
         alignment: Some("center".to_string()),
         bounce: false,
+        ..Default::default()
     };
 
     // 3 fixtures: i=0 (left edge), i=1 (center), i=2 (right edge)
@@ -316,6 +330,7 @@ fn test_center_alignment_and_calculate_effective_fract() {
         effect: None,
         alignment: None,
         bounce: false,
+        ..Default::default()
     };
     assert!(calculate_effective_fract(&state_none, 0.0, 0, 3, 1, 60).is_none());
 }

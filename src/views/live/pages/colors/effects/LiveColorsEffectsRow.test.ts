@@ -84,6 +84,19 @@ describe("LiveColorsEffectsRow.vue", () => {
       effect: null,
       alignment: null,
       bounce: false,
+      width: 100,
     });
+  });
+
+  it("updates group color effect width on knob keyboard navigation", async () => {
+    const user = userEvent.setup();
+    const liveButtons = useLiveButtons();
+    renderRow();
+
+    const knob = screen.getByRole("slider", { name: "Width" });
+    knob.focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(liveButtons.getGroupColorEffect(1).width).toBe(99);
   });
 });

@@ -63,7 +63,6 @@ pub fn calculate_effect_factor(
     group_count: usize,
     fixture_id: u32,
     bpm: u16,
-    width: u8,
 ) -> f32 {
     let effect_type = match effect_state.effect.as_deref() {
         Some(e) if e != "none" && e != "off" => e,
@@ -85,7 +84,7 @@ pub fn calculate_effect_factor(
         return 0.0;
     };
 
-    let w = (width as f32 / 100.0).clamp(0.0, 1.0);
+    let w = (effect_state.width as f32 / 100.0).clamp(0.0, 1.0);
     if w <= 0.0 || effective_fract >= w {
         return 0.0;
     }
@@ -121,7 +120,6 @@ pub fn calculate_effect_intensity(
     group_count: usize,
     fixture_id: u32,
     bpm: u16,
-    width: u8,
 ) -> u8 {
     (calculate_effect_factor(
         effect_state,
@@ -130,7 +128,6 @@ pub fn calculate_effect_intensity(
         group_count,
         fixture_id,
         bpm,
-        width,
     ) * 255.0)
         .round()
         .clamp(0.0, 255.0) as u8

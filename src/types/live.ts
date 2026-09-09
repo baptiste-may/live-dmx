@@ -32,12 +32,14 @@ export type GroupEffectState = {
   effect: IntensityEffectType | null;
   alignment: AlignmentType | null;
   bounce: boolean;
+  width: number;
 };
 
 export type GroupColorEffectState = {
   effect: ColorEffectType | null;
   alignment: AlignmentType | null;
   bounce: boolean;
+  width: number;
 };
 
 export type LiveButtonsState = {
@@ -54,8 +56,6 @@ export type LiveButtonsState = {
   whiteFlashFade: number;
   effectBpm: number;
   colorEffectBpm: number;
-  effectWidth: number;
-  colorEffectWidth: number;
   colorFadeSpeed: number;
   colorFadeOrder: ColorFadeOrder | null;
 };

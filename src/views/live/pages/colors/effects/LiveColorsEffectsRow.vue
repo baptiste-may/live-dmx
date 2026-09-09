@@ -19,11 +19,13 @@ const liveButtons = useLiveButtons();
     :current-effect="liveButtons.getGroupColorEffect(group.id).effect"
     :current-alignment="liveButtons.getGroupColorEffect(group.id).alignment"
     :is-bounce="liveButtons.getGroupColorEffect(group.id).bounce"
+    :width="liveButtons.getGroupColorEffect(group.id).width"
     @select-effect="liveButtons.setGroupColorEffectType(group.id, $event as ColorEffectType | null)"
     @select-alignment="
       liveButtons.setGroupColorEffectAlignment(group.id, $event as AlignmentType | null)
     "
     @toggle-bounce="liveButtons.setGroupColorEffectBounce(group.id, $event)"
+    @set-width="liveButtons.setGroupColorEffectWidth(group.id, $event)"
     @reset="liveButtons.resetGroupColorEffect(group.id)"
   />
 </template>
