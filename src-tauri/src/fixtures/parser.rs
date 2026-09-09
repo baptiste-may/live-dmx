@@ -1,7 +1,7 @@
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::io::{Cursor, Read};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -21,6 +21,7 @@ pub struct ParsedGdtfFixture {
     pub manufacturer: String,
     pub description: Option<String>,
     pub fixture_type_id: Option<String>,
+    pub categories: Option<Vec<String>>,
     pub modes: Vec<ParsedGdtfMode>,
 }
 
@@ -85,6 +86,8 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
     let mut manufacturer = String::new();
     let mut description = None;
     let mut fixture_type_id = None;
+    let mut categories: Option<Vec<String>> = None;
+    let mut fixture_attributes: HashSet<String> = HashSet::new();
 
     let mut modes = Vec::new();
     let mut current_mode_name: Option<String> = None;
@@ -108,6 +111,7 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                         &mut manufacturer,
                         &mut description,
                         &mut fixture_type_id,
+                        &mut categories,
                     );
                 }
                 b"DMXMode" => {
@@ -157,6 +161,8 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                         }
                     }
 
+                    fixture_attributes.insert(attribute_name.clone());
+
                     if !attribute_name.is_empty() {
                         for (idx, &offset) in current_channel_offsets.iter().enumerate() {
                             let is_fine = idx > 0 || attribute_name.ends_with("Fine");
@@ -176,6 +182,7 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                         &mut manufacturer,
                         &mut description,
                         &mut fixture_type_id,
+                        &mut categories,
                     );
                 }
                 b"LogicalChannel" if in_dmx_channel && !current_channel_offsets.is_empty() => {
@@ -185,6 +192,8 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                             attribute_name = attr.unescape_value().unwrap_or_default().into_owned();
                         }
                     }
+
+                    fixture_attributes.insert(attribute_name.clone());
 
                     if !attribute_name.is_empty() {
                         for (idx, &offset) in current_channel_offsets.iter().enumerate() {
@@ -241,14 +250,53 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
         return Err("GDTF FixtureType has no Name attribute".to_string());
     }
 
+    let categories = categories
+        .filter(|cats| !cats.is_empty())
+        .or_else(|| infer_categories_from_attributes(&fixture_attributes));
+
     Ok(ParsedGdtfFixture {
         name: fixture_name,
         short_name: fixture_short_name,
         manufacturer,
         description,
         fixture_type_id,
+        categories,
         modes,
     })
+}
+
+fn infer_categories_from_attributes(attributes: &HashSet<String>) -> Option<Vec<String>> {
+    let mut categories = Vec::new();
+
+    let has = |needle: &str| attributes.iter().any(|a| a.contains(needle));
+    let has_color = attributes.iter().any(|a| a.starts_with("Color"));
+    let has_strobe = attributes
+        .iter()
+        .any(|a| a.starts_with("Shutter") || a == "StrobeRate" || a.starts_with("Strobe"));
+    let has_dimmer = attributes.iter().any(|a| a.starts_with("Dim"));
+    let has_laser = has("Laser");
+
+    if has("Pan") && has("Tilt") {
+        categories.push("Moving Head".to_string());
+    }
+    if has_color {
+        categories.push("Color Changer".to_string());
+    }
+    if has_strobe {
+        categories.push("Strobe".to_string());
+    }
+    if has_dimmer {
+        categories.push("Dimmer".to_string());
+    }
+    if has_laser {
+        categories.push("Laser".to_string());
+    }
+
+    if categories.is_empty() {
+        None
+    } else {
+        Some(categories)
+    }
 }
 
 fn parse_fixture_type_attributes(
@@ -258,6 +306,7 @@ fn parse_fixture_type_attributes(
     manufacturer: &mut String,
     description: &mut Option<String>,
     fixture_type_id: &mut Option<String>,
+    categories: &mut Option<Vec<String>>,
 ) {
     for attr in e.attributes().flatten() {
         let key = attr.key.as_ref();
@@ -273,6 +322,14 @@ fn parse_fixture_type_attributes(
             }
             b"FixtureTypeID" if !val.is_empty() => {
                 *fixture_type_id = Some(val);
+            }
+            b"Categories" if !val.is_empty() => {
+                *categories = Some(
+                    val.split(',')
+                        .map(|c| c.trim().to_string())
+                        .filter(|c| !c.is_empty())
+                        .collect(),
+                );
             }
             _ => {}
         }

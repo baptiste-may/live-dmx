@@ -322,6 +322,9 @@ impl GdtfCatalogManager {
                     if existing.is_installed {
                         item.is_installed = true;
                     }
+                    if item.categories.is_none() && existing.categories.is_some() {
+                        item.categories = existing.categories.clone();
+                    }
                     if item.modes.is_empty() && !existing.modes.is_empty() {
                         item.modes = existing.modes.clone();
                     } else {
@@ -352,6 +355,13 @@ impl GdtfCatalogManager {
                             }
                         }
                     }
+                    if item.categories.is_none() {
+                        if let Some(parsed) = local_snapshot.get(&key) {
+                            if let Some(cats) = &parsed.categories {
+                                item.categories = Some(cats.clone());
+                            }
+                        }
+                    }
 
                     // If existing had channels and item.modes still has no channels at all, keep existing modes
                     if item.modes.iter().all(|m| m.channels.is_none())
@@ -377,6 +387,9 @@ impl GdtfCatalogManager {
                     }
                     if existing.rating.is_none() && item.rating.is_some() {
                         existing.rating = item.rating;
+                    }
+                    if existing.categories.is_none() && item.categories.is_some() {
+                        existing.categories = item.categories.clone();
                     }
                     if existing.modes.is_empty() && !item.modes.is_empty() {
                         existing.modes = item.modes.clone();
@@ -413,6 +426,11 @@ impl GdtfCatalogManager {
                 // First time seeing this fixture key: ensure local channels are attached if installed locally
                 if let Some(parsed) = local_snapshot.get(&key) {
                     item.is_installed = true;
+                    if item.categories.is_none() {
+                        if let Some(cats) = &parsed.categories {
+                            item.categories = Some(cats.clone());
+                        }
+                    }
                     if item.modes.is_empty() {
                         item.modes = parsed
                             .modes
@@ -475,6 +493,7 @@ impl GdtfCatalogManager {
                     filesize: None,
                     is_installed: true,
                     is_generic: true,
+                    categories: g.categories,
                 });
             }
         }
@@ -515,6 +534,7 @@ impl GdtfCatalogManager {
                     filesize: None,
                     is_installed: true,
                     is_generic: false,
+                    categories: parsed.categories.clone(),
                 });
             }
         }
@@ -541,6 +561,9 @@ impl GdtfCatalogManager {
                         // Check if already installed locally
                         let key = format!("{}@{}", man_lower, fix_lower);
                         item_clone.is_installed = local_snapshot.contains_key(&key);
+                        if !item_clone.is_installed && item_clone.categories.is_none() {
+                            item_clone.categories = infer_categories_from_name(&item_clone.fixture);
+                        }
                         add_or_update(item_clone);
                         online_added += 1;
                         if online_added >= 100 {
@@ -572,6 +595,83 @@ impl GdtfCatalogManager {
             g.manufacturer.eq_ignore_ascii_case(manufacturer)
                 && g.name.eq_ignore_ascii_case(fixture)
         })
+    }
+}
+
+// Well-known moving-head fixture families whose model names carry no generic keyword
+// (e.g. Clay Paky "Sharpy"). Used only as a fallback when categories are absent.
+const FAMOUS_MOVING_HEAD_NAMES: &[&str] = &["sharpy"];
+
+fn infer_categories_from_name(name: &str) -> Option<Vec<String>> {
+    let lower = name.to_lowercase();
+    let tokens: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .collect();
+    let word = |needle: &str| tokens.contains(&needle);
+
+    let mut categories = Vec::new();
+
+    if lower.contains("strobe") {
+        categories.push("Strobe".to_string());
+    }
+    if lower.contains("blinder") {
+        categories.push("Blinder".to_string());
+    }
+    if lower.contains("laser") {
+        categories.push("Laser".to_string());
+    }
+    if lower.contains("smoke") || lower.contains("hazer") || lower.contains("fog") {
+        categories.push("Smoke".to_string());
+    }
+    if lower.contains("matrix") {
+        categories.push("Matrix".to_string());
+    }
+    if lower.contains("dimmer") {
+        categories.push("Dimmer".to_string());
+    }
+    if lower.contains("confetti") {
+        categories.push("Confetti".to_string());
+    }
+    if lower.contains("geyser") {
+        categories.push("Geyser".to_string());
+    }
+    if lower.contains("pyro") {
+        categories.push("Pyro".to_string());
+    }
+    if lower.contains("water") {
+        categories.push("Water".to_string());
+    }
+    if lower.contains("wind") {
+        categories.push("Wind".to_string());
+    }
+    if word("scanner") {
+        categories.push("Scanner".to_string());
+    }
+    if word("pixel") {
+        categories.push("Pixel Bar".to_string());
+    }
+    if word("par") {
+        categories.push("PAR".to_string());
+    }
+    if word("spot") {
+        categories.push("Spot".to_string());
+    }
+    if word("wash") {
+        categories.push("Wash".to_string());
+    }
+    if lower.contains("moving")
+        || word("head")
+        || word("beam")
+        || FAMOUS_MOVING_HEAD_NAMES.iter().any(|f| tokens.contains(f))
+    {
+        categories.push("Moving Head".to_string());
+    }
+
+    if categories.is_empty() {
+        None
+    } else {
+        Some(categories)
     }
 }
 

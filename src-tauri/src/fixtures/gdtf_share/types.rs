@@ -30,6 +30,8 @@ pub struct GdtfCatalogItem {
     pub is_installed: bool,
     #[serde(default)]
     pub is_generic: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub categories: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

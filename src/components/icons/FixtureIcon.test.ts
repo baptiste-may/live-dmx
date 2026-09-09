@@ -39,6 +39,24 @@ describe("FixtureIcon.vue", () => {
     expect(container.querySelector(".lucide-fixture-generic")).not.toBeNull();
   });
 
+  it("should render new categories (Water, Wind, Confetti, Emitter, Geyser, Pyro)", () => {
+    const cases: [string, string][] = [
+      ["Water", "lucide-fixture-water"],
+      ["Wind", "lucide-fixture-wind"],
+      ["Confetti", "lucide-fixture-confetti"],
+      ["Emitter", "lucide-fixture-emitter"],
+      ["Geyser", "lucide-fixture-geyser"],
+      ["Pyro", "lucide-fixture-pyro"],
+    ];
+
+    for (const [category, expectedClass] of cases) {
+      const { container } = render(FixtureIcon, {
+        props: { category },
+      });
+      expect(container.querySelector(`.${expectedClass}`), category).not.toBeNull();
+    }
+  });
+
   it("should apply custom size and strokeWidth attributes", () => {
     const { container } = render(FixtureIcon, {
       props: { category: "PAR", size: 32, strokeWidth: 3, color: "#ff0000" },

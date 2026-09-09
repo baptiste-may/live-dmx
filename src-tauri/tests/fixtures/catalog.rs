@@ -51,6 +51,7 @@ fn test_catalog_manager_save_and_retrieve_online_catalog() {
         filesize: Some(1024),
         is_installed: false,
         is_generic: false,
+        categories: None,
     };
 
     manager
@@ -96,6 +97,7 @@ fn test_catalog_manager_smart_deduplication_prefers_manuf_and_highest_rating() {
         filesize: None,
         is_installed: false,
         is_generic: false,
+        categories: None,
     };
 
     let rev2 = GdtfCatalogItem {
@@ -114,6 +116,7 @@ fn test_catalog_manager_smart_deduplication_prefers_manuf_and_highest_rating() {
         filesize: None,
         is_installed: false,
         is_generic: false,
+        categories: None,
     };
 
     manager
@@ -149,6 +152,7 @@ fn test_catalog_manager_deduplicates_generic_against_online() {
         filesize: None,
         is_installed: false,
         is_generic: false,
+        categories: None,
     };
 
     manager
@@ -270,6 +274,7 @@ fn test_catalog_manager_preserves_channels_when_merging_online_item() {
         filesize: Some(1024),
         is_installed: false,
         is_generic: false,
+        categories: None,
     };
 
     manager
@@ -299,6 +304,206 @@ fn test_catalog_manager_preserves_channels_when_merging_online_item() {
             "Dimmer".to_string(),
         ])
     );
+}
+
+#[test]
+fn test_catalog_name_inference_for_online_uninstalled_items() {
+    let tmp = tempdir().unwrap();
+    let manager = GdtfCatalogManager::new(tmp.path());
+
+    let test_item = GdtfCatalogItem {
+        rid: Some(7001),
+        fixture: "Pro Laser 2000".to_string(),
+        manufacturer: "LaserCo".to_string(),
+        revision: None,
+        uploader: Some("User".to_string()),
+        rating: Some(4.0),
+        modes: vec![GdtfCatalogMode {
+            name: "Standard".to_string(),
+            dmxfootprint: 6,
+            channels: None,
+        }],
+        uuid: None,
+        filesize: None,
+        is_installed: false,
+        is_generic: false,
+        categories: None,
+    };
+    manager
+        .save_online_catalog(&[test_item])
+        .expect("Should save catalog");
+
+    let results = manager.search(Some("Laser"));
+    let item = results
+        .iter()
+        .find(|i| i.fixture == "Pro Laser 2000")
+        .expect("Should find the online fixture");
+    assert_eq!(item.categories, Some(vec!["Laser".to_string()]));
+}
+
+#[test]
+fn test_catalog_no_name_inference_for_uninstalled_unknown_fixture() {
+    let tmp = tempdir().unwrap();
+    let manager = GdtfCatalogManager::new(tmp.path());
+
+    let sharpy = GdtfCatalogItem {
+        rid: Some(75541),
+        fixture: "Zutopia 4K".to_string(),
+        manufacturer: "UnknownCo".to_string(),
+        revision: None,
+        uploader: Some("User".to_string()),
+        rating: Some(4.0),
+        modes: vec![GdtfCatalogMode {
+            name: "Standard".to_string(),
+            dmxfootprint: 17,
+            channels: None,
+        }],
+        uuid: None,
+        filesize: None,
+        is_installed: false,
+        is_generic: false,
+        categories: None,
+    };
+    manager
+        .save_online_catalog(&[sharpy])
+        .expect("Should save catalog");
+
+    let results = manager.search(Some("Zutopia"));
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].categories, None);
+}
+
+#[test]
+fn test_catalog_known_moving_head_family_inferred_from_name() {
+    let tmp = tempdir().unwrap();
+    let manager = GdtfCatalogManager::new(tmp.path());
+
+    for fixture in ["Sharpy Plus", "Sharpy X Frame", "Ultimo Sharpy"] {
+        let item = GdtfCatalogItem {
+            rid: Some(9001),
+            fixture: fixture.to_string(),
+            manufacturer: "Clay Paky".to_string(),
+            revision: None,
+            uploader: Some("User".to_string()),
+            rating: Some(4.0),
+            modes: vec![GdtfCatalogMode {
+                name: "Standard".to_string(),
+                dmxfootprint: 31,
+                channels: None,
+            }],
+            uuid: None,
+            filesize: None,
+            is_installed: false,
+            is_generic: false,
+            categories: None,
+        };
+        manager
+            .save_online_catalog(std::slice::from_ref(&item))
+            .expect("Should save catalog");
+    }
+
+    let results = manager.search(Some("Sharpy"));
+    assert!(!results.is_empty());
+    for item in results {
+        assert_eq!(item.categories, Some(vec!["Moving Head".to_string()]));
+    }
+}
+
+#[test]
+fn test_catalog_beam_fixture_inferred_as_moving_head() {
+    let tmp = tempdir().unwrap();
+    let manager = GdtfCatalogManager::new(tmp.path());
+
+    let beam = GdtfCatalogItem {
+        rid: Some(9002),
+        fixture: "Beam 5R".to_string(),
+        manufacturer: "Acme".to_string(),
+        revision: None,
+        uploader: Some("User".to_string()),
+        rating: Some(4.0),
+        modes: vec![GdtfCatalogMode {
+            name: "Standard".to_string(),
+            dmxfootprint: 12,
+            channels: None,
+        }],
+        uuid: None,
+        filesize: None,
+        is_installed: false,
+        is_generic: false,
+        categories: None,
+    };
+    manager
+        .save_online_catalog(&[beam])
+        .expect("Should save catalog");
+
+    let results = manager.search(Some("Beam"));
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].categories, Some(vec!["Moving Head".to_string()]));
+}
+
+#[test]
+fn test_catalog_installed_parsed_categories_override_name_inference() {
+    let tmp = tempdir().unwrap();
+    let manager = GdtfCatalogManager::new(tmp.path());
+
+    // Installed fixture with Pan/Tilt and no Categories attribute → inferred "Moving Head"
+    let xml = r#"<GDTF DataVersion="1.2">
+    <FixtureType Name="Wash 1000" Manufacturer="DemoCo">
+        <DMXModes>
+            <DMXMode Name="Standard">
+                <DMXChannels>
+                    <DMXChannel Offset="1"><LogicalChannel Attribute="Pan"/></DMXChannel>
+                    <DMXChannel Offset="2"><LogicalChannel Attribute="Tilt"/></DMXChannel>
+                </DMXChannels>
+            </DMXMode>
+        </DMXModes>
+    </FixtureType>
+</GDTF>"#;
+
+    let mut buf = Vec::new();
+    {
+        let cursor = std::io::Cursor::new(&mut buf);
+        let mut zip_writer = zip::ZipWriter::new(cursor);
+        let options = zip::write::SimpleFileOptions::default();
+        zip_writer.start_file("description.xml", options).unwrap();
+        std::io::Write::write_all(&mut zip_writer, xml.as_bytes()).unwrap();
+        zip_writer.finish().unwrap();
+    }
+
+    manager
+        .save_downloaded_gdtf("DemoCo", "Wash 1000", &buf)
+        .expect("Should save GDTF fixture");
+
+    // Online entry with the same name but no categories (would now infer "Wash")
+    let online_item = GdtfCatalogItem {
+        rid: Some(8001),
+        fixture: "Wash 1000".to_string(),
+        manufacturer: "DemoCo".to_string(),
+        revision: None,
+        uploader: Some("Manuf.".to_string()),
+        rating: Some(5.0),
+        modes: vec![GdtfCatalogMode {
+            name: "Standard".to_string(),
+            dmxfootprint: 2,
+            channels: None,
+        }],
+        uuid: None,
+        filesize: None,
+        is_installed: false,
+        is_generic: false,
+        categories: None,
+    };
+    manager
+        .save_online_catalog(&[online_item])
+        .expect("Should save online catalog");
+
+    let results = manager.search(Some("Wash"));
+    let item = results
+        .iter()
+        .find(|i| i.fixture == "Wash 1000")
+        .expect("Should be found");
+    assert!(item.is_installed);
+    assert_eq!(item.categories, Some(vec!["Moving Head".to_string()]));
 }
 
 #[test]

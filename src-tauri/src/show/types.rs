@@ -233,6 +233,18 @@ pub fn clean_fixture_type(val: &serde_json::Value) -> serde_json::Value {
             serde_json::Value::String(manufacturer_key.to_string()),
         );
     }
+    if let Some(categories) = val.get("categories").and_then(|v| v.as_array()) {
+        let clean_categories: Vec<serde_json::Value> = categories
+            .iter()
+            .filter_map(|c| c.as_str().map(|s| serde_json::Value::String(s.to_string())))
+            .collect();
+        if !clean_categories.is_empty() {
+            map.insert(
+                "categories".to_string(),
+                serde_json::Value::Array(clean_categories),
+            );
+        }
+    }
     serde_json::Value::Object(map)
 }
 

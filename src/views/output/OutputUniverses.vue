@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Badge, Button, Card, CardBody, Text } from "daisy-ui-kit";
-import { AlertCircleIcon, AlertTriangleIcon, PlusIcon } from "lucide-vue-next";
+import { CircleAlertIcon, PlusIcon, TriangleAlertIcon } from "lucide-vue-next";
 import { computed } from "vue";
 
 import { useOutputInterfaces } from "@/stores/output/output-interfaces.ts";
@@ -48,7 +48,7 @@ const warningCount = computed(() => {
               class="flex items-center gap-1 font-medium"
               :class="[errorCount === 0 ? 'opacity-60' : '']"
             >
-              <AlertTriangleIcon v-if="errorCount > 0" class="h-3 w-3" />
+              <TriangleAlertIcon v-if="errorCount > 0" class="h-3 w-3" />
               {{ errorCount }} {{ errorCount === 1 ? "error" : "errors" }}
             </Badge>
 
@@ -60,7 +60,7 @@ const warningCount = computed(() => {
               class="flex items-center gap-1 font-medium"
               :class="[warningCount === 0 ? 'opacity-60' : '']"
             >
-              <AlertCircleIcon v-if="warningCount > 0" class="h-3 w-3" />
+              <CircleAlertIcon v-if="warningCount > 0" class="h-3 w-3" />
               {{ warningCount }} {{ warningCount === 1 ? "warning" : "warnings" }}
             </Badge>
           </div>

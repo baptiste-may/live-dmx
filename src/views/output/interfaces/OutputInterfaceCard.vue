@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Badge } from "daisy-ui-kit";
-import { CheckCircle2Icon, UsbIcon } from "lucide-vue-next";
+import { CircleCheckIcon, UsbIcon } from "lucide-vue-next";
 
 import type { PhysicalInterface } from "@/types/output.ts";
 
@@ -46,7 +46,7 @@ withDefaults(
         v-if="assignedUniverses.length > 0"
         class="text-info flex items-center gap-1.5 text-xs font-medium"
       >
-        <CheckCircle2Icon class="h-3.5 w-3.5 shrink-0" />
+        <CircleCheckIcon class="h-3.5 w-3.5 shrink-0" />
         <span>Routing Universe {{ assignedUniverses.join(", ") }}</span>
       </div>
       <div v-else class="text-base-content/40 text-xs italic">Not assigned to any universe</div>

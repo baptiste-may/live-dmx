@@ -1,13 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-fixture-blinder">
-  <!-- Double Blinder Housing Casing -->
-  <rect x="2" y="6" width="20" height="12" rx="3" />
-  <!-- Left Lamp Pod -->
-  <circle cx="7.5" cy="12" r="3.5" />
-  <circle cx="7.5" cy="12" r="1" fill="currentColor" />
-  <!-- Right Lamp Pod -->
-  <circle cx="16.5" cy="12" r="3.5" />
-  <circle cx="16.5" cy="12" r="1" fill="currentColor" />
-  <!-- Top Mounting Hardware -->
-  <path d="M12 2v4" />
-  <path d="M9 2h6" />
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M8 8C10.2091 8 12 9.79086 12 12C12 14.2091 10.2091 16 8 16C5.79086 16 4 14.2091 4 12C4 9.79086 5.79086 8 8 8ZM8 10C6.89543 10 6 10.8954 6 12C6 13.1046 6.89543 14 8 14C9.10457 14 10 13.1046 10 12C10 10.8954 9.10457 10 8 10Z" fill="black"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M16 8C18.2091 8 20 9.79086 20 12C20 14.2091 18.2091 16 16 16C13.7909 16 12 14.2091 12 12C12 9.79086 13.7909 8 16 8ZM16 10C14.8954 10 14 10.8954 14 12C14 13.1046 14.8954 14 16 14C17.1046 14 18 13.1046 18 12C18 10.8954 17.1046 10 16 10Z" fill="black"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M19 5C21.2091 5 23 6.79086 23 9V15C23 17.2091 21.2091 19 19 19H5C2.79086 19 1 17.2091 1 15V9C1 6.79086 2.79086 5 5 5H19ZM5 7C3.89543 7 3 7.89543 3 9V15C3 16.1046 3.89543 17 5 17H19C20.1046 17 21 16.1046 21 15V9C21 7.89543 20.1046 7 19 7H5Z" fill="black"/>
 </svg>

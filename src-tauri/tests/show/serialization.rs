@@ -117,7 +117,10 @@ fn test_clean_fixture_type_strips_unneeded_data() {
     assert_eq!(cleaned["shortName"], "MS300");
     assert_eq!(cleaned["fixtureKey"], "mega-spot-300");
     assert_eq!(cleaned["manufacturerKey"], "cameo");
-    assert!(cleaned.get("categories").is_none());
+    assert_eq!(
+        cleaned["categories"],
+        serde_json::json!(["Moving Head", "Spot", "Color Changer"])
+    );
     assert!(cleaned.get("meta").is_none());
     assert!(cleaned.get("links").is_none());
     assert!(cleaned.get("physical").is_none());
@@ -186,7 +189,10 @@ fn test_clean_patched_fixture_cleans_entire_fixture() {
     assert_eq!(cleaned.name, "Stage Left Spot");
     assert_eq!(cleaned.universe, 2);
     assert_eq!(cleaned.address, 100);
-    assert_eq!(cleaned.fixture_type, serde_json::json!({"name": "Wash FX"}));
+    assert_eq!(
+        cleaned.fixture_type,
+        serde_json::json!({"name": "Wash FX", "categories": ["Wash"]})
+    );
     assert_eq!(
         cleaned.mode,
         serde_json::json!({

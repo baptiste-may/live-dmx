@@ -258,6 +258,9 @@ export const usePatchForm = defineStore("patch-form", {
         ...(this.selectedFixture.manufacturerKey
           ? { manufacturerKey: this.selectedFixture.manufacturerKey }
           : {}),
+        ...(this.selectedFixture.categories && this.selectedFixture.categories.length > 0
+          ? { categories: this.selectedFixture.categories }
+          : {}),
       };
 
       const cleanMode: CleanFixtureMode = {

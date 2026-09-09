@@ -16,6 +16,7 @@ export interface GdtfCatalogItem {
   filesize?: number;
   isInstalled: boolean;
   isGeneric: boolean;
+  categories?: string[];
 }
 
 export interface ParsedGdtfMode {

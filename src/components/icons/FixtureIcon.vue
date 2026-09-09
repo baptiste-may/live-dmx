@@ -52,6 +52,12 @@ const categoryKeyMap: Record<string, string> = {
   fan: "fan",
   stand: "stand",
   structure: "stand",
+  water: "water",
+  wind: "wind",
+  confetti: "confetti",
+  emitter: "emitter",
+  geyser: "geyser",
+  pyro: "pyro",
 };
 
 const priorityKeys = [
@@ -74,6 +80,12 @@ const priorityKeys = [
   "fan",
   "stand",
   "structure",
+  "water",
+  "wind",
+  "confetti",
+  "emitter",
+  "geyser",
+  "pyro",
 ];
 
 // High-performance memoization cache for processed SVG strings
@@ -102,14 +114,16 @@ function getProcessedSvg(
   let raw = rawSvgCache.get(key) || rawSvgCache.get("generic") || "";
   if (!raw) return "";
 
-  raw = raw.replace(/<svg\s+([^>]*)/, (_, attrs) => {
-    let newAttrs = attrs
-      .replace(/\bwidth="[^"]*"/g, "")
-      .replace(/\bheight="[^"]*"/g, "")
-      .replace(/\bstroke-width="[^"]*"/g, "")
-      .replace(/\bstroke="[^"]*"/g, "");
+  raw = raw
+    .replace(/\bstroke="[^"]*"/g, "")
+    .replace(/\bstroke-width="[^"]*"/g, "")
+    .replace(/fill="(?:black|#000(?:000)?)"/gi, `fill="${escapeAttr(color)}"`);
 
-    newAttrs += ` width="${escapeAttr(size)}" height="${escapeAttr(size)}" stroke="${escapeAttr(color)}" stroke-width="${escapeAttr(strokeWidth)}"`;
+  raw = raw.replace(/<svg\s+([^>]*)/, (_, attrs) => {
+    let newAttrs = attrs.replace(/\bwidth="[^"]*"/g, "").replace(/\bheight="[^"]*"/g, "");
+
+    const safeKey = key.replace(/[^a-z0-9-]/g, "-");
+    newAttrs += ` class="lucide-fixture-${escapeAttr(safeKey)}" width="${escapeAttr(size)}" height="${escapeAttr(size)}" stroke="${escapeAttr(color)}" stroke-width="${escapeAttr(strokeWidth)}"`;
     return `<svg ${newAttrs.trim()}`;
   });
 

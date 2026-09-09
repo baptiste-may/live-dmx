@@ -310,10 +310,11 @@ pub async fn gdtf_import_file(app: AppHandle, path: String) -> Result<GdtfCatalo
                     channels: Some(m.channels),
                 })
                 .collect(),
-            uuid: saved.fixture_type_id,
+            uuid: saved.fixture_type_id.clone(),
             filesize: Some(bytes.len() as u64),
             is_installed: true,
             is_generic: false,
+            categories: saved.categories.clone(),
         })
     })
     .await

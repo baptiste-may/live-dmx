@@ -56,7 +56,12 @@ export function catalogItemsToManufacturers(items: GdtfCatalogItem[]): Manufactu
       uploader: item.uploader,
       rating: item.rating,
       revision: item.revision,
-      categories: item.isGeneric ? ["Generic"] : ["GDTF"],
+      categories:
+        item.categories && item.categories.length > 0
+          ? item.categories
+          : item.isGeneric
+            ? ["Generic"]
+            : ["GDTF"],
     };
   }
 

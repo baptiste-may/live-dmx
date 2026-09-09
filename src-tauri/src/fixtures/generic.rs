@@ -8,6 +8,7 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
             manufacturer: "Generic".to_string(),
             description: Some("Generic 1-channel dimmer / intensity control".to_string()),
             fixture_type_id: Some("generic-dimmer".to_string()),
+            categories: Some(vec!["Dimmer".to_string()]),
             modes: vec![ParsedGdtfMode {
                 name: "1 Channel".to_string(),
                 short_name: Some("1ch".to_string()),
@@ -21,6 +22,7 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
             manufacturer: "Generic".to_string(),
             description: Some("Generic 3-channel RGB fixture".to_string()),
             fixture_type_id: Some("generic-rgb".to_string()),
+            categories: Some(vec!["Color Changer".to_string(), "PAR".to_string()]),
             modes: vec![ParsedGdtfMode {
                 name: "3 Channel (RGB)".to_string(),
                 short_name: Some("3ch".to_string()),
@@ -34,6 +36,7 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
             manufacturer: "Generic".to_string(),
             description: Some("Generic 4-channel RGBW fixture".to_string()),
             fixture_type_id: Some("generic-rgbw".to_string()),
+            categories: Some(vec!["Color Changer".to_string(), "PAR".to_string()]),
             modes: vec![
                 ParsedGdtfMode {
                     name: "4 Channel (RGBW)".to_string(),
@@ -66,6 +69,7 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
             manufacturer: "Generic".to_string(),
             description: Some("Generic 6-channel RGBAW+UV fixture".to_string()),
             fixture_type_id: Some("generic-rgbaw-uv".to_string()),
+            categories: Some(vec!["Color Changer".to_string(), "PAR".to_string()]),
             modes: vec![
                 ParsedGdtfMode {
                     name: "6 Channel (RGBAW+UV)".to_string(),
@@ -105,6 +109,7 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
             manufacturer: "Generic".to_string(),
             description: Some("Generic strobe light".to_string()),
             fixture_type_id: Some("generic-strobe".to_string()),
+            categories: Some(vec!["Strobe".to_string()]),
             modes: vec![
                 ParsedGdtfMode {
                     name: "1 Channel (Rate)".to_string(),
@@ -126,6 +131,7 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
             manufacturer: "Generic".to_string(),
             description: Some("Generic Moving Head Spot".to_string()),
             fixture_type_id: Some("generic-mh-spot".to_string()),
+            categories: Some(vec!["Moving Head".to_string(), "Spot".to_string()]),
             modes: vec![ParsedGdtfMode {
                 name: "Standard (16ch)".to_string(),
                 short_name: Some("16ch".to_string()),
@@ -156,6 +162,7 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
             manufacturer: "Generic".to_string(),
             description: Some("Generic Moving Head Wash (RGBW)".to_string()),
             fixture_type_id: Some("generic-mh-wash".to_string()),
+            categories: Some(vec!["Moving Head".to_string(), "Wash".to_string()]),
             modes: vec![ParsedGdtfMode {
                 name: "Standard (12ch)".to_string(),
                 short_name: Some("12ch".to_string()),

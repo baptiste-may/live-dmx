@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button, Join } from "daisy-ui-kit";
-import { Edit2Icon, Trash2Icon } from "lucide-vue-next";
+import { PenIcon, Trash2Icon } from "lucide-vue-next";
 import { computed, ref } from "vue";
 
 import TextForm from "@/components/inputs/TextForm.vue";
@@ -69,7 +69,7 @@ async function handleRemove() {
         {{ group.id === 0 ? group.name : `${group.id} - ${group.name}` }}
       </Button>
       <Button v-if="isSelected && group.id !== 0" join warning soft @click.stop="isEditing = true">
-        <Edit2Icon class="h-4 w-4" />
+        <PenIcon class="h-4 w-4" />
       </Button>
       <Button
         v-if="isSelected && group.id !== 0"

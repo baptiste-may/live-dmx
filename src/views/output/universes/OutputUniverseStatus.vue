@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ActivityIcon, AlertCircleIcon, AlertTriangleIcon, CircleSlashIcon } from "lucide-vue-next";
+import { ActivityIcon, CircleAlertIcon, CircleSlashIcon, TriangleAlertIcon } from "lucide-vue-next";
 import { computed } from "vue";
 
 const props = withDefaults(
@@ -46,14 +46,14 @@ const statusDetails = computed(() => {
         tooltip: props.isMissingPhysical
           ? `Universe ${props.universe}: Interface not found`
           : `Universe ${props.universe}: Interface disconnected`,
-        icon: AlertTriangleIcon,
+        icon: TriangleAlertIcon,
         classes: "bg-error/15 text-error border-error/30",
       };
     case "idle":
       return {
         label: "Idle",
         tooltip: `Universe ${props.universe}: No route assigned`,
-        icon: AlertCircleIcon,
+        icon: CircleAlertIcon,
         classes: "bg-warning/15 text-warning border-warning/30",
       };
     case "sending":

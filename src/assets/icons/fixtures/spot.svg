@@ -1,8 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-fixture-spot">
-  <!-- Spotlight Body Profile -->
-  <path d="M3 8h6l4 2v4l-4 2H3z" />
-  <!-- Front Lens Barrel -->
-  <rect x="13" y="10" width="3" height="4" rx="0.5" />
-  <!-- Expanding Focused Beam Cone (closed on right end) -->
-  <polygon points="17,10 23,7 23,17 17,14" />
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 8H8L12 10V14L8 16H2V8Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M14.5 10H12.5C12.2239 10 12 10.2239 12 10.5V13.5C12 13.7761 12.2239 14 12.5 14H14.5C14.7761 14 15 13.7761 15 13.5V10.5C15 10.2239 14.7761 10 14.5 10Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M16 10.8L22 9V15L16 13.2V10.8Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

@@ -5,6 +5,7 @@ export type CleanFixtureType = {
   shortName?: string;
   fixtureKey?: string;
   manufacturerKey?: string;
+  categories?: string[];
 };
 
 export type CleanFixtureMode = {

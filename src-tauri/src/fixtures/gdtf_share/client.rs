@@ -172,6 +172,7 @@ impl GdtfShareClient {
                 filesize,
                 is_installed: false,
                 is_generic: false,
+                categories: None,
             });
         }
 

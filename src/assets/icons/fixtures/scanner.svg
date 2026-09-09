@@ -1,10 +1,3 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-fixture-scanner">
-  <!-- Slim Scanner Main Box Body -->
-  <rect x="6" y="11" width="6" height="10" rx="1.5" />
-  <!-- Top Mirror Support Bracket -->
-  <path d="M9 11V6" />
-  <!-- Top Angled Scanning Mirror -->
-  <line x1="6" y1="6" x2="12" y2="3" stroke-width="2.5" />
-  <!-- Single Reflected Scanning Light Beam -->
-  <line x1="9" y1="4.5" x2="20" y2="10" stroke-width="2" />
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 11V6M5 6L11 3M8 4.5L19 10M6.5 11H9.5C10.3284 11 11 11.6716 11 12.5V19.5C11 20.3284 10.3284 21 9.5 21H6.5C5.67157 21 5 20.3284 5 19.5V12.5C5 11.6716 5.67157 11 6.5 11Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

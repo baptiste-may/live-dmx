@@ -314,6 +314,7 @@ fn fallback_fixture_definition(name: &str) -> ParsedGdtfFixture {
         manufacturer: "Generic".to_string(),
         description: Some("Imported from MVR".to_string()),
         fixture_type_id: None,
+        categories: Some(vec!["Dimmer".to_string()]),
         modes: vec![crate::fixtures::parser::ParsedGdtfMode {
             name: "1 Channel".to_string(),
             short_name: Some("1ch".to_string()),

@@ -60,6 +60,39 @@ describe("fixture-browser store", () => {
     expect(manufacturers["american-dj"].fixtures["mega-par-profile"].rid).toBe(1234);
   });
 
+  it("should propagate real categories when present and fall back otherwise", () => {
+    const items: GdtfCatalogItem[] = [
+      {
+        fixture: "Spider",
+        manufacturer: "Robe",
+        isInstalled: true,
+        isGeneric: false,
+        categories: ["Moving Head", "Spot"],
+        modes: [{ name: "Standard", dmxfootprint: 24 }],
+      },
+      {
+        fixture: "Dimmer",
+        manufacturer: "Generic",
+        isInstalled: true,
+        isGeneric: true,
+        modes: [{ name: "1ch", dmxfootprint: 1 }],
+      },
+      {
+        fixture: "Unknown Online",
+        manufacturer: "Vendor",
+        isInstalled: false,
+        isGeneric: false,
+        modes: [{ name: "Basic", dmxfootprint: 2 }],
+      },
+    ];
+
+    const manufacturers = catalogItemsToManufacturers(items);
+
+    expect(manufacturers["robe"].fixtures["spider"].categories).toEqual(["Moving Head", "Spot"]);
+    expect(manufacturers["generic"].fixtures["dimmer"].categories).toEqual(["Generic"]);
+    expect(manufacturers["vendor"].fixtures["unknown-online"].categories).toEqual(["GDTF"]);
+  });
+
   it("should fetch fixtures and perform search via gdtf_search", async () => {
     mockInvoke.mockResolvedValue(mockCatalogItems);
 

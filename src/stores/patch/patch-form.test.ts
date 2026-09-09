@@ -372,6 +372,7 @@ describe("patch-form store", () => {
       name: "GigBAR 2",
       fixtureKey: "gig-bar-2",
       manufacturerKey: "chauvet",
+      categories: ["Color Changer"],
     });
     expect(callArg.mode).toEqual({
       name: "Standard",
