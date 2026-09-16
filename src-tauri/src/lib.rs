@@ -129,6 +129,7 @@ pub fn run() {
                 .collect();
             handle_open_request(app, &resolved);
         }));
+        builder = builder.plugin(tauri_plugin_process::init());
     }
 
     builder = builder
@@ -234,6 +235,8 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 let app_handle = app.handle().clone();
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
                 app.deep_link().on_open_url(move |event| {
                     let urls: Vec<String> =
                         event.urls().into_iter().map(|u| u.to_string()).collect();
