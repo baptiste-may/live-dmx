@@ -32,6 +32,76 @@ use tauri::Manager;
 #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
 use tauri::RunEvent;
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_log::fern;
+
+const ANSI_RESET: &str = "\x1b[0m";
+
+fn ansi(bold: bool, color: fern::colors::Color) -> String {
+    if bold {
+        format!("\x1b[1;{}m", color.to_fg_str())
+    } else {
+        format!("\x1b[{}m", color.to_fg_str())
+    }
+}
+
+fn level_style(level: log::Level) -> (bool, fern::colors::Color) {
+    match level {
+        log::Level::Error => (true, fern::colors::Color::BrightRed),
+        log::Level::Warn => (true, fern::colors::Color::BrightYellow),
+        log::Level::Info => (true, fern::colors::Color::BrightGreen),
+        log::Level::Debug => (false, fern::colors::Color::Blue),
+        log::Level::Trace => (false, fern::colors::Color::BrightBlack),
+    }
+}
+
+fn message_style(level: log::Level) -> Option<fern::colors::Color> {
+    match level {
+        log::Level::Error => Some(fern::colors::Color::BrightRed),
+        log::Level::Warn => Some(fern::colors::Color::BrightYellow),
+        _ => None,
+    }
+}
+
+fn render_record(
+    timestamp: &str,
+    target: &str,
+    level: log::Level,
+    message: &str,
+    colored: bool,
+) -> String {
+    if !colored {
+        return format!("{timestamp}[{target}][{level}] {message}");
+    }
+    let dim = ansi(false, fern::colors::Color::BrightBlack);
+    let (bold, color) = level_style(level);
+    let label = format!("{}{level}{ANSI_RESET}", ansi(bold, color));
+    let line =
+        format!("{dim}{timestamp}{ANSI_RESET}[{dim}{target}{ANSI_RESET}][{label}] {message}");
+    match message_style(level) {
+        Some(color) => format!("{}{line}{ANSI_RESET}", ansi(false, color)),
+        None => line,
+    }
+}
+
+fn log_formatter(
+    colored: bool,
+) -> impl Fn(fern::FormatCallback, &std::fmt::Arguments, &log::Record) + Send + Sync + 'static {
+    move |out, message, record| {
+        let timestamp = time::OffsetDateTime::now_utc()
+            .format(&time::macros::format_description!(
+                "[[[year]-[month]-[day]][[[hour]:[minute]:[second]]"
+            ))
+            .unwrap_or_default();
+        let line = render_record(
+            &timestamp,
+            record.target(),
+            record.level(),
+            &message.to_string(),
+            colored,
+        );
+        out.finish(format_args!("{line}"));
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -65,12 +135,16 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
-                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout)
+                        .format(log_formatter(true)),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
                         file_name: Some("live-dmx".into()),
-                    }),
-                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                    })
+                    .format(log_formatter(false)),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview)
+                        .format(log_formatter(false)),
                 ])
+                .clear_format()
                 .level(if cfg!(debug_assertions) {
                     log::LevelFilter::Debug
                 } else {
@@ -195,4 +269,60 @@ pub fn run() {
             #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android")))]
             let _ = (app, event);
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(level: log::Level, message: &str) -> String {
+        let timestamp = "[2026-09-16][19:50:02]";
+        render_record(timestamp, "live-dmx::test", level, message, true)
+    }
+
+    #[test]
+    fn plain_output_has_no_ansi_escape() {
+        let line = render_record("[ts]", "live-dmx::test", log::Level::Error, "boom", false);
+        assert!(!line.contains("\x1b["));
+        assert_eq!(line, "[ts][live-dmx::test][ERROR] boom");
+    }
+
+    #[test]
+    fn colored_output_wraps_level_in_ansi_escape() {
+        assert!(record(log::Level::Error, "boom").contains("\x1b["));
+        assert!(record(log::Level::Info, "hi").contains("\x1b["));
+    }
+
+    #[test]
+    fn error_level_is_bold_bright_red() {
+        let line = record(log::Level::Error, "boom");
+        assert!(line.contains("\x1b[1;91mERROR\x1b[0m"));
+        assert!(line.ends_with("\x1b[0m"));
+    }
+
+    #[test]
+    fn warn_level_is_bold_bright_yellow() {
+        assert!(record(log::Level::Warn, "careful").contains("\x1b[1;93mWARN\x1b[0m"));
+    }
+
+    #[test]
+    fn info_level_is_bold_bright_green() {
+        assert!(record(log::Level::Info, "hello").contains("\x1b[1;92mINFO\x1b[0m"));
+    }
+
+    #[test]
+    fn debug_and_trace_levels_are_not_bold() {
+        assert!(record(log::Level::Debug, "dbg").contains("\x1b[34mDEBUG\x1b[0m"));
+        assert!(record(log::Level::Trace, "trc").contains("\x1b[90mTRACE\x1b[0m"));
+    }
+
+    #[test]
+    fn error_and_warn_messages_are_tinted() {
+        let error_line = record(log::Level::Error, "boom");
+        assert!(error_line.contains("\x1b[91m"));
+        assert!(error_line.ends_with("boom\x1b[0m"));
+        let warn_line = record(log::Level::Warn, "careful");
+        assert!(warn_line.contains("\x1b[93m"));
+        assert!(warn_line.ends_with("careful\x1b[0m"));
+    }
 }

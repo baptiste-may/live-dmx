@@ -33,9 +33,10 @@ serialport = "4.10.0"
 rosc = "0.10.1"
 quick-xml = "0.37"
 tauri-plugin-deep-link = "2"
-tauri-plugin-log = "2"
+tauri-plugin-log = { version = "2", features = ["colored"] }
 log = "0.4"
 url = "2"
+time = { version = "0.3", features = ["formatting", "macros"] }
 
 [dev-dependencies]
 tempfile = "3"
