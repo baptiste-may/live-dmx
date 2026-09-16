@@ -1,5 +1,6 @@
 use live_dmx_lib::fixtures::{
     get_generic_fixtures, map_gdtf_attribute_to_name, parse_gdtf_archive, parse_gdtf_xml,
+    parse_physical_bounds,
 };
 use std::io::Write;
 use zip::write::SimpleFileOptions;
@@ -214,4 +215,91 @@ fn test_generic_fixtures_available() {
         mh_spot.categories,
         Some(vec!["Moving Head".to_string(), "Spot".to_string()])
     );
+    assert_eq!(mh_spot.modes[0].pan_bounds, Some([-270, 270]));
+    assert_eq!(mh_spot.modes[0].tilt_bounds, Some([-135, 135]));
+
+    let mh_wash = generics
+        .iter()
+        .find(|g| g.name == "Moving Head Wash")
+        .unwrap();
+    assert_eq!(mh_wash.modes[0].pan_bounds, Some([-270, 270]));
+    assert_eq!(mh_wash.modes[0].tilt_bounds, Some([-135, 135]));
+}
+
+#[test]
+fn test_parse_physical_bounds_centering_and_ranges() {
+    // Zero-based 0..540 should center to -270..270
+    assert_eq!(parse_physical_bounds("0", "540"), Some([-270, 270]));
+    assert_eq!(parse_physical_bounds("0.0", "270.0"), Some([-135, 135]));
+    assert_eq!(parse_physical_bounds("540", "0"), Some([-270, 270]));
+
+    // Already signed -270..270
+    assert_eq!(parse_physical_bounds("-270", "270"), Some([-270, 270]));
+    assert_eq!(parse_physical_bounds("-135.0", "135.0"), Some([-135, 135]));
+    assert_eq!(parse_physical_bounds("-110", "110"), Some([-110, 110]));
+    assert_eq!(parse_physical_bounds("-30", "100"), Some([-30, 100]));
+
+    // Invalid / identical
+    assert_eq!(parse_physical_bounds("0", "0"), None);
+    assert_eq!(parse_physical_bounds("invalid", "270"), None);
+    assert_eq!(parse_physical_bounds("0", "0.2"), None);
+}
+
+#[test]
+fn test_parse_gdtf_xml_with_pan_tilt_physical_bounds() {
+    let xml = r#"<GDTF DataVersion="1.2">
+    <FixtureType Name="Test Head" Manufacturer="TestCo">
+        <DMXModes>
+            <DMXMode Name="Standard 16ch">
+                <DMXChannels>
+                    <DMXChannel Offset="1,2">
+                        <LogicalChannel Attribute="Pan">
+                            <ChannelFunction Attribute="Pan" PhysicalFrom="-270.0" PhysicalTo="270.0"/>
+                        </LogicalChannel>
+                    </DMXChannel>
+                    <DMXChannel Offset="3,4">
+                        <LogicalChannel Attribute="Tilt">
+                            <ChannelFunction Attribute="Tilt" PhysicalFrom="0.0" PhysicalTo="270.0"/>
+                        </LogicalChannel>
+                    </DMXChannel>
+                    <DMXChannel Offset="5">
+                        <LogicalChannel Attribute="Dimmer"/>
+                    </DMXChannel>
+                </DMXChannels>
+            </DMXMode>
+        </DMXModes>
+    </FixtureType>
+</GDTF>"#;
+
+    let parsed = parse_gdtf_xml(xml).expect("Should parse GDTF XML with bounds");
+    assert_eq!(parsed.modes.len(), 1);
+    let mode = &parsed.modes[0];
+    assert_eq!(mode.pan_bounds, Some([-270, 270]));
+    assert_eq!(mode.tilt_bounds, Some([-135, 135]));
+}
+
+#[test]
+fn test_parse_gdtf_xml_with_logical_channel_bounds() {
+    let xml = r#"<GDTF DataVersion="1.2">
+    <FixtureType Name="Test Head 2" Manufacturer="TestCo">
+        <DMXModes>
+            <DMXMode Name="Basic">
+                <DMXChannels>
+                    <DMXChannel Offset="1">
+                        <LogicalChannel Attribute="Pan" PhysicalFrom="-180" PhysicalTo="180"/>
+                    </DMXChannel>
+                    <DMXChannel Offset="2">
+                        <LogicalChannel Attribute="Tilt" PhysicalFrom="-110" PhysicalTo="110"/>
+                    </DMXChannel>
+                </DMXChannels>
+            </DMXMode>
+        </DMXModes>
+    </FixtureType>
+</GDTF>"#;
+
+    let parsed = parse_gdtf_xml(xml).expect("Should parse GDTF XML with LogicalChannel bounds");
+    assert_eq!(parsed.modes.len(), 1);
+    let mode = &parsed.modes[0];
+    assert_eq!(mode.pan_bounds, Some([-180, 180]));
+    assert_eq!(mode.tilt_bounds, Some([-110, 110]));
 }

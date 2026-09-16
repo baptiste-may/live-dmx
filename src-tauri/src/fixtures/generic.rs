@@ -1,6 +1,14 @@
+use std::sync::OnceLock;
+
 use super::parser::{ParsedGdtfFixture, ParsedGdtfMode};
 
-pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
+static GENERIC_FIXTURES: OnceLock<Vec<ParsedGdtfFixture>> = OnceLock::new();
+
+pub fn get_generic_fixtures() -> &'static [ParsedGdtfFixture] {
+    GENERIC_FIXTURES.get_or_init(build_generic_fixtures)
+}
+
+fn build_generic_fixtures() -> Vec<ParsedGdtfFixture> {
     vec![
         ParsedGdtfFixture {
             name: "Dimmer".to_string(),
@@ -14,6 +22,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                 short_name: Some("1ch".to_string()),
                 channel_count: 1,
                 channels: vec!["Dimmer".to_string()],
+                pan_bounds: None,
+                tilt_bounds: None,
             }],
         },
         ParsedGdtfFixture {
@@ -28,6 +38,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                 short_name: Some("3ch".to_string()),
                 channel_count: 3,
                 channels: vec!["Red".to_string(), "Green".to_string(), "Blue".to_string()],
+                pan_bounds: None,
+                tilt_bounds: None,
             }],
         },
         ParsedGdtfFixture {
@@ -48,6 +60,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                         "Blue".to_string(),
                         "White".to_string(),
                     ],
+                    pan_bounds: None,
+                    tilt_bounds: None,
                 },
                 ParsedGdtfMode {
                     name: "5 Channel (Dimmer + RGBW)".to_string(),
@@ -60,6 +74,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                         "Blue".to_string(),
                         "White".to_string(),
                     ],
+                    pan_bounds: None,
+                    tilt_bounds: None,
                 },
             ],
         },
@@ -83,6 +99,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                         "White".to_string(),
                         "UV".to_string(),
                     ],
+                    pan_bounds: None,
+                    tilt_bounds: None,
                 },
                 ParsedGdtfMode {
                     name: "10 Channel (Dimmer + Strobe + RGBAW+UV)".to_string(),
@@ -100,6 +118,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                         "Macro".to_string(),
                         "Speed".to_string(),
                     ],
+                    pan_bounds: None,
+                    tilt_bounds: None,
                 },
             ],
         },
@@ -116,12 +136,16 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                     short_name: Some("1ch".to_string()),
                     channel_count: 1,
                     channels: vec!["Strobe".to_string()],
+                    pan_bounds: None,
+                    tilt_bounds: None,
                 },
                 ParsedGdtfMode {
                     name: "2 Channel (Dimmer + Strobe)".to_string(),
                     short_name: Some("2ch".to_string()),
                     channel_count: 2,
                     channels: vec!["Dimmer".to_string(), "Strobe".to_string()],
+                    pan_bounds: None,
+                    tilt_bounds: None,
                 },
             ],
         },
@@ -154,6 +178,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                     "Frost".to_string(),
                     "Control".to_string(),
                 ],
+                pan_bounds: Some([-270, 270]),
+                tilt_bounds: Some([-135, 135]),
             }],
         },
         ParsedGdtfFixture {
@@ -181,6 +207,8 @@ pub fn get_generic_fixtures() -> Vec<ParsedGdtfFixture> {
                     "White".to_string(),
                     "Zoom".to_string(),
                 ],
+                pan_bounds: Some([-270, 270]),
+                tilt_bounds: Some([-135, 135]),
             }],
         },
     ]

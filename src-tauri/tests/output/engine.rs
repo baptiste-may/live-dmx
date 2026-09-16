@@ -1,5 +1,5 @@
 use live_dmx_lib::output::LiveEngine;
-use live_dmx_lib::show::{PatchedFixture, ShowData};
+use live_dmx_lib::show::{ColorPreference, GroupSettings, PatchedFixture, ShowData};
 
 #[test]
 fn test_live_engine_default_state_and_blackout() {
@@ -383,4 +383,169 @@ fn test_red_blue_pulse_channels() {
         min_blue, 0,
         "Pulse effect should return to pure primary red channel"
     );
+}
+
+#[test]
+fn test_fixture_color_wheel_routing() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Wheel Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Color Wheel"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            color_preference: ColorPreference::ColorWheel,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color(1, Some("red".to_string()), Some(&show));
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255); // Dimmer
+    assert!(buf[1] > 0, "Color wheel channel should receive a position");
+}
+
+#[test]
+fn test_wheel_only_fixture_falls_back_to_wheel_routing() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Wheel Par".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Color Wheel"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    // No settings configured: effective routing must fall back to wheel
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color(1, Some("blue".to_string()), Some(&show));
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255);
+    assert!(buf[1] > 0);
+}
+
+#[test]
+fn test_color_mix_preference_zeroes_wheel_channel() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Hybrid Par".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Red", "Green", "Blue", "Color Wheel"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            color_preference: ColorPreference::ColorMix,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color(1, Some("blue".to_string()), Some(&show));
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[1], 0); // Red
+    assert_eq!(buf[2], 0); // Green
+    assert_eq!(buf[3], 255); // Blue
+    assert_eq!(buf[4], 0, "Wheel channel must stay at 0 under Color Mix");
+}
+
+#[test]
+fn test_fixture_cct_routing() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "CCT Wash".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "CCT"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            color_preference: ColorPreference::Cct,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color(1, Some("white".to_string()), Some(&show));
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255); // Dimmer
+    let cct_value = buf[1];
+    assert!(
+        cct_value > 0 && cct_value < 255,
+        "CCT channel should map white to an in-range temperature, got {cct_value}"
+    );
+}
+
+#[test]
+fn test_cct_preference_falls_back_to_rgb_on_mix_fixture() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "RGB Wash".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer", "Red", "Green", "Blue"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    // No CCT channel available: CCT preference must fall back to Color Mix
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            color_preference: ColorPreference::Cct,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.set_color_fade_speed(0.0);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color(1, Some("green".to_string()), Some(&show));
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[2], 255); // Green
+    assert_eq!(buf[1], 0); // Red
 }

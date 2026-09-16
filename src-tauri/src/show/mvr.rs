@@ -267,41 +267,48 @@ fn find_matching_generic_fixture(query: &str) -> Option<ParsedGdtfFixture> {
 
     if lower.contains("dimmer") || lower.contains("intensity") {
         return generics
-            .into_iter()
-            .find(|f| f.name.eq_ignore_ascii_case("Dimmer"));
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case("Dimmer"))
+            .cloned();
     }
     if lower.contains("rgbw") {
         return generics
-            .into_iter()
-            .find(|f| f.name.eq_ignore_ascii_case("RGBW PAR"));
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case("RGBW PAR"))
+            .cloned();
     }
     let has_uv_token = lower
         .split(|c: char| !c.is_ascii_alphanumeric())
         .any(|token| token == "uv");
     if lower.contains("rgbaw") || has_uv_token {
         return generics
-            .into_iter()
-            .find(|f| f.name.eq_ignore_ascii_case("RGBAW+UV PAR"));
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case("RGBAW+UV PAR"))
+            .cloned();
     }
     if lower.contains("rgb") {
         return generics
-            .into_iter()
-            .find(|f| f.name.eq_ignore_ascii_case("RGB PAR"));
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case("RGB PAR"))
+            .cloned();
     }
     if lower.contains("spot") {
         return generics
-            .into_iter()
-            .find(|f| f.name.eq_ignore_ascii_case("Moving Head Spot"));
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case("Moving Head Spot"))
+            .cloned();
     }
     if lower.contains("wash") {
         return generics
-            .into_iter()
-            .find(|f| f.name.eq_ignore_ascii_case("Moving Head Wash"));
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case("Moving Head Wash"))
+            .cloned();
     }
     if lower.contains("strobe") {
         return generics
-            .into_iter()
-            .find(|f| f.name.eq_ignore_ascii_case("Strobe 1ch"));
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case("Strobe"))
+            .cloned();
     }
 
     None
@@ -320,6 +327,8 @@ fn fallback_fixture_definition(name: &str) -> ParsedGdtfFixture {
             short_name: Some("1ch".to_string()),
             channel_count: 1,
             channels: vec!["Dimmer".to_string()],
+            pan_bounds: None,
+            tilt_bounds: None,
         }],
     }
 }
@@ -384,6 +393,8 @@ fn resolve_fixture_gdtf_and_mode(
                             short_name: None,
                             channel_count: 1,
                             channels: vec!["Dimmer".to_string()],
+                            pan_bounds: None,
+                            tilt_bounds: None,
                         }
                     })
                 })
@@ -394,6 +405,8 @@ fn resolve_fixture_gdtf_and_mode(
                     short_name: None,
                     channel_count: 1,
                     channels: vec!["Dimmer".to_string()],
+                    pan_bounds: None,
+                    tilt_bounds: None,
                 }
             })
         };
@@ -787,6 +800,8 @@ pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, S
                             short_name: m.short_name.clone(),
                             channel_count: m.channel_count,
                             channels: m.channels.clone(),
+                            pan_bounds: m.pan_bounds,
+                            tilt_bounds: m.tilt_bounds,
                         })
                         .collect(),
                 },
@@ -834,11 +849,34 @@ pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, S
             "manufacturerKey": gdtf_def.manufacturer.to_lowercase().replace(' ', "_"),
         });
 
-        let mode_val = serde_json::json!({
-            "name": mode.name,
-            "shortName": mode.short_name,
-            "channels": mode.channels,
-        });
+        let mut mode_map = serde_json::Map::new();
+        mode_map.insert(
+            "name".to_string(),
+            serde_json::Value::String(mode.name.clone()),
+        );
+        if let Some(ref short_name) = mode.short_name {
+            mode_map.insert(
+                "shortName".to_string(),
+                serde_json::Value::String(short_name.clone()),
+            );
+        }
+        mode_map.insert(
+            "channels".to_string(),
+            serde_json::to_value(&mode.channels).unwrap_or_default(),
+        );
+        if let Some(pan_bounds) = mode.pan_bounds {
+            mode_map.insert(
+                "panBounds".to_string(),
+                serde_json::to_value(pan_bounds).unwrap_or_default(),
+            );
+        }
+        if let Some(tilt_bounds) = mode.tilt_bounds {
+            mode_map.insert(
+                "tiltBounds".to_string(),
+                serde_json::to_value(tilt_bounds).unwrap_or_default(),
+            );
+        }
+        let mode_val = serde_json::Value::Object(mode_map);
 
         patched_fixtures.push(PatchedFixture {
             id: allocated_id,
@@ -887,6 +925,7 @@ pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, S
         },
         groups: crate::show::types::PatchGroupsState {
             groups: show_groups,
+            settings: std::collections::HashMap::new(),
         },
         output: ShowOutputState {
             universes: output_universes,

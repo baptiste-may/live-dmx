@@ -1,6 +1,9 @@
 use tauri::{AppHandle, State};
 
-use crate::show::{AppState, FixtureGroup};
+use crate::show::configure::{
+    clamp_group_settings, get_group_color_options, get_group_pan_bounds, get_group_tilt_bounds,
+};
+use crate::show::{AppState, FixtureGroup, GroupSettings, PatchedFixture};
 
 #[tauri::command]
 pub fn show_group_create(
@@ -17,6 +20,37 @@ pub fn show_group_create(
 }
 
 #[tauri::command]
+pub fn show_group_update_settings(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    group_id: u32,
+    mut settings: GroupSettings,
+) -> Result<(), String> {
+    state.apply_mutation(&app, |show| {
+        if group_id != 0 && !show.groups.groups.iter().any(|g| g.id == group_id) {
+            return Err("Group not found".to_string());
+        }
+        let relevant_fixtures: Vec<&PatchedFixture> = if group_id == 0 {
+            show.patch.fixtures.iter().collect()
+        } else {
+            show.patch
+                .fixtures
+                .iter()
+                .filter(|f| f.groups.contains(&group_id))
+                .collect()
+        };
+        let pan_bounds = get_group_pan_bounds(&relevant_fixtures, &show.fixture_definitions);
+        let tilt_bounds = get_group_tilt_bounds(&relevant_fixtures, &show.fixture_definitions);
+        let color_options = get_group_color_options(&relevant_fixtures);
+
+        clamp_group_settings(&mut settings, pan_bounds, tilt_bounds, &color_options);
+
+        show.groups.settings.insert(group_id, settings);
+        Ok(())
+    })
+}
+
+#[tauri::command]
 pub fn show_group_remove(
     state: State<'_, AppState>,
     app: AppHandle,
@@ -27,6 +61,7 @@ pub fn show_group_remove(
     }
     state.apply_mutation(&app, |show| {
         show.groups.groups.retain(|g| g.id != id);
+        show.groups.settings.remove(&id);
         for f in &mut show.patch.fixtures {
             f.groups.retain(|&gid| gid != id);
         }

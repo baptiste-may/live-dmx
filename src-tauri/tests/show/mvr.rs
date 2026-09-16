@@ -539,6 +539,15 @@ fn test_import_mvr_clean_transformations() {
     assert_eq!(show.patch.fixtures[1].id, 201);
     assert_eq!(show.patch.fixtures[1].name, "Strobe"); // only 1 strobe, stays single name
     assert_eq!(show.patch.fixtures[1].groups, vec![2]); // new Strobe group
+                                                        // "Strobe 1ch.gdtf" must resolve to the built-in generic Strobe, not a fallback dimmer.
+    assert_eq!(
+        show.patch.fixtures[1].fixture_type.get("name").unwrap(),
+        "Strobe"
+    );
+    assert_eq!(
+        show.patch.fixtures[1].mode.get("channels").unwrap(),
+        &serde_json::json!(["Strobe"])
+    );
 
     assert_eq!(show.patch.fixtures[2].universe, 1);
     assert_eq!(show.patch.fixtures[2].address, 50);

@@ -12,6 +12,8 @@ export type CleanFixtureMode = {
   name?: string;
   shortName?: string;
   channels: (string | null)[];
+  panBounds?: [number, number];
+  tiltBounds?: [number, number];
 };
 
 export type PatchRequest = {

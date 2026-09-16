@@ -308,6 +308,8 @@ pub async fn gdtf_import_file(app: AppHandle, path: String) -> Result<GdtfCatalo
                     name: m.name,
                     dmxfootprint: m.channel_count as u32,
                     channels: Some(m.channels),
+                    pan_bounds: m.pan_bounds,
+                    tilt_bounds: m.tilt_bounds,
                 })
                 .collect(),
             uuid: saved.fixture_type_id.clone(),

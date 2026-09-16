@@ -308,160 +308,198 @@ impl GdtfCatalogManager {
         let mut results = Vec::new();
         let mut results_map: HashMap<String, usize> = HashMap::new();
 
-        let mut add_or_update = |mut item: GdtfCatalogItem| {
-            let key = format!(
-                "{}@{}",
-                item.manufacturer.trim().to_lowercase(),
-                item.fixture.trim().to_lowercase()
-            );
+        let mut add_or_update =
+            |mut item: GdtfCatalogItem| {
+                let key = format!(
+                    "{}@{}",
+                    item.manufacturer.trim().to_lowercase(),
+                    item.fixture.trim().to_lowercase()
+                );
 
-            if let Some(&idx) = results_map.get(&key) {
-                let existing = &mut results[idx];
-                let better = is_better_item(&item, existing);
-                if better {
-                    if existing.is_installed {
-                        item.is_installed = true;
-                    }
-                    if item.categories.is_none() && existing.categories.is_some() {
-                        item.categories = existing.categories.clone();
-                    }
-                    if item.modes.is_empty() && !existing.modes.is_empty() {
-                        item.modes = existing.modes.clone();
-                    } else {
-                        // Merge channels from existing modes
-                        for target in &mut item.modes {
-                            if target.channels.is_none() {
+                if let Some(&idx) = results_map.get(&key) {
+                    let existing = &mut results[idx];
+                    let better = is_better_item(&item, existing);
+                    if better {
+                        if existing.is_installed {
+                            item.is_installed = true;
+                        }
+                        if item.categories.is_none() && existing.categories.is_some() {
+                            item.categories = existing.categories.clone();
+                        }
+                        if item.modes.is_empty() && !existing.modes.is_empty() {
+                            item.modes = existing.modes.clone();
+                        } else {
+                            // Merge channels from existing modes
+                            for target in &mut item.modes {
                                 if let Some(source) = existing.modes.iter().find(|s| {
                                     s.name.trim().eq_ignore_ascii_case(target.name.trim())
                                 }) {
-                                    if source.channels.is_some() {
-                                        target.channels = source.channels.clone();
+                                    if target.channels.is_none() {
+                                        if let Some(ch) = &source.channels {
+                                            target.channels = Some(ch.clone());
+                                        }
+                                    }
+                                    if target.pan_bounds.is_none() {
+                                        target.pan_bounds = source.pan_bounds;
+                                    }
+                                    if target.tilt_bounds.is_none() {
+                                        target.tilt_bounds = source.tilt_bounds;
+                                    }
+                                }
+                            }
+                        }
+
+                        // If any mode in item still lacks channels, try populating from local_snapshot
+                        if let Some(parsed) = local_snapshot.get(&key) {
+                            item.is_installed = true;
+                            for target in &mut item.modes {
+                                if let Some(pm) = parsed.modes.iter().find(|pm| {
+                                    pm.name.trim().eq_ignore_ascii_case(target.name.trim())
+                                }) {
+                                    if target.channels.is_none() {
+                                        target.channels = Some(pm.channels.clone());
+                                    }
+                                    if target.pan_bounds.is_none() {
+                                        target.pan_bounds = pm.pan_bounds;
+                                    }
+                                    if target.tilt_bounds.is_none() {
+                                        target.tilt_bounds = pm.tilt_bounds;
+                                    }
+                                }
+                            }
+                        }
+                        if item.categories.is_none() {
+                            if let Some(parsed) = local_snapshot.get(&key) {
+                                if let Some(cats) = &parsed.categories {
+                                    item.categories = Some(cats.clone());
+                                }
+                            }
+                        }
+
+                        // If existing had channels and item.modes still has no channels at all, keep existing modes
+                        if item.modes.iter().all(|m| m.channels.is_none())
+                            && existing.modes.iter().any(|m| m.channels.is_some())
+                        {
+                            item.modes = existing.modes.clone();
+                        }
+
+                        results[idx] = item;
+                    } else {
+                        if item.is_installed {
+                            existing.is_installed = true;
+                        }
+                        if existing.rid.is_none() && item.rid.is_some() {
+                            existing.rid = item.rid;
+                        }
+                        if existing.revision.is_none() && item.revision.is_some() {
+                            existing.revision = item.revision.clone();
+                        }
+                        if existing.uploader.as_deref() == Some("Installed")
+                            && item.uploader.is_some()
+                        {
+                            existing.uploader = item.uploader.clone();
+                        }
+                        if existing.rating.is_none() && item.rating.is_some() {
+                            existing.rating = item.rating;
+                        }
+                        if existing.categories.is_none() && item.categories.is_some() {
+                            existing.categories = item.categories.clone();
+                        }
+                        if existing.modes.is_empty() && !item.modes.is_empty() {
+                            existing.modes = item.modes.clone();
+                        } else {
+                            // Merge channels from candidate into existing
+                            for target in &mut existing.modes {
+                                if target.channels.is_none() {
+                                    if let Some(source) = item.modes.iter().find(|s| {
+                                        s.name.trim().eq_ignore_ascii_case(target.name.trim())
+                                    }) {
+                                        if source.channels.is_some() {
+                                            target.channels = source.channels.clone();
+                                        }
+                                        if target.pan_bounds.is_none()
+                                            && source.pan_bounds.is_some()
+                                        {
+                                            target.pan_bounds = source.pan_bounds;
+                                        }
+                                        if target.tilt_bounds.is_none()
+                                            && source.tilt_bounds.is_some()
+                                        {
+                                            target.tilt_bounds = source.tilt_bounds;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // If existing still has modes lacking channels or bounds, check local_snapshot
+                        if let Some(parsed) = local_snapshot.get(&key) {
+                            existing.is_installed = true;
+                            for target in &mut existing.modes {
+                                if let Some(pm) = parsed.modes.iter().find(|pm| {
+                                    pm.name.trim().eq_ignore_ascii_case(target.name.trim())
+                                }) {
+                                    if target.channels.is_none() {
+                                        target.channels = Some(pm.channels.clone());
+                                    }
+                                    if target.pan_bounds.is_none() {
+                                        target.pan_bounds = pm.pan_bounds;
+                                    }
+                                    if target.tilt_bounds.is_none() {
+                                        target.tilt_bounds = pm.tilt_bounds;
                                     }
                                 }
                             }
                         }
                     }
-
-                    // If any mode in item still lacks channels, try populating from local_snapshot
+                } else {
+                    // First time seeing this fixture key: ensure local channels are attached if installed locally
                     if let Some(parsed) = local_snapshot.get(&key) {
                         item.is_installed = true;
-                        for target in &mut item.modes {
-                            if target.channels.is_none() {
-                                if let Some(pm) = parsed.modes.iter().find(|pm| {
-                                    pm.name.trim().eq_ignore_ascii_case(target.name.trim())
-                                }) {
-                                    target.channels = Some(pm.channels.clone());
-                                }
-                            }
-                        }
-                    }
-                    if item.categories.is_none() {
-                        if let Some(parsed) = local_snapshot.get(&key) {
+                        if item.categories.is_none() {
                             if let Some(cats) = &parsed.categories {
                                 item.categories = Some(cats.clone());
                             }
                         }
-                    }
-
-                    // If existing had channels and item.modes still has no channels at all, keep existing modes
-                    if item.modes.iter().all(|m| m.channels.is_none())
-                        && existing.modes.iter().any(|m| m.channels.is_some())
-                    {
-                        item.modes = existing.modes.clone();
-                    }
-
-                    results[idx] = item;
-                } else {
-                    if item.is_installed {
-                        existing.is_installed = true;
-                    }
-                    if existing.rid.is_none() && item.rid.is_some() {
-                        existing.rid = item.rid;
-                    }
-                    if existing.revision.is_none() && item.revision.is_some() {
-                        existing.revision = item.revision.clone();
-                    }
-                    if existing.uploader.as_deref() == Some("Installed") && item.uploader.is_some()
-                    {
-                        existing.uploader = item.uploader.clone();
-                    }
-                    if existing.rating.is_none() && item.rating.is_some() {
-                        existing.rating = item.rating;
-                    }
-                    if existing.categories.is_none() && item.categories.is_some() {
-                        existing.categories = item.categories.clone();
-                    }
-                    if existing.modes.is_empty() && !item.modes.is_empty() {
-                        existing.modes = item.modes.clone();
-                    } else {
-                        // Merge channels from candidate into existing
-                        for target in &mut existing.modes {
-                            if target.channels.is_none() {
-                                if let Some(source) = item.modes.iter().find(|s| {
-                                    s.name.trim().eq_ignore_ascii_case(target.name.trim())
+                        if item.modes.is_empty() {
+                            item.modes = parsed
+                                .modes
+                                .iter()
+                                .map(|m| GdtfCatalogMode {
+                                    name: m.name.clone(),
+                                    dmxfootprint: m.channel_count as u32,
+                                    channels: Some(m.channels.clone()),
+                                    pan_bounds: m.pan_bounds,
+                                    tilt_bounds: m.tilt_bounds,
+                                })
+                                .collect();
+                        } else {
+                            for target in &mut item.modes {
+                                if let Some(pm) = parsed.modes.iter().find(|pm| {
+                                    pm.name.trim().eq_ignore_ascii_case(target.name.trim())
                                 }) {
-                                    if source.channels.is_some() {
-                                        target.channels = source.channels.clone();
+                                    if target.channels.is_none() {
+                                        target.channels = Some(pm.channels.clone());
+                                    }
+                                    if target.pan_bounds.is_none() {
+                                        target.pan_bounds = pm.pan_bounds;
+                                    }
+                                    if target.tilt_bounds.is_none() {
+                                        target.tilt_bounds = pm.tilt_bounds;
                                     }
                                 }
                             }
                         }
                     }
-
-                    // If existing still has modes lacking channels, check local_snapshot
-                    if let Some(parsed) = local_snapshot.get(&key) {
-                        existing.is_installed = true;
-                        for target in &mut existing.modes {
-                            if target.channels.is_none() {
-                                if let Some(pm) = parsed.modes.iter().find(|pm| {
-                                    pm.name.trim().eq_ignore_ascii_case(target.name.trim())
-                                }) {
-                                    target.channels = Some(pm.channels.clone());
-                                }
-                            }
-                        }
-                    }
+                    results_map.insert(key, results.len());
+                    results.push(item);
                 }
-            } else {
-                // First time seeing this fixture key: ensure local channels are attached if installed locally
-                if let Some(parsed) = local_snapshot.get(&key) {
-                    item.is_installed = true;
-                    if item.categories.is_none() {
-                        if let Some(cats) = &parsed.categories {
-                            item.categories = Some(cats.clone());
-                        }
-                    }
-                    if item.modes.is_empty() {
-                        item.modes = parsed
-                            .modes
-                            .iter()
-                            .map(|m| GdtfCatalogMode {
-                                name: m.name.clone(),
-                                dmxfootprint: m.channel_count as u32,
-                                channels: Some(m.channels.clone()),
-                            })
-                            .collect();
-                    } else {
-                        for target in &mut item.modes {
-                            if target.channels.is_none() {
-                                if let Some(pm) = parsed.modes.iter().find(|pm| {
-                                    pm.name.trim().eq_ignore_ascii_case(target.name.trim())
-                                }) {
-                                    target.channels = Some(pm.channels.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-                results_map.insert(key, results.len());
-                results.push(item);
-            }
-            results.len()
-        };
+                results.len()
+            };
 
         // 1. Generic fixtures
         let generic_fixtures = get_generic_fixtures();
-        for g in generic_fixtures {
+        for g in generic_fixtures.iter() {
             let fixture_lower = g.name.to_lowercase();
             let man_lower = g.manufacturer.to_lowercase();
 
@@ -475,25 +513,28 @@ impl GdtfCatalogManager {
             if matches {
                 add_or_update(GdtfCatalogItem {
                     rid: None,
-                    fixture: g.name,
-                    manufacturer: g.manufacturer,
+                    fixture: g.name.clone(),
+                    manufacturer: g.manufacturer.clone(),
                     revision: Some("1.0".to_string()),
                     uploader: Some("Built-in".to_string()),
                     rating: Some(5.0),
                     modes: g
                         .modes
-                        .into_iter()
+                        .iter()
+                        .cloned()
                         .map(|m| GdtfCatalogMode {
                             name: m.name,
                             dmxfootprint: m.channel_count as u32,
                             channels: Some(m.channels),
+                            pan_bounds: m.pan_bounds,
+                            tilt_bounds: m.tilt_bounds,
                         })
                         .collect(),
-                    uuid: g.fixture_type_id,
+                    uuid: g.fixture_type_id.clone(),
                     filesize: None,
                     is_installed: true,
                     is_generic: true,
-                    categories: g.categories,
+                    categories: g.categories.clone(),
                 });
             }
         }
@@ -528,6 +569,8 @@ impl GdtfCatalogManager {
                             name: m.name.clone(),
                             dmxfootprint: m.channel_count as u32,
                             channels: Some(m.channels.clone()),
+                            pan_bounds: m.pan_bounds,
+                            tilt_bounds: m.tilt_bounds,
                         })
                         .collect(),
                     uuid: parsed.fixture_type_id.clone(),
@@ -591,10 +634,13 @@ impl GdtfCatalogManager {
         }
 
         // Check generic
-        get_generic_fixtures().into_iter().find(|g| {
-            g.manufacturer.eq_ignore_ascii_case(manufacturer)
-                && g.name.eq_ignore_ascii_case(fixture)
-        })
+        get_generic_fixtures()
+            .iter()
+            .find(|g| {
+                g.manufacturer.eq_ignore_ascii_case(manufacturer)
+                    && g.name.eq_ignore_ascii_case(fixture)
+            })
+            .cloned()
     }
 }
 

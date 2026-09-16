@@ -11,6 +11,10 @@ pub struct ParsedGdtfMode {
     pub short_name: Option<String>,
     pub channel_count: usize,
     pub channels: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pan_bounds: Option<[i32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tilt_bounds: Option<[i32; 2]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -50,6 +54,118 @@ pub fn map_gdtf_attribute_to_name(attribute: &str, is_fine: bool) -> String {
         format!("{} Fine", base)
     } else {
         base.to_string()
+    }
+}
+
+pub fn parse_physical_bounds(from_str: &str, to_str: &str) -> Option<[i32; 2]> {
+    let from: f64 = from_str.trim().parse().ok()?;
+    let to: f64 = to_str.trim().parse().ok()?;
+    if from == to || !from.is_finite() || !to.is_finite() {
+        return None;
+    }
+    let min = from.min(to);
+    let max = from.max(to);
+    if min >= 0.0 && max > 0.0 {
+        let span = ((max - min) / 2.0).round() as i32;
+        if span <= 0 {
+            return None;
+        }
+        Some([-span, span])
+    } else {
+        let min_i = min.round() as i32;
+        let max_i = max.round() as i32;
+        if min_i == max_i {
+            None
+        } else {
+            Some([min_i, max_i])
+        }
+    }
+}
+
+fn handle_logical_channel(
+    e: &quick_xml::events::BytesStart,
+    current_channel_offsets: &[usize],
+    fixture_attributes: &mut HashSet<String>,
+    current_channels_map: &mut BTreeMap<usize, String>,
+    current_mode_pan_bounds: &mut Option<[i32; 2]>,
+    current_mode_tilt_bounds: &mut Option<[i32; 2]>,
+) -> Option<String> {
+    let mut attribute_name = String::new();
+    let mut phys_from = None;
+    let mut phys_to = None;
+    for attr in e.attributes().flatten() {
+        match attr.key.as_ref() {
+            b"Attribute" => {
+                attribute_name = attr.unescape_value().unwrap_or_default().into_owned();
+            }
+            b"PhysicalFrom" => {
+                phys_from = Some(attr.unescape_value().unwrap_or_default().into_owned());
+            }
+            b"PhysicalTo" => {
+                phys_to = Some(attr.unescape_value().unwrap_or_default().into_owned());
+            }
+            _ => {}
+        }
+    }
+
+    if !attribute_name.is_empty() {
+        fixture_attributes.insert(attribute_name.clone());
+
+        for (idx, &offset) in current_channel_offsets.iter().enumerate() {
+            let is_fine = idx > 0 || attribute_name.ends_with("Fine");
+            let channel_name = map_gdtf_attribute_to_name(&attribute_name, is_fine);
+            current_channels_map.insert(offset, channel_name);
+        }
+
+        if let (Some(f), Some(t)) = (phys_from, phys_to) {
+            if attribute_name == "Pan" && current_mode_pan_bounds.is_none() {
+                *current_mode_pan_bounds = parse_physical_bounds(&f, &t);
+            } else if attribute_name == "Tilt" && current_mode_tilt_bounds.is_none() {
+                *current_mode_tilt_bounds = parse_physical_bounds(&f, &t);
+            }
+        }
+
+        Some(attribute_name)
+    } else {
+        None
+    }
+}
+
+fn handle_channel_function(
+    e: &quick_xml::events::BytesStart,
+    current_logical_attribute: Option<&str>,
+    current_mode_pan_bounds: &mut Option<[i32; 2]>,
+    current_mode_tilt_bounds: &mut Option<[i32; 2]>,
+) {
+    let mut func_attr = current_logical_attribute.map(str::to_string);
+    let mut phys_from = None;
+    let mut phys_to = None;
+    for attr in e.attributes().flatten() {
+        match attr.key.as_ref() {
+            b"Attribute" => {
+                let val = attr.unescape_value().unwrap_or_default().into_owned();
+                if !val.is_empty() {
+                    func_attr = Some(val);
+                }
+            }
+            b"PhysicalFrom" => {
+                phys_from = Some(attr.unescape_value().unwrap_or_default().into_owned());
+            }
+            b"PhysicalTo" => {
+                phys_to = Some(attr.unescape_value().unwrap_or_default().into_owned());
+            }
+            _ => {}
+        }
+    }
+
+    if let (Some(f), Some(t)) = (phys_from, phys_to) {
+        if let Some(ref attr) = func_attr {
+            if attr == "Pan" && current_mode_pan_bounds.is_none() {
+                *current_mode_pan_bounds = parse_physical_bounds(&f, &t);
+            } else if attr == "Tilt" && current_mode_tilt_bounds.is_none() {
+                *current_mode_tilt_bounds = parse_physical_bounds(&f, &t);
+            }
+        }
     }
 }
 
@@ -93,6 +209,9 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
     let mut current_mode_name: Option<String> = None;
     let mut current_mode_short_name: Option<String> = None;
     let mut current_channels_map: BTreeMap<usize, String> = BTreeMap::new();
+    let mut current_mode_pan_bounds: Option<[i32; 2]> = None;
+    let mut current_mode_tilt_bounds: Option<[i32; 2]> = None;
+    let mut current_logical_attribute: Option<String> = None;
 
     let mut current_channel_offsets: Vec<usize> = Vec::new();
     let mut in_dmx_mode = false;
@@ -119,6 +238,9 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                     current_channels_map.clear();
                     current_mode_name = None;
                     current_mode_short_name = None;
+                    current_mode_pan_bounds = None;
+                    current_mode_tilt_bounds = None;
+                    current_logical_attribute = None;
 
                     for attr in e.attributes().flatten() {
                         let key = attr.key.as_ref();
@@ -136,6 +258,7 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                     if in_dmx_mode {
                         in_dmx_channel = true;
                         current_channel_offsets.clear();
+                        current_logical_attribute = None;
 
                         for attr in e.attributes().flatten() {
                             if attr.key.as_ref() == b"Offset" {
@@ -154,22 +277,22 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                     }
                 }
                 b"LogicalChannel" if in_dmx_channel && !current_channel_offsets.is_empty() => {
-                    let mut attribute_name = String::new();
-                    for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"Attribute" {
-                            attribute_name = attr.unescape_value().unwrap_or_default().into_owned();
-                        }
-                    }
-
-                    fixture_attributes.insert(attribute_name.clone());
-
-                    if !attribute_name.is_empty() {
-                        for (idx, &offset) in current_channel_offsets.iter().enumerate() {
-                            let is_fine = idx > 0 || attribute_name.ends_with("Fine");
-                            let channel_name = map_gdtf_attribute_to_name(&attribute_name, is_fine);
-                            current_channels_map.insert(offset, channel_name);
-                        }
-                    }
+                    current_logical_attribute = handle_logical_channel(
+                        e,
+                        &current_channel_offsets,
+                        &mut fixture_attributes,
+                        &mut current_channels_map,
+                        &mut current_mode_pan_bounds,
+                        &mut current_mode_tilt_bounds,
+                    );
+                }
+                b"ChannelFunction" if in_dmx_channel && !current_channel_offsets.is_empty() => {
+                    handle_channel_function(
+                        e,
+                        current_logical_attribute.as_deref(),
+                        &mut current_mode_pan_bounds,
+                        &mut current_mode_tilt_bounds,
+                    );
                 }
                 _ => {}
             },
@@ -186,29 +309,33 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                     );
                 }
                 b"LogicalChannel" if in_dmx_channel && !current_channel_offsets.is_empty() => {
-                    let mut attribute_name = String::new();
-                    for attr in e.attributes().flatten() {
-                        if attr.key.as_ref() == b"Attribute" {
-                            attribute_name = attr.unescape_value().unwrap_or_default().into_owned();
-                        }
-                    }
-
-                    fixture_attributes.insert(attribute_name.clone());
-
-                    if !attribute_name.is_empty() {
-                        for (idx, &offset) in current_channel_offsets.iter().enumerate() {
-                            let is_fine = idx > 0 || attribute_name.ends_with("Fine");
-                            let channel_name = map_gdtf_attribute_to_name(&attribute_name, is_fine);
-                            current_channels_map.insert(offset, channel_name);
-                        }
-                    }
+                    current_logical_attribute = handle_logical_channel(
+                        e,
+                        &current_channel_offsets,
+                        &mut fixture_attributes,
+                        &mut current_channels_map,
+                        &mut current_mode_pan_bounds,
+                        &mut current_mode_tilt_bounds,
+                    );
+                }
+                b"ChannelFunction" if in_dmx_channel && !current_channel_offsets.is_empty() => {
+                    handle_channel_function(
+                        e,
+                        current_logical_attribute.as_deref(),
+                        &mut current_mode_pan_bounds,
+                        &mut current_mode_tilt_bounds,
+                    );
                 }
                 _ => {}
             },
             Ok(Event::End(ref e)) => match e.name().as_ref() {
+                b"LogicalChannel" => {
+                    current_logical_attribute = None;
+                }
                 b"DMXChannel" => {
                     in_dmx_channel = false;
                     current_channel_offsets.clear();
+                    current_logical_attribute = None;
                 }
                 b"DMXMode" => {
                     in_dmx_mode = false;
@@ -228,6 +355,8 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
                             short_name: current_mode_short_name.take(),
                             channel_count: max_offset,
                             channels,
+                            pan_bounds: current_mode_pan_bounds.take(),
+                            tilt_bounds: current_mode_tilt_bounds.take(),
                         });
                     }
                 }

@@ -42,6 +42,8 @@ export function catalogItemsToManufacturers(items: GdtfCatalogItem[]): Manufactu
           ? m.channels
           : Array.from({ length: m.dmxfootprint }, (_, i) => `Channel ${i + 1}`),
       dmxfootprint: m.dmxfootprint,
+      ...(m.panBounds ? { panBounds: m.panBounds } : {}),
+      ...(m.tiltBounds ? { tiltBounds: m.tiltBounds } : {}),
     }));
 
     result[manKey].fixtures[fixKey] = {
@@ -237,6 +239,8 @@ export const useFixtureBrowser = defineStore("fixture-browser", {
         if (targetMode) {
           targetMode.channels = result.channels;
           targetMode.dmxfootprint = result.channelCount;
+          if (result.panBounds) targetMode.panBounds = result.panBounds;
+          if (result.tiltBounds) targetMode.tiltBounds = result.tiltBounds;
         }
         if (this.manufacturers) {
           this.manufacturers = { ...this.manufacturers };

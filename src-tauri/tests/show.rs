@@ -1,4 +1,5 @@
 mod show {
+    mod configure;
     mod history;
     mod identity;
     mod mvr;

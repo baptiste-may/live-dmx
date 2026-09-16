@@ -1,5 +1,6 @@
 use live_dmx_lib::output::{
-    classify_channel, extract_fixture_channel_count, get_fixture_channel_name, ChannelType,
+    classify_channel, extract_fixture_channel_count, get_fixture_channel_capabilities,
+    get_fixture_channel_name, ChannelType,
 };
 use live_dmx_lib::show::PatchedFixture;
 
@@ -17,12 +18,52 @@ fn test_classify_channel() {
     assert_eq!(classify_channel("Yellow"), ChannelType::Yellow);
     assert_eq!(classify_channel("UV"), ChannelType::UV);
     assert_eq!(classify_channel("Strobe"), ChannelType::Strobe);
+    assert_eq!(classify_channel("Color Wheel"), ChannelType::ColorWheel);
+    assert_eq!(classify_channel("Color Macro"), ChannelType::ColorMacro);
+    assert_eq!(classify_channel("Color Preset"), ChannelType::ColorMacro);
+    assert_eq!(classify_channel("Colors"), ChannelType::ColorMacro);
+    assert_eq!(classify_channel("Color Slot"), ChannelType::ColorMacro);
+    assert_eq!(classify_channel("CTO"), ChannelType::ColorTemperature);
+    assert_eq!(classify_channel("CCT"), ChannelType::ColorTemperature);
+    assert_eq!(
+        classify_channel("Color Temperature"),
+        ChannelType::ColorTemperature
+    );
     assert_eq!(classify_channel("Dimmer fine"), ChannelType::Other);
     assert_eq!(classify_channel("Red Fine"), ChannelType::Other);
     assert_eq!(classify_channel("Green LSB"), ChannelType::Other);
     assert_eq!(classify_channel("Pan (16 bit)"), ChannelType::Other);
     assert_eq!(classify_channel("Pan"), ChannelType::Other);
     assert_eq!(classify_channel("Tilt"), ChannelType::Other);
+}
+
+#[test]
+fn test_fixture_channel_capabilities() {
+    let fixture = PatchedFixture {
+        id: 1,
+        groups: vec![0],
+        name: "Multi Capabilities".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "Dimmer",
+                {"name": "Color Wheel", "capabilities": [{"dmxRange": [1, 5], "name": "Red"}]},
+                {"channel": "Green"}
+            ]
+        }),
+        universe: 1,
+        address: 1,
+    };
+
+    let caps = get_fixture_channel_capabilities(&fixture, 1);
+    assert_eq!(caps.len(), 1);
+    assert_eq!(caps[0]["name"], "Red");
+    assert_eq!(caps[0]["dmxRange"][0], 1);
+
+    // Plain string channels and unknown indices yield no capabilities
+    assert!(get_fixture_channel_capabilities(&fixture, 0).is_empty());
+    assert!(get_fixture_channel_capabilities(&fixture, 2).is_empty());
+    assert!(get_fixture_channel_capabilities(&fixture, 9).is_empty());
 }
 
 #[test]

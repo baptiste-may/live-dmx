@@ -7,6 +7,10 @@ pub struct GdtfCatalogMode {
     pub dmxfootprint: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channels: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pan_bounds: Option<[i32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tilt_bounds: Option<[i32; 2]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

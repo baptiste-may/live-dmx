@@ -2,6 +2,8 @@ export interface GdtfCatalogMode {
   name: string;
   dmxfootprint: number;
   channels?: string[];
+  panBounds?: [number, number];
+  tiltBounds?: [number, number];
 }
 
 export interface GdtfCatalogItem {
@@ -24,6 +26,8 @@ export interface ParsedGdtfMode {
   shortName?: string;
   channelCount: number;
   channels: string[];
+  panBounds?: [number, number];
+  tiltBounds?: [number, number];
 }
 
 export interface EmbeddedGdtfMode {
@@ -31,6 +35,8 @@ export interface EmbeddedGdtfMode {
   shortName?: string;
   channelCount: number;
   channels: string[];
+  panBounds?: [number, number];
+  tiltBounds?: [number, number];
 }
 
 export interface EmbeddedGdtfDefinition {
@@ -71,6 +77,8 @@ export interface FixtureMode {
   channels: DmxChannelRef[];
   dmxfootprint?: number;
   physical?: FixturePhysical;
+  panBounds?: [number, number];
+  tiltBounds?: [number, number];
 }
 
 export interface FixtureType {

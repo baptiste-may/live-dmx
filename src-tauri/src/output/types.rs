@@ -38,6 +38,9 @@ pub enum ChannelType {
     Yellow,
     UV,
     Strobe,
+    ColorWheel,
+    ColorMacro,
+    ColorTemperature,
     Other,
 }
 

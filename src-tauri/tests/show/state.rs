@@ -108,6 +108,7 @@ fn test_show_data_snapshot_and_restore() {
                     name: "Front".to_string(),
                 },
             ],
+            settings: std::collections::HashMap::new(),
         },
         output: ShowOutputState::default(),
         fixture_definitions: std::collections::HashMap::new(),

@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 
 import type { UniverseOutputConfig } from "@/types/output.ts";
+import type { GroupSettings } from "@/views/configure/types.ts";
 
 import { useLiveButtons } from "../live/live-buttons.ts";
 import { useOutputUniverses } from "../output/output-universes.ts";
@@ -18,7 +19,11 @@ export type ShowData = {
   identity: ReturnType<typeof useShowIdentity>["$state"];
   file: ReturnType<typeof useShowChanges>["$state"];
   patch: ReturnType<typeof useShowPatch>["$state"];
-  groups: ReturnType<typeof useShowGroups>["$state"];
+  groups: {
+    groups: FixtureGroup[];
+    /** Per-group settings. Missing in legacy payloads; loaded state normalizes to `{}`. */
+    settings?: Record<number, GroupSettings>;
+  };
   output?: {
     universes: UniverseOutputConfig[];
   };
@@ -113,6 +118,7 @@ export const useShow = defineStore("show", {
                 const showGroups = useShowGroups();
                 const groupsPayload = event.payload.groups as {
                   groups?: FixtureGroup[];
+                  settings?: Record<number, GroupSettings>;
                 };
                 if (groupsPayload.groups) {
                   if (JSON.stringify(showGroups.groups) !== JSON.stringify(groupsPayload.groups)) {
@@ -123,6 +129,9 @@ export const useShow = defineStore("show", {
                   if (!showGroups.groups.some((g) => g.id === patchGroups.selectedGroup)) {
                     patchGroups.selectedGroup = 0;
                   }
+                }
+                if (groupsPayload.settings) {
+                  showGroups.settings = groupsPayload.settings;
                 }
               }
               if (event.payload.output) {
@@ -168,6 +177,7 @@ export const useShow = defineStore("show", {
       }
       if (data.groups?.groups) {
         this.groups.groups = data.groups.groups;
+        this.groups.settings = data.groups.settings ?? {};
       }
       if (data.output?.universes) {
         useOutputUniverses().universes = data.output.universes;

@@ -190,6 +190,8 @@ export const usePatchForm = defineStore("patch-form", {
           if (parsed && parsed.channels.length > 0) {
             resolvedChannels = parsed.channels;
             this.selectedMode.channels = parsed.channels;
+            if (parsed.panBounds) this.selectedMode.panBounds = parsed.panBounds;
+            if (parsed.tiltBounds) this.selectedMode.tiltBounds = parsed.tiltBounds;
           }
         } catch (err: unknown) {
           const errMsg = String(err);
@@ -242,6 +244,10 @@ export const usePatchForm = defineStore("patch-form", {
                 shortName: this.selectedMode.shortName,
                 channelCount,
                 channels: resolvedChannels,
+                ...(this.selectedMode.panBounds ? { panBounds: this.selectedMode.panBounds } : {}),
+                ...(this.selectedMode.tiltBounds
+                  ? { tiltBounds: this.selectedMode.tiltBounds }
+                  : {}),
               },
             ],
           },
@@ -267,6 +273,8 @@ export const usePatchForm = defineStore("patch-form", {
         name: this.selectedMode.name,
         ...(this.selectedMode.shortName ? { shortName: this.selectedMode.shortName } : {}),
         channels: resolvedChannels,
+        ...(this.selectedMode.panBounds ? { panBounds: this.selectedMode.panBounds } : {}),
+        ...(this.selectedMode.tiltBounds ? { tiltBounds: this.selectedMode.tiltBounds } : {}),
       };
 
       try {

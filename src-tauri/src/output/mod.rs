@@ -1,4 +1,5 @@
 pub mod channels;
+pub mod color_routing;
 pub mod colors;
 pub mod commands;
 pub mod effects;
@@ -9,6 +10,7 @@ pub mod runner;
 pub mod types;
 
 pub use channels::*;
+pub use color_routing::*;
 pub use colors::*;
 pub use commands::*;
 pub use effects::*;

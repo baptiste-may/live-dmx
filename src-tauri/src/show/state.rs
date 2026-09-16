@@ -40,12 +40,11 @@ impl AppState {
         let mut show = self.show.lock().map_err(|e| e.to_string())?;
         let mut history = self.history.lock().map_err(|e| e.to_string())?;
 
-        let previous_show = show.clone();
         let prev_snapshot = show.snapshot();
         let result = match f(&mut show) {
             Ok(res) => res,
             Err(err) => {
-                *show = previous_show;
+                show.restore_snapshot(prev_snapshot);
                 return Err(err);
             }
         };
@@ -54,7 +53,7 @@ impl AppState {
         let changed = prev_snapshot != current_snapshot;
         if changed {
             if prev_snapshot.patch != current_snapshot.patch
-                || prev_snapshot.groups != current_snapshot.groups
+                || prev_snapshot.groups.groups != current_snapshot.groups.groups
             {
                 match self.output.engine.lock() {
                     Ok(mut live) => live.reset_all(),

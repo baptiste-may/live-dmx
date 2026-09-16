@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 
 import { groupHasColorCapability } from "@/libs/fixture.ts";
 import { useShowPatch } from "@/stores/show/show-patch.ts";
+import type { GroupSettings } from "@/views/configure/types.ts";
 
 export type FixtureGroup = {
   id: number;
@@ -11,6 +12,8 @@ export type FixtureGroup = {
 
 export type ShowGroupsState = {
   groups: FixtureGroup[];
+  /** Per-group settings keyed by group id. Only entries the user has edited are stored. */
+  settings: Record<number, GroupSettings>;
 };
 
 export const defaultShowGroupsState: ShowGroupsState = {
@@ -20,11 +23,13 @@ export const defaultShowGroupsState: ShowGroupsState = {
       name: "All",
     },
   ],
+  settings: {},
 };
 
 export const useShowGroups = defineStore("showGroups", {
   state: (): ShowGroupsState => ({
     groups: [...defaultShowGroupsState.groups],
+    settings: {},
   }),
   getters: {
     colorGroups: (state): FixtureGroup[] => {
@@ -51,6 +56,10 @@ export const useShowGroups = defineStore("showGroups", {
     async rename(id: number, newName: string): Promise<void> {
       if (id === 0) return;
       await invoke("show_group_rename", { id, newName });
+    },
+    async updateSettings(groupId: number, settings: GroupSettings): Promise<void> {
+      await invoke("show_group_update_settings", { groupId, settings });
+      this.settings[groupId] = settings;
     },
     get(id: number): FixtureGroup | undefined {
       return this.groups.find((g) => g.id === id);

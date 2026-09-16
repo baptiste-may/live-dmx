@@ -155,6 +155,8 @@ impl GdtfShareClient {
                             name,
                             dmxfootprint,
                             channels: None,
+                            pan_bounds: None,
+                            tilt_bounds: None,
                         });
                     }
                 }

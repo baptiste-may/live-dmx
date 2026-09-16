@@ -37,6 +37,48 @@ fn test_live_engine_white_flash_calculation() {
 }
 
 #[test]
+fn test_live_engine_strobe_keeps_amber_uv_channels() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "RGBWA+UV Par".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": ["Dimmer", "Red", "Green", "Blue", "White", "Amber", "UV"]
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.strobe_rate = 50;
+    // Amber color (hex) → r=255, g=170, b=0, which matches the Amber heuristic.
+    engine.set_group_color(1, Some("#ffaa00".to_string()), Some(&show));
+    engine.set_flash(1, "strobe".to_string(), true);
+
+    let mut amber = Vec::new();
+    for _ in 0..15 {
+        engine.compute_dmx(&show);
+        let buf = engine.universe_buffers.get(&1).unwrap();
+        // Amber must track the strobe phase exactly like the Dimmer channel.
+        assert_eq!(buf[5], buf[0]);
+        assert_eq!(buf[6], 0); // UV stays 0 for an amber color
+        amber.push(buf[5]);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+
+    // ~75ms window at freq 10.5 covers both strobe phases.
+    assert!(amber.contains(&255), "amber strobe phase never reached 255");
+    assert!(amber.contains(&0), "amber strobe phase never reached 0");
+
+    // Strobe must be released cleanly.
+    engine.set_flash(1, "strobe".to_string(), false);
+    assert!(!engine.is_flash_active(1, "strobe"));
+}
+
+#[test]
 fn test_live_engine_simple_flash_calculation() {
     let mut engine = LiveEngine::new();
     let mut show = ShowData::default();

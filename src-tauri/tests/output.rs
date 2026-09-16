@@ -1,6 +1,7 @@
 mod output {
     mod artnet;
     mod channels;
+    mod color_routing;
     mod colors;
     mod effects;
     mod engine;

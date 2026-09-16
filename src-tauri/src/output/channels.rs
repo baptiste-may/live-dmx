@@ -51,9 +51,52 @@ pub fn classify_channel(name: &str) -> ChannelType {
         ChannelType::UV
     } else if lower.contains("strobe") || lower.contains("shutter") {
         ChannelType::Strobe
+    } else if lower.contains("wheel") {
+        ChannelType::ColorWheel
+    } else if lower.contains("macro")
+        || lower.contains("preset")
+        || lower.contains("colors")
+        || lower.contains("color slot")
+    {
+        ChannelType::ColorMacro
+    } else if lower.contains("cct")
+        || lower.contains("cto")
+        || lower.contains("ctb")
+        || lower.contains("ctc")
+        || lower.contains("color temperature")
+    {
+        ChannelType::ColorTemperature
     } else {
         ChannelType::Other
     }
+}
+
+/// Returns the capabilities array of a channel when it is stored as a
+/// `NamedChannel` object ({ name, channel?, capability?, capabilities? }).
+/// Capability data is currently only preserved when patched via the full GDTF
+/// pipeline; the rest of the time this returns an empty slice.
+pub fn get_fixture_channel_capabilities(
+    fixture: &PatchedFixture,
+    ch_index: usize,
+) -> Vec<serde_json::Value> {
+    let Some(channels) = fixture.mode.get("channels").and_then(|c| c.as_array()) else {
+        return Vec::new();
+    };
+    let Some(channel_val) = channels.get(ch_index) else {
+        return Vec::new();
+    };
+    let Some(obj) = channel_val.as_object() else {
+        return Vec::new();
+    };
+    if let Some(caps) = obj.get("capabilities") {
+        if let Some(arr) = caps.as_array() {
+            return arr.clone();
+        }
+    }
+    if let Some(cap) = obj.get("capability") {
+        return vec![cap.clone()];
+    }
+    Vec::new()
 }
 
 pub fn extract_fixture_channel_count(fixture: &PatchedFixture) -> usize {

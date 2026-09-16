@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod configure;
 pub mod history;
 pub mod identity;
 pub mod mvr;
@@ -9,6 +10,7 @@ pub mod state;
 pub mod types;
 
 pub use commands::*;
+pub use configure::*;
 pub use history::*;
 pub use identity::*;
 pub use mvr::*;

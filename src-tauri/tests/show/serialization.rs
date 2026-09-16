@@ -1,7 +1,9 @@
 use live_dmx_lib::show::{
-    clean_fixture_type, clean_mode, clean_patched_fixture, FixtureGroup, PatchGroupsState,
-    PatchedFixture, ShowFileContent, ShowIdentityState, ShowOutputState, ShowPatchState,
+    clean_fixture_type, clean_mode, clean_patched_fixture, ColorPreference, FixtureGroup,
+    GroupSettings, PatchGroupsState, PatchedFixture, ShowFileContent, ShowIdentityState,
+    ShowOutputState, ShowPatchState,
 };
+use std::collections::HashMap;
 
 #[test]
 fn test_show_file_serialization_round_trip() {
@@ -35,6 +37,7 @@ fn test_show_file_serialization_round_trip() {
                     name: "Front Truss".to_string(),
                 },
             ],
+            settings: std::collections::HashMap::new(),
         },
         output: ShowOutputState::default(),
         fixture_definitions: std::collections::HashMap::new(),
@@ -203,6 +206,74 @@ fn test_clean_patched_fixture_cleans_entire_fixture() {
 }
 
 #[test]
+fn test_show_file_group_settings_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    let file_path = dir.path().join("settings_show.ldmx");
+
+    let content = ShowFileContent {
+        version: 1,
+        identity: ShowIdentityState {
+            display_name: "Settings Show".to_string(),
+        },
+        patch: ShowPatchState::default(),
+        groups: PatchGroupsState {
+            groups: vec![
+                FixtureGroup {
+                    id: 0,
+                    name: "All".to_string(),
+                },
+                FixtureGroup {
+                    id: 1,
+                    name: "Front Wash".to_string(),
+                },
+            ],
+            settings: HashMap::from([(
+                1,
+                GroupSettings {
+                    color_preference: ColorPreference::ColorWheel,
+                    pan_min: -90,
+                    pan_max: 90,
+                    tilt_min: -45,
+                    tilt_max: 45,
+                    inverse_pan: true,
+                    inverse_tilt: false,
+                },
+            )]),
+        },
+        output: ShowOutputState::default(),
+        fixture_definitions: HashMap::new(),
+    };
+
+    let json_str = serde_json::to_string_pretty(&content).unwrap();
+    std::fs::write(&file_path, &json_str).unwrap();
+
+    let read_str = std::fs::read_to_string(&file_path).unwrap();
+    let loaded: ShowFileContent = serde_json::from_str(&read_str).unwrap();
+    let stored = loaded.groups.settings.get(&1).unwrap();
+    assert_eq!(stored.color_preference, ColorPreference::ColorWheel);
+    assert_eq!(stored.pan_min, -90);
+    assert_eq!(stored.pan_max, 90);
+    assert_eq!(stored.tilt_min, -45);
+    assert_eq!(stored.tilt_max, 45);
+    assert!(stored.inverse_pan);
+    assert!(!stored.inverse_tilt);
+}
+
+#[test]
+fn test_show_file_without_group_settings_loads_default_cleanly() {
+    let json_without_settings = r#"{
+        "version": 1,
+        "identity": { "displayName": "Legacy Show" },
+        "patch": { "fixtures": [] },
+        "groups": { "groups": [{ "id": 0, "name": "All" }] }
+    }"#;
+
+    let loaded: ShowFileContent = serde_json::from_str(json_without_settings).unwrap();
+    assert!(loaded.groups.settings.is_empty());
+    assert_eq!(loaded.groups.groups.len(), 1);
+}
+
+#[test]
 fn test_show_file_with_embedded_gdtf_definitions() {
     use live_dmx_lib::show::types::{EmbeddedGdtfDefinition, EmbeddedGdtfMode};
     use std::collections::HashMap;
@@ -225,6 +296,8 @@ fn test_show_file_with_embedded_gdtf_definitions() {
                 short_name: Some("Std".to_string()),
                 channel_count: 24,
                 channels: vec!["Pan".to_string(), "Tilt".to_string(), "Dimmer".to_string()],
+                pan_bounds: Some([-270, 270]),
+                tilt_bounds: Some([-135, 135]),
             }],
         },
     );
@@ -250,4 +323,38 @@ fn test_show_file_with_embedded_gdtf_definitions() {
     assert_eq!(def.manufacturer, "Robe Lighting");
     assert_eq!(def.rid, Some(1234));
     assert_eq!(def.modes[0].channels.len(), 3);
+    assert_eq!(def.modes[0].pan_bounds, Some([-270, 270]));
+    assert_eq!(def.modes[0].tilt_bounds, Some([-135, 135]));
+}
+
+#[test]
+fn test_clean_mode_preserves_pan_and_tilt_bounds() {
+    let mode_json = serde_json::json!({
+        "name": "Standard (16ch)",
+        "shortName": "16ch",
+        "channels": ["Pan", "Tilt", "Dimmer"],
+        "panBounds": [-270, 270],
+        "tiltBounds": [-135, 135],
+        "extraUnneededField": 12345
+    });
+
+    let cleaned = clean_mode(&mode_json);
+    assert_eq!(cleaned["name"], "Standard (16ch)");
+    assert_eq!(cleaned["panBounds"], serde_json::json!([-270, 270]));
+    assert_eq!(cleaned["tiltBounds"], serde_json::json!([-135, 135]));
+    assert!(cleaned.get("extraUnneededField").is_none());
+}
+
+#[test]
+fn test_clean_mode_discards_invalid_pan_and_tilt_bounds() {
+    let mode_with_invalid_bounds = serde_json::json!({
+        "name": "Standard (16ch)",
+        "channels": ["Pan", "Tilt"],
+        "panBounds": [-270],
+        "tiltBounds": ["invalid", 135]
+    });
+
+    let cleaned = clean_mode(&mode_with_invalid_bounds);
+    assert!(cleaned.get("panBounds").is_none());
+    assert!(cleaned.get("tiltBounds").is_none());
 }

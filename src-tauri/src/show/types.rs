@@ -70,6 +70,10 @@ pub struct EmbeddedGdtfMode {
     pub short_name: Option<String>,
     pub channel_count: usize,
     pub channels: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pan_bounds: Option<[i32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tilt_bounds: Option<[i32; 2]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -118,6 +122,69 @@ fn default_file_version() -> u32 {
     1
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ColorPreference {
+    #[default]
+    #[serde(rename = "Color Mix")]
+    ColorMix,
+    #[serde(rename = "Color Wheel")]
+    ColorWheel,
+    #[serde(rename = "CCT")]
+    Cct,
+    #[serde(rename = "Color presets")]
+    ColorPresets,
+}
+
+fn default_pan_min() -> i32 {
+    -180
+}
+
+fn default_pan_max() -> i32 {
+    180
+}
+
+fn default_tilt_min() -> i32 {
+    -110
+}
+
+fn default_tilt_max() -> i32 {
+    110
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupSettings {
+    #[serde(default)]
+    pub color_preference: ColorPreference,
+    #[serde(default = "default_pan_min")]
+    pub pan_min: i32,
+    #[serde(default = "default_pan_max")]
+    pub pan_max: i32,
+    #[serde(default = "default_tilt_min")]
+    pub tilt_min: i32,
+    #[serde(default = "default_tilt_max")]
+    pub tilt_max: i32,
+    #[serde(default)]
+    pub inverse_pan: bool,
+    #[serde(default)]
+    pub inverse_tilt: bool,
+}
+
+impl Default for GroupSettings {
+    fn default() -> Self {
+        Self {
+            color_preference: ColorPreference::default(),
+            pan_min: default_pan_min(),
+            pan_max: default_pan_max(),
+            tilt_min: default_tilt_min(),
+            tilt_max: default_tilt_max(),
+            inverse_pan: false,
+            inverse_tilt: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FixtureGroup {
@@ -157,6 +224,8 @@ pub struct ShowPatchState {
 #[serde(rename_all = "camelCase")]
 pub struct PatchGroupsState {
     pub groups: Vec<FixtureGroup>,
+    #[serde(default)]
+    pub settings: HashMap<u32, GroupSettings>,
 }
 
 impl Default for PatchGroupsState {
@@ -166,6 +235,7 @@ impl Default for PatchGroupsState {
                 id: 0,
                 name: "All".to_string(),
             }],
+            settings: HashMap::new(),
         }
     }
 }
@@ -248,6 +318,15 @@ pub fn clean_fixture_type(val: &serde_json::Value) -> serde_json::Value {
     serde_json::Value::Object(map)
 }
 
+fn clean_bounds(val: Option<&serde_json::Value>) -> Option<serde_json::Value> {
+    let arr = val?.as_array()?;
+    if arr.len() == 2 && arr[0].is_number() && arr[1].is_number() {
+        Some(serde_json::Value::Array(arr.clone()))
+    } else {
+        None
+    }
+}
+
 pub fn clean_mode(val: &serde_json::Value) -> serde_json::Value {
     if !val.is_object() {
         return val.clone();
@@ -288,6 +367,12 @@ pub fn clean_mode(val: &serde_json::Value) -> serde_json::Value {
             "channels".to_string(),
             serde_json::Value::Array(clean_channels),
         );
+    }
+    if let Some(pan_bounds) = clean_bounds(val.get("panBounds")) {
+        map.insert("panBounds".to_string(), pan_bounds);
+    }
+    if let Some(tilt_bounds) = clean_bounds(val.get("tiltBounds")) {
+        map.insert("tiltBounds".to_string(), tilt_bounds);
     }
     serde_json::Value::Object(map)
 }
