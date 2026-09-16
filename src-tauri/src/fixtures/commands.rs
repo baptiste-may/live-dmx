@@ -19,18 +19,24 @@ fn get_app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("Failed to get app data dir: {:?}", e))
 }
 
+fn get_app_local_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_local_data_dir()
+        .map_err(|e| format!("Failed to get app local data dir: {:?}", e))
+}
+
 fn ensure_logged_in(app: &AppHandle, client: &GdtfShareClient) -> bool {
     if client.is_logged_in() {
         return true;
     }
 
-    if let Ok(app_data) = get_app_data_dir(app) {
+    if let (Ok(app_data), Ok(local_dir)) = (get_app_data_dir(app), get_app_local_data_dir(app)) {
         let mut creds_lock = match GDTF_CREDS.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
         if creds_lock.is_none() {
-            if let Ok(Some(loaded)) = load_stored_credentials(&app_data) {
+            if let Ok(Some(loaded)) = load_stored_credentials(&app_data, &local_dir) {
                 *creds_lock = Some(loaded);
             }
         }
@@ -102,7 +108,8 @@ pub async fn gdtf_set_credentials(
         client.login(&user, &pass)?;
 
         let app_data = get_app_data_dir(&app)?;
-        save_stored_credentials(&app_data, &user, &pass)?;
+        let local_dir = get_app_local_data_dir(&app)?;
+        save_stored_credentials(&app_data, &local_dir, &user, &pass)?;
 
         let mut creds = match GDTF_CREDS.lock() {
             Ok(guard) => guard,
@@ -124,13 +131,14 @@ pub async fn gdtf_get_credentials_status(app: AppHandle) -> Result<bool, String>
     }
 
     let app_data = get_app_data_dir(&app)?;
+    let local_dir = get_app_local_data_dir(&app)?;
     let creds_opt = {
         let mut creds_lock = match GDTF_CREDS.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
         if creds_lock.is_none() {
-            if let Ok(Some(loaded)) = load_stored_credentials(&app_data) {
+            if let Ok(Some(loaded)) = load_stored_credentials(&app_data, &local_dir) {
                 *creds_lock = Some(loaded);
             }
         }
@@ -152,7 +160,8 @@ pub async fn gdtf_get_credentials_status(app: AppHandle) -> Result<bool, String>
 #[tauri::command]
 pub async fn gdtf_logout(app: AppHandle) -> Result<bool, String> {
     let app_data = get_app_data_dir(&app)?;
-    let _ = delete_stored_credentials(&app_data);
+    let local_dir = get_app_local_data_dir(&app)?;
+    delete_stored_credentials(&app_data, &local_dir)?;
 
     let mut creds = match GDTF_CREDS.lock() {
         Ok(guard) => guard,

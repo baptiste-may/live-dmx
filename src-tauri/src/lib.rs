@@ -155,6 +155,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(AppState::default())
         .manage(PendingOpenStore::default())
         .invoke_handler(tauri::generate_handler![

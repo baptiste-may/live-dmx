@@ -37,9 +37,19 @@ tauri-plugin-log = { version = "2", features = ["colored"] }
 log = "0.4"
 url = "2"
 time = { version = "0.3", features = ["formatting", "macros"] }
+tauri-plugin-window-state = "2"
+tauri-plugin-stronghold = "2"
+iota_stronghold = "2.1.0"
+keyring = "4"
+getrandom = "0.3"
 
 [dev-dependencies]
 tempfile = "3"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+# Dev builds of the scrypt crate (used by stronghold's password hashing) are
+# extremely slow; see https://github.com/tauri-apps/plugins-workspace/issues/2048
+[profile.dev.package.scrypt]
+opt-level = 3

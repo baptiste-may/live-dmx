@@ -182,53 +182,30 @@ fn test_gdtf_auth_storage_roundtrip_and_delete() {
     };
 
     let tmp = tempdir().unwrap();
+    let local_dir = tempdir().unwrap();
     let app_data = tmp.path();
 
     // 1. Initial state: no credentials
-    let initial = load_stored_credentials(app_data).expect("Should load without error");
+    let initial =
+        load_stored_credentials(app_data, local_dir.path()).expect("Should load without error");
     assert_eq!(initial, None);
 
     // 2. Save credentials
-    save_stored_credentials(app_data, "lighting_tech", "super_secret")
+    save_stored_credentials(app_data, local_dir.path(), "lighting_tech", "super_secret")
         .expect("Should save credentials");
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let file_path = live_dmx_lib::fixtures::get_auth_file_path(app_data);
-        let metadata = std::fs::metadata(&file_path).expect("File metadata should exist");
-        assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
-    }
-
     // 3. Load credentials back
-    let loaded = load_stored_credentials(app_data)
+    let loaded = load_stored_credentials(app_data, local_dir.path())
         .expect("Should load credentials")
         .expect("Credentials should exist");
     assert_eq!(loaded.0, "lighting_tech");
     assert_eq!(loaded.1, "super_secret");
 
     // 4. Delete credentials
-    delete_stored_credentials(app_data).expect("Should delete credentials");
-    let after_delete = load_stored_credentials(app_data).expect("Should load after delete");
+    delete_stored_credentials(app_data, local_dir.path()).expect("Should delete credentials");
+    let after_delete =
+        load_stored_credentials(app_data, local_dir.path()).expect("Should load after delete");
     assert_eq!(after_delete, None);
-}
-
-#[test]
-fn test_gdtf_auth_corrupted_file_handling() {
-    use live_dmx_lib::fixtures::{get_auth_file_path, load_stored_credentials};
-
-    let tmp = tempdir().unwrap();
-    let app_data = tmp.path();
-    let file_path = get_auth_file_path(app_data);
-
-    // Write corrupt JSON
-    std::fs::write(&file_path, "{ broken json ...").unwrap();
-    assert!(file_path.exists());
-
-    // Loading should gracefully handle corruption by removing file and returning None
-    let loaded = load_stored_credentials(app_data).expect("Should not fail on corrupt file");
-    assert_eq!(loaded, None);
-    assert!(!file_path.exists());
 }
 
 #[test]
