@@ -5,7 +5,9 @@ import { onMounted } from "vue";
 import ProgressScreen from "@/components/feedback/ProgressScreen.vue";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import Welcome from "@/components/Welcome.vue";
+import { initLogger } from "@/libs/logger";
 import { useGlobalShortcuts } from "@/libs/shortcuts";
+import { useShowOpener } from "@/libs/show-opener";
 import { useSettings } from "@/stores/settings.ts";
 import { useShow } from "@/stores/show/show.ts";
 import { useShowChanges } from "@/stores/show/show-changes.ts";
@@ -15,9 +17,11 @@ const changes = useShowChanges();
 const settings = useSettings();
 
 useGlobalShortcuts();
+useShowOpener();
 
 onMounted(async () => {
   settings.initTheme();
+  await initLogger();
   await show.initEventListener();
 
   try {

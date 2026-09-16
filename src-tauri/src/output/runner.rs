@@ -34,6 +34,7 @@ impl LiveEngineRunner {
         let running = self.running.clone();
 
         thread::spawn(move || {
+            log::info!(target: "live-dmx::engine", "live engine loop started at 44Hz");
             let tick_rate = Duration::from_micros(22727); // 44Hz standard DMX rate
             let mut artnet_sender = crate::output::protocols::ArtNetSender::new();
             let mut sacn_sender = crate::output::protocols::SacnSender::new().ok();
@@ -80,7 +81,7 @@ impl LiveEngineRunner {
                         }
                     }
                     Err(err) => {
-                        eprintln!("live engine loop stopping: show state lock poisoned: {err}");
+                        log::error!(target: "live-dmx::engine", "live engine loop stopping: show state lock poisoned: {err}");
                         running.store(false, Ordering::SeqCst);
                         break;
                     }

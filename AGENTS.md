@@ -114,6 +114,15 @@ The application uses the modern DIN SPEC 15800 standard (General Device Type For
 - Physical USB DMX interfaces (`src-tauri/src/output/interfaces/`) are discovered cross-platform across Linux (`/dev/ttyUSB*`, `/dev/ttyACM*`), macOS (`/dev/cu.*` callout devices), and Windows (`COM*`). Frames are formatted with Enttec DMX USB Pro framing at 57,600 baud and streamed with automatic reconnection on disconnect.
 - The frontend sends live control updates (`live_set_*`) or direct manual channel updates via `set_dmx_channel` / `set_dmx_data` commands.
 
+## Opening Shows from the OS (Deep-Link, File Association, Single-Instance)
+
+- The app registers the `live-dmx://` URL scheme (`plugins.deep-link.desktop.schemes` in `tauri.conf.json`) and the `.ldmx` file association (`bundle.fileAssociations`). This allows opening show files from a double-click, an argument passed to the executable, or a deep link.
+- Three complementary plugins are registered in `src-tauri/src/lib.rs`, always in this order: `tauri-plugin-single-instance` (first, with the `deep-link` feature so a second launch forwards its arguments to the running instance), `tauri-plugin-log`, and `tauri-plugin-deep-link`.
+- Backend entry logic lives in `src-tauri/src/show/open.rs`: `handle_open_request` normalizes candidates (plain paths, `file://` URLs, `live-dmx://open?path=...` deep links), rejects non-`.ldmx` values, logs them under the `live-dmx::open` target, stores the first valid path in `PendingOpenStore`, and emits the `open-show-request` event to the frontend. Path extraction is centralized in the pure function `extract_show_path` (unit-tested).
+- The frontend consumes open requests in `src/libs/show-opener.ts` (`useShowOpener()`): on mount it asks the backend for any pending path via the `get_pending_open_path` command (covers requests that arrived before the webview was ready) and listens for `open-show-request` afterwards. Paths are deduplicated and loaded through `useApp().loadShow(path)`. `App.vue` wires it up.
+- Logging output is configured in `src-tauri/src/lib.rs` (stdout + `LogDir` file `live-dmx` + webview), and the frontend attaches to it via `attachConsole()` in `src/libs/logger.ts` (`initLogger()`). Backend subsystems log under dedicated targets (e.g. `live-dmx::show`, `live-dmx::engine`, `live-dmx::open`, `live-dmx::main`).
+- File associations only take effect once the app is bundled/installed; during development, test with a CLI argument (`tauri dev -- <path>.ldmx`) or a deep link (`live-dmx://open?path=<urlencoded-absolute-path>`). The Tauri `RunEvent::Opened` variant (macOS/other) is additionally handled in the run callback.
+
 ## Quality Assurance & Tooling
 
 The project uses a strict linting and testing suite to ensure code quality.

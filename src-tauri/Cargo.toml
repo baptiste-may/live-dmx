@@ -32,6 +32,13 @@ artnet_protocol = "0.4.4"
 serialport = "4.10.0"
 rosc = "0.10.1"
 quick-xml = "0.37"
+tauri-plugin-deep-link = "2"
+tauri-plugin-log = "2"
+log = "0.4"
+url = "2"
 
 [dev-dependencies]
 tempfile = "3"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

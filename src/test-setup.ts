@@ -30,6 +30,16 @@ vi.mock("@tauri-apps/plugin-global-shortcut", () => ({
   isRegistered: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock("@tauri-apps/plugin-log", () => ({
+  attachConsole: vi.fn().mockResolvedValue(vi.fn()),
+  attachLogger: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  trace: vi.fn(),
+}));
+
 // Global Testing Pinia plugin for Vue Testing Library / Vue Test Utils
 beforeEach(() => {
   config.global.plugins = [createTestingPinia({ stubActions: false })];

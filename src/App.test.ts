@@ -6,6 +6,10 @@ import App from "./App.vue";
 import { ShowStatus, useShow } from "./stores/show/show";
 import { useShowChanges } from "./stores/show/show-changes";
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockResolvedValue(vi.fn()),
+}));
+
 describe("App.vue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -108,5 +112,17 @@ describe("App.vue", () => {
     const handler = vi.mocked(register).mock.calls[0][1];
     handler({ shortcut: "CommandOrControl+Z", state: "Pressed", id: 1 });
     expect(changesStore.undo).not.toHaveBeenCalled();
+  });
+
+  it("should attach the console logger on mount", async () => {
+    const { attachConsole } = await import("@tauri-apps/plugin-log");
+    const showStore = useShow();
+    showStore.state = ShowStatus.NOT_LOADED;
+
+    render(App);
+
+    await vi.waitFor(() => {
+      expect(attachConsole).toHaveBeenCalled();
+    });
   });
 });

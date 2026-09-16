@@ -97,6 +97,7 @@ pub fn show_get_data(state: State<'_, AppState>) -> Result<ShowData, String> {
 
 #[tauri::command]
 pub fn show_create(state: State<'_, AppState>, app: AppHandle) -> Result<ShowData, String> {
+    log::info!(target: "live-dmx::show", "creating new show");
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
     let mut history = state.history.lock().map_err(|e| e.to_string())?;
     *show = ShowData {
@@ -123,6 +124,7 @@ pub fn show_save(
     app: AppHandle,
     path: String,
 ) -> Result<ShowData, String> {
+    log::info!(target: "live-dmx::show", "saving show to {path}");
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
     let mut history = state.history.lock().map_err(|e| e.to_string())?;
 
@@ -169,6 +171,7 @@ pub fn show_load(
     app: AppHandle,
     path: String,
 ) -> Result<ShowData, String> {
+    log::info!(target: "live-dmx::show", "loading show from {path}");
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
     let mut history = state.history.lock().map_err(|e| e.to_string())?;
 
