@@ -197,6 +197,10 @@ Stronghold` — no JS bindings; Rust stays the sole owner of credentials).
    integers).
 4. Configures `ShowOutputState.universes`.
 
+The import drives the load progress bar through an `MvrProgressCallback`
+(`import_mvr_from_bytes_with_progress`); `show_import_mvr` passes its
+`AppHandle` to `import_mvr_file`, which forwards each step to `emit_progress`.
+
 Tests: `src-tauri/tests/show/mvr.rs`.
 
 ## Frontend fixture types

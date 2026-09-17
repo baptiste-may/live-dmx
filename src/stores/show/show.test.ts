@@ -22,6 +22,17 @@ describe("show store", () => {
     expect(show.canRedo).toBe(false);
   });
 
+  it("should report isSaving and stay loaded while the show is saving", () => {
+    const show = useShow();
+
+    show.state = ShowStatus.SAVING;
+    expect(show.isSaving).toBe(true);
+    expect(show.isLoaded).toBe(true);
+
+    show.state = ShowStatus.LOADED;
+    expect(show.isSaving).toBe(false);
+  });
+
   it("should load show data and transition to LOADED status", () => {
     const show = useShow();
 
@@ -108,9 +119,11 @@ describe("show store", () => {
     show.load(defaultShow);
     expect(show.isLoaded).toBe(true);
 
+    show.state = ShowStatus.SAVING;
     show.unload();
     expect(show.state).toBe(ShowStatus.NOT_LOADED);
     expect(show.isLoaded).toBe(false);
+    expect(show.isSaving).toBe(false);
     expect(show.identity.displayName).toBe("My show");
   });
 

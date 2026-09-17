@@ -35,7 +35,8 @@ composables, or frontend tests.
 - **modals:** `ConfirmationModal.vue`, `UnsavedChangesModal.vue`,
   `SettingsModal.vue`, plus `modals/settings/*` (e.g. `SettingsAbout.vue`
   surfaces the updater)
-- **feedback:** `ToastContainer.vue`, `ProgressScreen.vue`, `WipAlert.vue`
+- **feedback:** `ToastContainer.vue`, `ProgressScreen.vue`, `SavingBar.vue`
+  (thin top-of-window bar tracking the backend `Saving` state), `WipAlert.vue`
 - **icons:** `FixtureIcon.vue`, `NumberIcon.vue`
 
 ## Views (src/views/)
@@ -68,7 +69,9 @@ composables, or frontend tests.
   `isShowLoaded`, `handleOpenRequest`.
 - `show/` — domain stores. Each file is small and event-sourced from backend
   snapshot events:
-  - `show.ts` — core `useShow()` store (current show state, snapshots)
+  - `show.ts` — core `useShow()` store (current show state, snapshots, plus
+    load/save `progress`/`statusMessage`; `isSaving`/`isLoaded` derive from
+    `ShowStatus`, with `Saving` treated as active so the layout stays mounted)
   - `show-changes.ts` — dirty/undo/redo/can-undo/can-redo + unsaved-changes modal
   - `show-identity.ts` — show name/display identity
   - `show-patch.ts` — patched fixtures

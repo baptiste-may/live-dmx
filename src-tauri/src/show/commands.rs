@@ -1,6 +1,8 @@
+use std::io::Write;
+
 use tauri::{AppHandle, State};
 
-use crate::show::state::{emit_show_changed, AppState};
+use crate::show::state::{emit_progress, emit_show_changed, AppState};
 use crate::show::types::{
     clean_patched_fixture, EmbeddedGdtfDefinition, PatchGroupsState, PatchedFixture,
     ShowChangesState, ShowData, ShowFileContent, ShowIdentityState, ShowOutputState,
@@ -118,16 +120,7 @@ pub fn show_create(state: State<'_, AppState>, app: AppHandle) -> Result<ShowDat
     Ok(show.clone())
 }
 
-#[tauri::command]
-pub fn show_save(
-    state: State<'_, AppState>,
-    app: AppHandle,
-    path: String,
-) -> Result<ShowData, String> {
-    log::info!(target: "live-dmx::show", "saving show to {path}");
-    let mut show = state.show.lock().map_err(|e| e.to_string())?;
-    let mut history = state.history.lock().map_err(|e| e.to_string())?;
-
+fn write_show_file(show: &ShowData, path: &str) -> Result<(), String> {
     let clean_fixtures: Vec<_> = show
         .patch
         .fixtures
@@ -147,12 +140,50 @@ pub fn show_save(
     };
 
     let json_str = serde_json::to_string_pretty(&content).map_err(|e| e.to_string())?;
-    let tmp_path = format!("{}.tmp.{}", path, std::process::id());
-    std::fs::write(&tmp_path, json_str).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp_path, &path).map_err(|e| {
+
+    let mut suffix = [0u8; 8];
+    getrandom::fill(&mut suffix).map_err(|e| e.to_string())?;
+    let suffix: String = suffix.iter().map(|b| format!("{b:02x}")).collect();
+    let tmp_path = format!("{path}.tmp.{suffix}");
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp_path)
+        .map_err(|e| e.to_string())?;
+    let write_result = file.write_all(json_str.as_bytes());
+    drop(file);
+    if let Err(err) = write_result {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(err.to_string());
+    }
+
+    std::fs::rename(&tmp_path, path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp_path);
         e.to_string()
     })?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn show_save(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    path: String,
+) -> Result<ShowData, String> {
+    log::info!(target: "live-dmx::show", "saving show to {path}");
+    let mut show = state.show.lock().map_err(|e| e.to_string())?;
+    let mut history = state.history.lock().map_err(|e| e.to_string())?;
+
+    show.status = ShowStatus::Saving;
+    emit_show_changed(&app, &show);
+
+    if let Err(err) = write_show_file(&show, &path) {
+        show.status = ShowStatus::Loaded;
+        emit_show_changed(&app, &show);
+        return Err(err);
+    }
 
     show.file.path = Some(path);
     history.mark_saved(show.snapshot());
@@ -175,18 +206,28 @@ pub fn show_load(
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
     let mut history = state.history.lock().map_err(|e| e.to_string())?;
 
+    emit_progress(&app, ShowStatus::Loading, 5, "Reading show file...");
     let json_str = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+
+    emit_progress(&app, ShowStatus::Loading, 25, "Parsing show data...");
     let content: ShowFileContent = serde_json::from_str(&json_str).map_err(|e| e.to_string())?;
 
-    let mut clean_fixtures: Vec<_> = content
-        .patch
-        .fixtures
-        .into_iter()
-        .map(|f| clean_patched_fixture(&f))
-        .collect();
+    emit_progress(&app, ShowStatus::Loading, 40, "Cleaning fixtures...");
+    let fixtures = content.patch.fixtures;
+    let total = fixtures.len().max(1);
+    let mut clean_fixtures = Vec::with_capacity(fixtures.len());
+    for (i, fixture) in fixtures.into_iter().enumerate() {
+        clean_fixtures.push(clean_patched_fixture(&fixture));
+        if i % 20 == 0 || i + 1 == total {
+            let pct = 40 + ((i + 1) * 30 / total) as u8;
+            emit_progress(&app, ShowStatus::Loading, pct, "Cleaning fixtures...");
+        }
+    }
 
+    emit_progress(&app, ShowStatus::Loading, 80, "Enriching fixture data...");
     enrich_fixture_modes_bounds(&mut clean_fixtures, &content.fixture_definitions);
 
+    emit_progress(&app, ShowStatus::Loading, 92, "Applying show data...");
     *show = ShowData {
         status: ShowStatus::Loaded,
         identity: content.identity,
@@ -207,6 +248,7 @@ pub fn show_load(
     history.reset_with_saved(show.snapshot());
     state.reset_live_engine()?;
 
+    emit_progress(&app, ShowStatus::Loaded, 100, "");
     emit_show_changed(&app, &show);
     Ok(show.clone())
 }
@@ -311,4 +353,30 @@ pub fn show_register_fixture_definition(
         show.fixture_definitions.insert(key, definition);
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_show_file_round_trips_and_leaves_no_temp_file() {
+        let show = ShowData::default();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("My Show.ldmx");
+
+        write_show_file(&show, path.to_str().unwrap()).unwrap();
+
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let content: ShowFileContent = serde_json::from_str(&raw).unwrap();
+        assert_eq!(content.version, 1);
+        assert_eq!(content.identity, show.identity);
+
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".tmp."))
+            .collect();
+        assert!(leftovers.is_empty(), "unexpected temp files: {leftovers:?}");
+    }
 }

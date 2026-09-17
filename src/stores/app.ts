@@ -92,15 +92,22 @@ export const useApp = defineStore("app", {
       return changes.confirmWithSaveGuard(async () => {
         const previousState = this.show.state;
         this.show.state = ShowStatus.LOADING;
+        this.show.loadingTitle = "Importing MVR...";
+        this.show.progress = 0;
+        this.show.statusMessage = "";
         try {
           await invoke("show_import_mvr", { path });
           this.show.file.path = undefined;
           this.show.file.isDirty = true;
           this.show.state = ShowStatus.LOADED;
+          this.show.progress = 0;
+          this.show.statusMessage = "";
           await useLiveButtons().resetAll();
           useToastStore().addToast("Show imported from MVR successfully", ToastType.SUCCESS);
         } catch (error: unknown) {
           this.show.state = previousState;
+          this.show.progress = 0;
+          this.show.statusMessage = "";
           useToastStore().addToast(`Failed to import MVR: ${String(error)}`, ToastType.ERROR);
         }
       });
@@ -110,17 +117,24 @@ export const useApp = defineStore("app", {
       return changes.confirmWithSaveGuard(async () => {
         const previousState = this.show.state;
         this.show.state = ShowStatus.LOADING;
+        this.show.loadingTitle = "Loading show...";
+        this.show.progress = 0;
+        this.show.statusMessage = "";
         try {
           await invoke("show_load", { path });
           this.show.file.path = path;
           this.show.file.isDirty = false;
           this.show.state = ShowStatus.LOADED;
+          this.show.progress = 0;
+          this.show.statusMessage = "";
           await useLiveButtons().resetAll();
 
           const recentShows = useRecentShows();
           recentShows.addOrUpdate(this.show.identity.displayName, path);
         } catch (error: unknown) {
           this.show.state = previousState;
+          this.show.progress = 0;
+          this.show.statusMessage = "";
           useToastStore().addToast(`Failed to load show: ${String(error)}`, ToastType.ERROR);
         }
       });

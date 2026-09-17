@@ -13,6 +13,9 @@ use crate::show::types::{
     ShowData, ShowIdentityState, ShowOutputState, ShowPatchState, ShowStatus, UniverseOutputConfig,
 };
 
+/// Callback reporting `(percent, message)` while a long MVR import runs.
+pub type MvrProgressCallback<'a> = &'a dyn Fn(u8, &str);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MvrAddress {
     pub break_id: u32,
@@ -624,14 +627,32 @@ pub fn disambiguate_fixture_name(
 
 /// Parses an in-memory MVR ZIP archive and builds a ShowData structure.
 pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, String> {
+    import_mvr_from_bytes_with_progress(data, show_name, None)
+}
+
+/// Same as [`import_mvr_from_bytes`], reporting coarse progress through `on_progress`
+/// as `(percent, message)`.
+pub fn import_mvr_from_bytes_with_progress(
+    data: &[u8],
+    show_name: &str,
+    on_progress: Option<MvrProgressCallback<'_>>,
+) -> Result<ShowData, String> {
+    let report = |pct: u8, msg: &str| {
+        if let Some(cb) = on_progress {
+            cb(pct, msg);
+        }
+    };
+
     let cursor = Cursor::new(data);
     let mut archive = zip::ZipArchive::new(cursor)
         .map_err(|e| format!("Failed to read MVR zip archive: {}", e))?;
+    report(10, "Reading MVR archive...");
 
     let mut scene_xml: Option<String> = None;
     let mut gdtf_files: HashMap<String, ParsedGdtfFixture> = HashMap::new();
 
-    for i in 0..archive.len() {
+    let entry_count = archive.len();
+    for i in 0..entry_count {
         let mut file = archive
             .by_index(i)
             .map_err(|e| format!("Failed to read zip entry #{}: {}", i, e))?;
@@ -674,6 +695,9 @@ pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, S
                     gdtf_files.insert(stem, parsed.clone());
                     gdtf_files.insert(key_mfg_name, parsed.clone());
                     gdtf_files.insert(key_name_only, parsed);
+
+                    let pct = 20 + ((i + 1) * 30 / entry_count.max(1)) as u8;
+                    report(pct.min(50), "Parsing fixtures...");
                 }
             }
         }
@@ -682,6 +706,7 @@ pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, S
     let xml = scene_xml
         .ok_or_else(|| "GeneralSceneDescription.xml not found in MVR archive".to_string())?;
 
+    report(55, "Reading scene layout...");
     let scene = parse_mvr_xml(&xml)?;
 
     let mut show_groups = vec![FixtureGroup {
@@ -771,9 +796,16 @@ pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, S
         }
     }
 
-    for ((mvr_fixture, assigned_group_id), allocated_id) in
-        fixture_layer_pairs.into_iter().zip(allocated_ids)
+    let fixture_total = fixture_layer_pairs.len().max(1);
+    for (index, ((mvr_fixture, assigned_group_id), allocated_id)) in fixture_layer_pairs
+        .into_iter()
+        .zip(allocated_ids)
+        .enumerate()
     {
+        report(
+            55 + (((index + 1) * 35 / fixture_total) as u8).min(35),
+            "Patching fixtures...",
+        );
         let (gdtf_def, mode) = resolve_fixture_gdtf_and_mode(&mvr_fixture, &gdtf_files);
 
         // Register fixture definition into show definitions
@@ -904,6 +936,8 @@ pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, S
         })
         .collect();
 
+    report(95, "Finalizing show...");
+
     Ok(ShowData {
         status: ShowStatus::Loaded,
         identity: ShowIdentityState {
@@ -972,5 +1006,14 @@ pub fn import_mvr_file(path_str: &str, app: Option<&AppHandle>) -> Result<ShowDa
         }
     }
 
-    import_mvr_from_bytes(&bytes, show_name)
+    match app {
+        Some(app_handle) => import_mvr_from_bytes_with_progress(
+            &bytes,
+            show_name,
+            Some(&|pct, msg| {
+                crate::show::state::emit_progress(app_handle, ShowStatus::Loading, pct, msg);
+            }),
+        ),
+        None => import_mvr_from_bytes(&bytes, show_name),
+    }
 }

@@ -3,7 +3,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::output::LiveEngineRunner;
 use crate::show::history::ShowHistory;
-use crate::show::types::ShowData;
+use crate::show::types::{ShowData, ShowStatus};
 
 pub struct AppState {
     pub show: Arc<Mutex<ShowData>>,
@@ -88,4 +88,13 @@ impl AppState {
 
 pub fn emit_show_changed(app: &AppHandle, show: &ShowData) {
     let _ = app.emit("show-state-changed", show);
+}
+
+pub fn emit_progress(app: &AppHandle, status: ShowStatus, progress: u8, message: &str) {
+    let payload = serde_json::json!({
+        "status": status,
+        "progress": progress,
+        "statusMessage": message,
+    });
+    let _ = app.emit("show-state-changed", payload);
 }

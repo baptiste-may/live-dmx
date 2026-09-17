@@ -43,26 +43,32 @@ export enum ShowStatus {
   LOADED = "LOADED",
 }
 
+/** A show is active once loaded, including while a save is in flight. */
+function isActiveStatus(status: ShowStatus): boolean {
+  return status === ShowStatus.LOADED || status === ShowStatus.SAVING;
+}
+
 let unlistenShowChanged: (() => void) | null = null;
 
 export const useShow = defineStore("show", {
   state: () => ({
     state: ShowStatus.NOT_LOADED,
     progress: 0,
+    statusMessage: "",
+    loadingTitle: "",
     identity: useShowIdentity(),
     file: useShowChanges(),
     patch: useShowPatch(),
     groups: useShowGroups(),
   }),
   getters: {
-    hasUnsavedChanges: (state) => state.state === ShowStatus.LOADED && state.file.isDirty,
-    canSave: (state) =>
-      state.state === ShowStatus.LOADED && (state.file.isDirty || !state.file.path),
-    canUndo: (state) => state.state === ShowStatus.LOADED && state.file.canUndo,
-    canRedo: (state) => state.state === ShowStatus.LOADED && state.file.canRedo,
+    hasUnsavedChanges: (state) => isActiveStatus(state.state) && state.file.isDirty,
+    canSave: (state) => isActiveStatus(state.state) && (state.file.isDirty || !state.file.path),
+    canUndo: (state) => isActiveStatus(state.state) && state.file.canUndo,
+    canRedo: (state) => isActiveStatus(state.state) && state.file.canRedo,
     isLoading: (state) => state.state === ShowStatus.LOADING,
     isSaving: (state) => state.state === ShowStatus.SAVING,
-    isLoaded: (state) => state.state === ShowStatus.LOADED,
+    isLoaded: (state) => isActiveStatus(state.state),
   },
   actions: {
     async initEventListener() {
@@ -77,6 +83,12 @@ export const useShow = defineStore("show", {
             if (event.payload) {
               let shouldResetLiveState = false;
 
+              if (typeof event.payload.progress === "number") {
+                this.progress = Math.min(100, Math.max(0, event.payload.progress));
+              }
+              if (typeof event.payload.statusMessage === "string") {
+                this.statusMessage = event.payload.statusMessage;
+              }
               if (event.payload.identity) {
                 const identity = event.payload.identity as ShowData["identity"];
                 if (identity.displayName !== undefined) {
@@ -146,10 +158,16 @@ export const useShow = defineStore("show", {
                 typeof event.payload.status === "string" &&
                 Object.values(ShowStatus).includes(event.payload.status as ShowStatus)
               ) {
-                if (this.state !== event.payload.status) {
+                const nextStatus = event.payload.status as ShowStatus;
+                if (isActiveStatus(this.state) !== isActiveStatus(nextStatus)) {
                   shouldResetLiveState = true;
                 }
-                this.state = event.payload.status as ShowStatus;
+                this.state = nextStatus;
+                if (nextStatus === ShowStatus.LOADED) {
+                  this.progress = 0;
+                  this.statusMessage = "";
+                  this.loadingTitle = "";
+                }
               }
 
               if (shouldResetLiveState) {
@@ -185,6 +203,9 @@ export const useShow = defineStore("show", {
         useOutputUniverses().$reset();
       }
       this.state = ShowStatus.LOADED;
+      this.progress = 0;
+      this.statusMessage = "";
+      this.loadingTitle = "";
       useLiveButtons().$reset();
       invoke("show_create").catch((error: unknown) => {
         useToastStore().addToast(`Failed to create show: ${String(error)}`, ToastType.ERROR);
@@ -199,6 +220,9 @@ export const useShow = defineStore("show", {
       useOutputUniverses().$reset();
       useLiveButtons().$reset();
       this.state = ShowStatus.NOT_LOADED;
+      this.progress = 0;
+      this.statusMessage = "";
+      this.loadingTitle = "";
       invoke("show_unload").catch((error: unknown) => {
         useToastStore().addToast(`Failed to unload show: ${String(error)}`, ToastType.ERROR);
       });

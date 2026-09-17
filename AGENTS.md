@@ -5,8 +5,10 @@ conventions and workflow. Deep domain knowledge lives in `docs/` (see the index
 below) and should be read on demand.
 
 > [!IMPORTANT]
-> This file is a living document. Update it (or the relevant `docs/` file) when
-> you implement a feature, change project structure, or identify a new pattern.
+> This file is a living document. **Documentation must be updated on every
+> change — not just major features.** Whenever you implement a feature, change
+> project structure, or identify a new pattern, update this file (or the
+> relevant `docs/` file) in the same change.
 
 ## Documentation index — read these when relevant
 
@@ -73,7 +75,10 @@ Details per domain (file-level maps, data flows, conventions) are in the docs.
 
 - **Frontend ↔ backend:** components call thin `#[tauri::command]` handlers that
   mutate `AppState` and emit `show-state-changed`; frontend stores apply the
-  snapshot. Capabilities/permissions live in `src-tauri/capabilities/default.json`
+  snapshot. Long-running handlers (`show_load`, MVR import, `show_save`) also
+  emit partial progress snapshots (`emit_progress`) and flip `ShowStatus` to
+  `Saving`/back to `Loaded`, which drives the load/save UI.
+  Capabilities/permissions live in `src-tauri/capabilities/default.json`
   (plugin permissions only — custom commands are always allowed once registered
   in `lib.rs` `generate_handler!`).
 - **Live output:** `LiveEngineRunner` (44 Hz) clones `ShowData`, computes DMX,
@@ -115,5 +120,7 @@ Automation: Husky + lint-staged on commit · CI runs
    until lint/format are clean (or intentional, with a comment). Ensure
    `src`/`src-tauri` don't drift from CI (`release:version -- --check` when you
    touch versions).
-4. **Document:** if you add a subsystem or major feature, update this `AGENTS.md`
-   (or the matching `docs/` file) to help future agents.
+4. **Document — mandatory on every change:** always update this `AGENTS.md` or the
+   matching `docs/` file whenever your change affects behavior, structure,
+   conventions, or workflows (not only subsystems/major features). Do it in the
+   same change as the code.

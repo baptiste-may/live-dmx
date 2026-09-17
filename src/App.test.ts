@@ -22,27 +22,29 @@ describe("App.vue", () => {
     render(App);
 
     expect(screen.getByText("Live DMX")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.queryByText("Loading show...")).not.toBeInTheDocument();
-    expect(screen.queryByText("Saving show...")).not.toBeInTheDocument();
   });
 
   it("should render Loading component when show is loading", () => {
     const showStore = useShow();
     showStore.state = ShowStatus.LOADING;
+    showStore.loadingTitle = "Loading show...";
 
     render(App);
 
     expect(screen.getByText("Loading show...")).toBeInTheDocument();
-    expect(screen.queryByText("Saving show...")).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
   });
 
-  it("should render Saving component when show is saving", () => {
+  it("should overlay a saving bar while keeping the app usable when saving", () => {
     const showStore = useShow();
     showStore.state = ShowStatus.SAVING;
 
     render(App);
 
-    expect(screen.getByText("Saving show...")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(screen.getByText("Show")).toBeInTheDocument();
     expect(screen.queryByText("Loading show...")).not.toBeInTheDocument();
   });
 
@@ -53,7 +55,7 @@ describe("App.vue", () => {
     render(App);
 
     expect(screen.queryByText("Loading show...")).not.toBeInTheDocument();
-    expect(screen.queryByText("Saving show...")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.getByText("Show")).toBeInTheDocument();
   });
 

@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { onMounted } from "vue";
 
 import ProgressScreen from "@/components/feedback/ProgressScreen.vue";
+import SavingBar from "@/components/feedback/SavingBar.vue";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import Welcome from "@/components/Welcome.vue";
 import { initLogger } from "@/libs/logger";
@@ -43,8 +44,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <ProgressScreen v-if="show.isLoading" title="Loading show..." />
-  <ProgressScreen v-else-if="show.isSaving" title="Saving show..." />
-  <AppLayout v-else-if="show.isLoaded" />
-  <Welcome v-else />
+  <ProgressScreen v-if="show.isLoading" :title="show.loadingTitle" />
+  <SavingBar />
+  <AppLayout v-if="show.isLoaded" />
+  <Welcome v-if="!show.isLoading && !show.isLoaded" />
 </template>

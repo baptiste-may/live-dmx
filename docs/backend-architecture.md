@@ -174,8 +174,15 @@ bounds, color options, and clamped defaults. The frontend only renders and saves
 
 - `show_get_data`, `show_create`, `show_load`, `show_save`, `show_unload`,
   `show_undo`/`show_redo`, `show_identity_update`.
-- The `show-state-changed` event carries the full `ShowData` to the frontend;
-  frontend stores diff/apply it (see `docs/frontend-architecture.md`).
+- The `show-state-changed` event carries either the full `ShowData`
+  (`emit_show_changed`) or a partial `{status, progress, statusMessage}`
+  snapshot for long-running work (`emit_progress`); frontend stores diff/apply
+  both (see `docs/frontend-architecture.md`).
+- `show_load` and MVR import report progress via `emit_progress`; `show_save`
+  flips `ShowStatus` to `Saving` before writing and back to `Loaded` afterwards
+  (even on error). `.ldmx` is written through `write_show_file`, which
+  serializes to a randomly-named temp file created exclusively in the
+  destination directory before an atomic rename.
 - `.ldmx` is the application's save format (extension registered via
   `bundle.fileAssociations`, see `docs/show-openers.md`).
 
