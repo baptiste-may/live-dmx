@@ -1,0 +1,30 @@
+name: Build App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-app:
+    name: 🚀 Tauri build (no bundle)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+        with:
+          system-deps: true
+          rust: true
+          install: true
+
+      - name: 🏗️ Build app (no bundle)
+        run: bun run build:app
