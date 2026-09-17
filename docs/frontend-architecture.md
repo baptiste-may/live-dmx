@@ -1,0 +1,144 @@
+# Frontend Architecture (Vue 3 + TypeScript)
+
+Read this when working on any frontend code: components, Pinia stores, views,
+composables, or frontend tests.
+
+## Stack
+
+- Vue 3 Composition API, `<script setup lang="ts">` (mandatory)
+- Vite + TypeScript
+- Tailwind CSS + DaisyUI, via **daisy-ui-kit** components by preference
+- Pinia (state management), VueUse, lucide-vue-next icons
+- Vitest + Vue Testing Library (tests colocated by default)
+
+## Directory map (src/)
+
+| Path                     | Purpose                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `main.ts`                | Entry point (mounts `App.vue`)                                                      |
+| `App.vue`                | Core app component; wires `useShowOpener()`                                         |
+| `Main.vue`               | Primary application layout (sidebar, view routing)                                  |
+| `components/`            | Global components (see below)                                                       |
+| `stores/`                | Pinia stores (see below)                                                            |
+| `views/`                 | Feature views (Patch, Configure, Input, Output, Live)                               |
+| `libs/`                  | Utilities + composables                                                             |
+| `types/`                 | TS type definitions (`fixtures.ts`, `live.ts`, `output.ts`, `patch.ts`, `shows.ts`) |
+| `assets/icons/fixtures/` | SVG fixture icons consumed by `FixtureIcon.vue`                                     |
+| `test-setup.ts`          | Vitest global setup: Tauri API mocks + testing Pinia                                |
+
+## Components (src/components/)
+
+- **entry/screens:** `Welcome.vue`, `RecentShowsList.vue`
+- **layout:** `AppLayout.vue`, `AppSidebar.vue`
+- **inputs:** `Fader.vue`, `FlashButton.vue`, `Knob.vue`, `NumberStepper.vue`,
+  `TextForm.vue`, `ToggleButton.vue`
+- **modals:** `ConfirmationModal.vue`, `UnsavedChangesModal.vue`,
+  `SettingsModal.vue`, plus `modals/settings/*` (e.g. `SettingsAbout.vue`
+  surfaces the updater)
+- **feedback:** `ToastContainer.vue`, `ProgressScreen.vue`, `WipAlert.vue`
+- **icons:** `FixtureIcon.vue`, `NumberIcon.vue`
+
+## Views (src/views/)
+
+- **`Patch.vue`** — fixture inventory + DMX addressing. Children:
+  `patch/form/` (`PatchForm.vue` = browser + adder), `patch/visualizer/`
+  (`PatchVisualizer.vue`, universe grids), `patch/groups/` (`PatchGroups.vue`,
+  group organization with `PatchGroupsEditModal`, list/table subviews).
+  Design focus: speed — quick manufacturer search, batch adding.
+- **`Configure.vue`** — fixture parameters (Dimmer, Pan/Tilt limits, inversions).
+  Children: `configure/selection/` (group tree), `configure/settings/`
+  (`ConfigureSettings.vue` = per-group limits). See **configuration store**
+  below.
+- **`Input.vue`** — input triggers and controller mapping (triggers/controllers).
+- **`Output.vue`** — universe routing + physical interfaces. Children:
+  `output/universes/` (`OutputUniverses.vue`: None/Physical/Virtual target
+  selection), `output/interfaces/` (`OutputInterfaces.vue`: hardware listing and
+  discovery), `output/dmx/` (`OutputDmxMonitor` = live universe monitor,
+  `OutputUniverseCard`).
+- **`live/`** — live control, navigated via the sidebar "Live" section:
+  - `pages/intensity/` — `LiveIntensity.vue` (master faders, flash buttons,
+    effects) plus `effects/`, `LiveIntensityMasters/Flashs`
+  - `pages/colors/` — `LiveColors.vue` (color table, fades, color effects) plus
+    `table/`, `effects/`
+  - `live/components/` — `LiveEffectsRow.vue`
+
+## Pinia stores (src/stores/)
+
+- `app.ts` — app-level navigation/state, `loadShow(path)` (the open-entry funnel),
+  `isShowLoaded`, `handleOpenRequest`.
+- `show/` — domain stores. Each file is small and event-sourced from backend
+  snapshot events:
+  - `show.ts` — core `useShow()` store (current show state, snapshots)
+  - `show-changes.ts` — dirty/undo/redo/can-undo/can-redo + unsaved-changes modal
+  - `show-identity.ts` — show name/display identity
+  - `show-patch.ts` — patched fixtures
+  - `show-groups.ts` — groups
+  - `show-configuration.ts` — **thin view-model** over the backend
+    `show_configure_get_overview` (see below)
+- `live/live-buttons.ts` — live flash/button state
+- `output/output-universes.ts`, `output/output-interfaces.ts`,
+  `output/output-dmx.ts` — universe config, interface discovery, DMX monitor
+- `patch/patch-form.ts`, `patch/patch-visualizer.ts`, `patch/patch-groups.ts` —
+  Patch view state
+- `fixture-browser.ts` — GDTF-Share browser state and search
+- `recent-shows.ts`, `settings.ts`, `toast.ts`, `confirmation.ts`,
+  `updates.ts`, `navigation.ts` — supporting UI state
+
+### Configuration store exception (`show-configuration.ts`)
+
+The Configure view does **not** duplicate business logic on the frontend:
+
+- All group capabilities (`has_pan`, `has_tilt`, `has_color`), bounds
+  (`panBounds`/`tiltBounds`), color options, and clamped defaults come from the
+  backend `show_configure_get_overview`.
+- Frontend `useShowConfigurationSync` watchers + `reconcileSettings` only handle
+  UI state: selected group, debounced save, settings cache sync.
+
+Do not move domain computation to this store — keep it a thin view-model.
+
+## Composables & libs (src/libs/)
+
+- `show-opener.ts` — `useShowOpener()` (see `docs/show-openers.md`)
+- `show-configuration-sync.ts` — Configure store sync logic
+- `logger.ts` — `initLogger()`: attaches webview console to backend logs
+- `shortcuts.ts`, `date.ts`, `fixture.ts` — small utilities
+
+## Conventions (non-negotiable)
+
+- TypeScript everywhere — never `.js`; `<script setup lang="ts">` only.
+- **Strings:** double quotes in TS; in templates, double quotes for attributes
+  and _single_ quotes for string literals inside attribute expressions
+  (`:class="[open ? 'active' : '']"`).
+- Remove empty `<script>` or `<style>` blocks from SFCs.
+- **Inline handlers:** simple one-liners go inline in the template
+  (`@click="isOpen = false"`); otherwise extract a handler.
+- **Styling:** prefer Tailwind utilities; for DaisyUI components prefer
+  `daisy-ui-kit` (`Button`, `Card`, `Modal`, `Table`, `Badge`, `Divider`, ...)
+  over raw DaisyUI classes.
+- **Tauri calls:** `@tauri-apps/api/core` `invoke`.
+- **State:** use `useShow()`/domain stores instead of mutating props (Vitest/Vue
+  linting requires no direct prop mutation). Compute store-derived values with
+  getters/composables.
+- **Notifications:** `useToastStore()` (`src/stores/toast.ts`) for non-blocking
+  alerts; avoid `alert()` / Tauri message dialogs.
+
+## Testing (frontend)
+
+- Vitest + Vue Testing Library; test files named `Component.test.ts` /
+  `Component.test.vue` **colocated next to the component**.
+- `src/test-setup.ts` installs a **testing Pinia globally**
+  (`createTestingPinia({ stubActions: false })`) and stubs `@tauri-apps/api/core`
+  (`invoke`), `@tauri-apps/api/window`, global-shortcut, and plugin-log.
+- **Mocking conventions:** declare typed mock refs at the top of the file
+  (`const mockInvoke = vi.mocked(invoke);`), clear mocks with
+  `vi.clearAllMocks()` in `beforeEach`.
+- If a component needs custom store state, build it in the test via the real
+  store composable (e.g. `store.setShow(mockData)`). Remember `@tauri-apps/api/app`
+  must be mocked when updater/version APIs are touched.
+
+## Adding a new store/component
+
+1. Colocate tests next to the new file.
+2. Wrap store-interaction tests with `createTestingPinia({ stubActions: false })`
+   (already global — just use the composables).
+3. Update this doc and `AGENTS.md`'s directory map if you add a significant area.
