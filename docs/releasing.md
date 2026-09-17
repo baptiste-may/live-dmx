@@ -12,6 +12,12 @@ or build/signing configuration.
 - `node scripts/release.mjs --check` only validates the sync (used by CI).
 - `Cargo.toml`/`Cargo.lock` keep their own `0.1.0` and are **intentionally left
   untouched**.
+- Prereleases (`0.1.0-beta`, `0.1.0-alpha.1`, …) are valid versions and follow
+  regular semver ordering. The first **stable** release must be `≥ 0.1.0`: a
+  prerelease (`-beta` < `0.1.0`) is never offered as an update to a stable
+  install. Note that `releases/latest` resolves to the latest **non-prerelease**
+  release, so a lone prerelease GitHub release 404s the updater endpoint until a
+  stable release exists — intended during the pre-release phase.
 
 ## Auto-updates
 
