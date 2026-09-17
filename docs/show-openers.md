@@ -59,7 +59,7 @@ forwarding, focuses the existing main window, and calls `handle_open_request`.
 
 - File associations only take effect once the app is **bundled/installed**. During
   development, test with:
-  - `tauri dev -- <path>.ldmx` (CLI argument), or
+  - `bun run dev:app -- -- <path>.ldmx` (CLI argument), or
   - a deep link: `live-dmx://open?path=<urlencoded-absolute-path>`.
 - Rust unit tests for path extraction are in `src-tauri/src/show/open.rs`;
   frontend tests in `src/libs/show-opener.test.ts`.

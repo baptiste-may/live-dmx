@@ -127,6 +127,34 @@ yet covered by `:default`), add the permission.
 7. **Docs:** update `AGENTS.md` list of commands/the relevant `docs/` module
    section if your command is a new area.
 
+## Debug tooling — MCP bridge (dev only)
+
+`tauri-plugin-mcp-bridge` (0.13) exposes a WebSocket server that lets the
+companion `@hypothesi/tauri-mcp-server` MCP server drive a **running dev app**
+(screenshots, DOM, JS/IPC execution, logs). It is tooling, not app code:
+
+- Registered **only in debug builds** (`#[cfg(debug_assertions)]` in `lib.rs`),
+  so it is never part of a release binary.
+- Bound to `127.0.0.1` via
+  `Builder::new().bind_address("127.0.0.1").build()` — the plugin defaults to
+  `0.0.0.0`, which would expose command/JS execution on the network.
+- Permission `mcp-bridge:default` in `capabilities/default.json` (plugin
+  commands need an entry; custom app commands don't).
+- `app.withGlobalTauri: true` is **required**: the injected `bridge.js` calls
+  `window.__TAURI__.*`, so without the global every eval-based feature
+  (execute_js, screenshots, DOM/interaction, execute_command) silently times
+  out. Pure Rust commands (e.g. `get_backend_state`) work either way since they
+  don't go through the webview.
+- That flag lives in `src-tauri/tauri.dev.conf.json` (not the base config), so
+  it stays out of release builds. Launch dev with `bun run dev:app` (which
+  passes `--config`). Plain `tauri dev` skips that file: the bridge and its
+  Rust commands still work, but `app.withGlobalTauri` is off, so the
+  eval-based features above break.
+- Client config lives **outside the repo**, in
+  `~/.config/opencode/opencode.jsonc` (`mcp.tauri` →
+  `npx @hypothesi/tauri-mcp-server`). Start the app with `bun run dev:app`,
+  then connect from the tooling side.
+
 ## Patch & batch (src-tauri/src/show/patch/)
 
 - `batch.rs` — fixture batching (patch many fixtures at once).

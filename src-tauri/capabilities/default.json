@@ -13,6 +13,7 @@
     "core:event:default",
     "global-shortcut:default",
     "log:default",
+    "mcp-bridge:default",
     "updater:default",
     "process:default"
   ]

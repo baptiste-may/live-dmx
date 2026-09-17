@@ -55,7 +55,7 @@ Modern lighting consoles often require hours of patching and programming before 
 Run the application in development mode:
 
 ```bash
-bun run tauri dev
+bun run dev:app
 ```
 
 ### Build

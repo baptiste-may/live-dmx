@@ -42,6 +42,7 @@ tauri-plugin-stronghold = "2"
 iota_stronghold = "2.1.0"
 keyring = "4"
 getrandom = "0.3"
+tauri-plugin-mcp-bridge = "0.13"
 
 [dev-dependencies]
 tempfile = "3"

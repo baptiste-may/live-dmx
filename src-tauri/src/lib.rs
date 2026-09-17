@@ -132,6 +132,18 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_process::init());
     }
 
+    // Dev-only MCP bridge (IPC monitoring, backend state, JS execution) for AI
+    // agents via the companion mcp-server-tauri; never enabled in release.
+    // Bind to loopback only — the plugin defaults to 0.0.0.0.
+    #[cfg(debug_assertions)]
+    {
+        builder = builder.plugin(
+            tauri_plugin_mcp_bridge::Builder::new()
+                .bind_address("127.0.0.1")
+                .build(),
+        );
+    }
+
     builder = builder
         .plugin(
             tauri_plugin_log::Builder::new()
