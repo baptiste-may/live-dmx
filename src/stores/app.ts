@@ -54,8 +54,11 @@ export const useApp = defineStore("app", {
           if (selected && typeof selected === "string") {
             await this.loadShow(selected);
           }
-        } catch {
-          // Ignored in non-Tauri / test environments
+        } catch (error: unknown) {
+          useToastStore().addToast(
+            `Failed to open show file dialog: ${String(error)}`,
+            ToastType.ERROR,
+          );
         }
       });
     },
@@ -76,8 +79,11 @@ export const useApp = defineStore("app", {
           if (selected && typeof selected === "string") {
             await this.importMvr(selected);
           }
-        } catch {
-          // Ignored in non-Tauri / test environments
+        } catch (error: unknown) {
+          useToastStore().addToast(
+            `Failed to open MVR file dialog: ${String(error)}`,
+            ToastType.ERROR,
+          );
         }
       });
     },
