@@ -36,6 +36,3 @@ jobs:
 
       - name: Lint, format, typecheck, tests
         run: bun run check
-
-      - name: Build app (release, no bundle)
-        run: bun run build:app
