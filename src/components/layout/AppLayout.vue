@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import ConfirmationModal from "@/components/modals/ConfirmationModal.vue";
-import SettingsModal from "@/components/modals/SettingsModal.vue";
 import UnsavedChangesModal from "@/components/modals/UnsavedChangesModal.vue";
 import { useNavigation } from "@/stores/navigation.ts";
 
@@ -14,7 +13,6 @@ const navigation = useNavigation();
     <AppSidebar />
     <ConfirmationModal />
     <UnsavedChangesModal />
-    <SettingsModal />
 
     <main class="bg-base-100 relative flex-1 overflow-hidden">
       <KeepAlive v-if="navigation.getCurrentPage()">

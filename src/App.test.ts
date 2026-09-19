@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App.vue";
+import { useSettings } from "./stores/settings";
 import { ShowStatus, useShow } from "./stores/show/show";
 import { useShowChanges } from "./stores/show/show-changes";
 
@@ -57,6 +58,17 @@ describe("App.vue", () => {
     expect(screen.queryByText("Loading show...")).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.getByText("Show")).toBeInTheDocument();
+  });
+
+  it("should render SettingsModal regardless of show load state when settings modal is open", () => {
+    const showStore = useShow();
+    const settingsStore = useSettings();
+    showStore.state = ShowStatus.NOT_LOADED;
+    settingsStore.isModalOpen = true;
+
+    render(App);
+
+    expect(screen.getByRole("heading", { name: /settings/i })).toBeInTheDocument();
   });
 
   it("should register global shortcuts and handle undo/redo/save actions", async () => {

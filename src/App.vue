@@ -5,6 +5,7 @@ import { onMounted } from "vue";
 import ProgressScreen from "@/components/feedback/ProgressScreen.vue";
 import SavingBar from "@/components/feedback/SavingBar.vue";
 import AppLayout from "@/components/layout/AppLayout.vue";
+import SettingsModal from "@/components/modals/SettingsModal.vue";
 import Welcome from "@/components/Welcome.vue";
 import { initLogger } from "@/libs/logger";
 import { useGlobalShortcuts } from "@/libs/shortcuts";
@@ -46,6 +47,7 @@ onMounted(async () => {
 <template>
   <ProgressScreen v-if="show.isLoading" :title="show.loadingTitle" />
   <SavingBar />
+  <SettingsModal />
   <AppLayout v-if="show.isLoaded" />
   <Welcome v-if="!show.isLoading && !show.isLoaded" />
 </template>

@@ -7,12 +7,14 @@ import {
   LoaderIcon,
   PlusIcon,
   RefreshCcwIcon,
+  SettingsIcon,
   UploadIcon,
   XIcon,
 } from "lucide-vue-next";
 import { computed, onMounted } from "vue";
 
 import { useApp } from "@/stores/app";
+import { useSettings } from "@/stores/settings.ts";
 import { useUpdates } from "@/stores/updates";
 
 import RecentShowsList from "./RecentShowsList.vue";
@@ -20,6 +22,7 @@ import RecentShowsList from "./RecentShowsList.vue";
 const app = useApp();
 const appWindow = getCurrentWindow();
 const updates = useUpdates();
+const settings = useSettings();
 
 onMounted(() => {
   updates.init();
@@ -102,14 +105,18 @@ function handleUpdateClick() {
           <UploadIcon />
           Load show
         </Button>
-        <Button outline primary @click="app.askImportMvr">
+        <Button secondary @click="app.askImportMvr">
           <FolderInputIcon />
           Import from MVR
         </Button>
 
         <RecentShowsList />
 
-        <Button error class="mt-4" @click="appWindow.close()">
+        <Button warning class="mt-4" @click="settings.openModal">
+          <SettingsIcon />
+          Settings
+        </Button>
+        <Button error @click="appWindow.close()">
           <XIcon />
           Exit
         </Button>

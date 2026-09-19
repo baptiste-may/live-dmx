@@ -5,6 +5,7 @@ import { render, screen } from "@testing-library/vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApp } from "@/stores/app";
+import { useSettings } from "@/stores/settings";
 import { useUpdates } from "@/stores/updates";
 
 import Welcome from "./Welcome.vue";
@@ -26,6 +27,7 @@ describe("Welcome.vue", () => {
     expect(screen.getByRole("button", { name: "New show" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Load show" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Import from MVR" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Exit" })).toBeInTheDocument();
   });
 
@@ -72,6 +74,16 @@ describe("Welcome.vue", () => {
     await user.click(screen.getByRole("button", { name: "Exit" }));
 
     expect(getCurrentWindow().close).toHaveBeenCalledTimes(1);
+  });
+
+  it("should open settings modal when Settings button is clicked", async () => {
+    const user = userEvent.setup();
+    render(Welcome);
+
+    const settingsStore = useSettings();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(settingsStore.isModalOpen).toBe(true);
   });
 
   it("should retry the update check when the update button is clicked", async () => {
