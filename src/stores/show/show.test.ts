@@ -50,7 +50,7 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
-      groups: { groups: [{ id: 0, name: "All" }] },
+      groups: { groups: [{ id: 0, name: "All" }], settings: {} },
     });
 
     expect(show.state).toBe(ShowStatus.LOADED);
@@ -81,7 +81,7 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
-      groups: { groups: [{ id: 0, name: "All" }] },
+      groups: { groups: [{ id: 0, name: "All" }], settings: {} },
     });
 
     expect(show.isLoaded).toBe(true);
@@ -106,7 +106,7 @@ describe("show store", () => {
         canRedo: false,
       },
       patch: { fixtures: [] },
-      groups: { groups: [{ id: 0, name: "All" }] },
+      groups: { groups: [{ id: 0, name: "All" }], settings: {} },
     });
 
     expect(show.hasUnsavedChanges).toBe(true);

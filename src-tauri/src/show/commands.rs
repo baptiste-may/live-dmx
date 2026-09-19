@@ -129,7 +129,6 @@ fn write_show_file(show: &ShowData, path: &str) -> Result<(), String> {
         .collect();
 
     let content = ShowFileContent {
-        version: 1,
         identity: show.identity.clone(),
         patch: ShowPatchState {
             fixtures: clean_fixtures,
@@ -369,7 +368,6 @@ mod tests {
 
         let raw = std::fs::read_to_string(&path).unwrap();
         let content: ShowFileContent = serde_json::from_str(&raw).unwrap();
-        assert_eq!(content.version, 1);
         assert_eq!(content.identity, show.identity);
 
         let leftovers: Vec<_> = std::fs::read_dir(dir.path())

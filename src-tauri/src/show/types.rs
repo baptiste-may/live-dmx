@@ -107,8 +107,6 @@ pub struct ShowSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShowFileContent {
-    #[serde(default = "default_file_version")]
-    pub version: u32,
     pub identity: ShowIdentityState,
     pub patch: ShowPatchState,
     pub groups: PatchGroupsState,
@@ -116,10 +114,6 @@ pub struct ShowFileContent {
     pub output: ShowOutputState,
     #[serde(default)]
     pub fixture_definitions: HashMap<String, EmbeddedGdtfDefinition>,
-}
-
-fn default_file_version() -> u32 {
-    1
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]

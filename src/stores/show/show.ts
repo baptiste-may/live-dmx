@@ -21,8 +21,7 @@ export type ShowData = {
   patch: ReturnType<typeof useShowPatch>["$state"];
   groups: {
     groups: FixtureGroup[];
-    /** Per-group settings. Missing in legacy payloads; loaded state normalizes to `{}`. */
-    settings?: Record<number, GroupSettings>;
+    settings: Record<number, GroupSettings>;
   };
   output?: {
     universes: UniverseOutputConfig[];
@@ -195,7 +194,7 @@ export const useShow = defineStore("show", {
       }
       if (data.groups?.groups) {
         this.groups.groups = data.groups.groups;
-        this.groups.settings = data.groups.settings ?? {};
+        this.groups.settings = data.groups.settings;
       }
       if (data.output?.universes) {
         useOutputUniverses().universes = data.output.universes;

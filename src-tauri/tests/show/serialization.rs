@@ -11,7 +11,6 @@ fn test_show_file_serialization_round_trip() {
     let file_path = dir.path().join("test_show.ldmx");
 
     let content = ShowFileContent {
-        version: 1,
         identity: ShowIdentityState {
             display_name: "Concert 2026".to_string(),
         },
@@ -48,8 +47,6 @@ fn test_show_file_serialization_round_trip() {
 
     let read_str = std::fs::read_to_string(&file_path).unwrap();
     let loaded: ShowFileContent = serde_json::from_str(&read_str).unwrap();
-
-    assert_eq!(loaded.version, 1);
     assert_eq!(loaded.identity.display_name, "Concert 2026");
     assert_eq!(loaded.patch.fixtures.len(), 1);
     assert_eq!(loaded.patch.fixtures[0].name, "Lead Spot");
@@ -57,16 +54,17 @@ fn test_show_file_serialization_round_trip() {
 }
 
 #[test]
-fn test_show_file_default_version_handling() {
-    let json_without_version = r#"{
-        "identity": { "displayName": "Default Version Show" },
+fn test_show_file_missing_optional_sections_loads_defaults() {
+    let json_minimal = r#"{
+        "identity": { "displayName": "Default Show" },
         "patch": { "fixtures": [] },
         "groups": { "groups": [{ "id": 0, "name": "All" }] }
     }"#;
 
-    let loaded: ShowFileContent = serde_json::from_str(json_without_version).unwrap();
-    assert_eq!(loaded.version, 1);
-    assert_eq!(loaded.identity.display_name, "Default Version Show");
+    let loaded: ShowFileContent = serde_json::from_str(json_minimal).unwrap();
+    assert_eq!(loaded.identity.display_name, "Default Show");
+    assert_eq!(loaded.output.universes[0].universe, 1);
+    assert!(loaded.fixture_definitions.is_empty());
 }
 
 #[test]
@@ -211,7 +209,6 @@ fn test_show_file_group_settings_round_trip() {
     let file_path = dir.path().join("settings_show.ldmx");
 
     let content = ShowFileContent {
-        version: 1,
         identity: ShowIdentityState {
             display_name: "Settings Show".to_string(),
         },
@@ -262,7 +259,6 @@ fn test_show_file_group_settings_round_trip() {
 #[test]
 fn test_show_file_without_group_settings_loads_default_cleanly() {
     let json_without_settings = r#"{
-        "version": 1,
         "identity": { "displayName": "Legacy Show" },
         "patch": { "fixtures": [] },
         "groups": { "groups": [{ "id": 0, "name": "All" }] }
@@ -303,7 +299,6 @@ fn test_show_file_with_embedded_gdtf_definitions() {
     );
 
     let content = ShowFileContent {
-        version: 1,
         identity: ShowIdentityState {
             display_name: "GDTF Show".to_string(),
         },
