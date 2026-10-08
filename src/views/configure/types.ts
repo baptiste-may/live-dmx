@@ -1,7 +1,10 @@
 export type ColorPreference = "Color Mix" | "Color Wheel" | "CCT" | "Color presets";
+export type PixelPreference = "Single" | "Individual" | "Grouped";
 
 export type GroupSettings = {
   colorPreference: ColorPreference;
+  pixelPreference: PixelPreference;
+  pixelGroupCount: number;
   panMin: number;
   panMax: number;
   tiltMin: number;
@@ -24,9 +27,12 @@ export type GroupConfigureInfo = {
   hasPan: boolean;
   hasTilt: boolean;
   hasColor: boolean;
+  hasPixels: boolean;
   panBounds: [number, number];
   tiltBounds: [number, number];
   colorOptions: ColorPreference[];
+  pixelOptions: PixelPreference[];
+  maxPixels: number;
   settings: GroupSettings;
 };
 

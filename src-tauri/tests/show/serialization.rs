@@ -1,7 +1,7 @@
 use live_dmx_lib::show::{
     clean_fixture_type, clean_mode, clean_patched_fixture, ColorPreference, FixtureGroup,
-    GroupSettings, PatchGroupsState, PatchedFixture, ShowFileContent, ShowIdentityState,
-    ShowOutputState, ShowPatchState,
+    GroupSettings, PatchGroupsState, PatchedFixture, PixelPreference, ShowFileContent,
+    ShowIdentityState, ShowOutputState, ShowPatchState,
 };
 use std::collections::HashMap;
 
@@ -228,6 +228,8 @@ fn test_show_file_group_settings_round_trip() {
                 1,
                 GroupSettings {
                     color_preference: ColorPreference::ColorWheel,
+                    pixel_preference: PixelPreference::Single,
+                    pixel_group_count: 2,
                     pan_min: -90,
                     pan_max: 90,
                     tilt_min: -45,

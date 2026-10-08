@@ -20,9 +20,12 @@ function seedOverview(
     hasPan,
     hasTilt,
     hasColor: false,
+    hasPixels: false,
     panBounds,
     tiltBounds,
     colorOptions: [] as ColorPreference[],
+    pixelOptions: [],
+    maxPixels: 1,
     settings: defaultGroupSettings("Color Mix", panBounds, tiltBounds),
   };
   configure.overview = {

@@ -134,6 +134,17 @@ pub enum ColorPreference {
     ColorPresets,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PixelPreference {
+    #[default]
+    #[serde(alias = "single")]
+    Single,
+    #[serde(alias = "individual")]
+    Individual,
+    #[serde(alias = "grouped")]
+    Grouped,
+}
+
 fn default_pan_min() -> i32 {
     -180
 }
@@ -150,11 +161,19 @@ fn default_tilt_max() -> i32 {
     110
 }
 
+fn default_pixel_group_count() -> u32 {
+    2
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupSettings {
     #[serde(default)]
     pub color_preference: ColorPreference,
+    #[serde(default)]
+    pub pixel_preference: PixelPreference,
+    #[serde(default = "default_pixel_group_count")]
+    pub pixel_group_count: u32,
     #[serde(default = "default_pan_min")]
     pub pan_min: i32,
     #[serde(default = "default_pan_max")]
@@ -173,6 +192,8 @@ impl Default for GroupSettings {
     fn default() -> Self {
         Self {
             color_preference: ColorPreference::default(),
+            pixel_preference: PixelPreference::default(),
+            pixel_group_count: default_pixel_group_count(),
             pan_min: default_pan_min(),
             pan_max: default_pan_max(),
             tilt_min: default_tilt_min(),

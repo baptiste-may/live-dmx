@@ -1,7 +1,8 @@
 use tauri::{AppHandle, State};
 
 use crate::show::configure::{
-    clamp_group_settings, get_group_color_options, get_group_pan_bounds, get_group_tilt_bounds,
+    clamp_group_settings, get_group_color_options, get_group_pan_bounds, get_group_pixel_options,
+    get_group_tilt_bounds,
 };
 use crate::show::{AppState, FixtureGroup, GroupSettings, PatchedFixture};
 
@@ -42,8 +43,16 @@ pub fn show_group_update_settings(
         let pan_bounds = get_group_pan_bounds(&relevant_fixtures, &show.fixture_definitions);
         let tilt_bounds = get_group_tilt_bounds(&relevant_fixtures, &show.fixture_definitions);
         let color_options = get_group_color_options(&relevant_fixtures);
+        let (_has_pixels, pixel_options, max_pixels) = get_group_pixel_options(&relevant_fixtures);
 
-        clamp_group_settings(&mut settings, pan_bounds, tilt_bounds, &color_options);
+        clamp_group_settings(
+            &mut settings,
+            pan_bounds,
+            tilt_bounds,
+            &color_options,
+            &pixel_options,
+            max_pixels,
+        );
 
         show.groups.settings.insert(group_id, settings);
         Ok(())

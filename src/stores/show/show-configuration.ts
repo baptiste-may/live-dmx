@@ -8,6 +8,7 @@ import type {
   ConfigureOverview,
   GroupRow,
   GroupSettings,
+  PixelPreference,
 } from "@/views/configure/types";
 
 export type ShowConfigurationState = {
@@ -30,8 +31,12 @@ export const defaultGroupSettings = (
   colorPreference: ColorPreference = "Color Mix",
   panBounds: [number, number] = [-180, 180],
   tiltBounds: [number, number] = [-110, 110],
+  pixelPreference: PixelPreference = "Single",
+  pixelGroupCount = 2,
 ): GroupSettings => ({
   colorPreference,
+  pixelPreference,
+  pixelGroupCount,
   panMin: panBounds[0],
   panMax: panBounds[1],
   tiltMin: tiltBounds[0],
@@ -68,8 +73,13 @@ export const useShowConfiguration = defineStore("show-configuration", {
     hasPan: (state): boolean => state.overview?.groups[state.selectedGroupId]?.hasPan ?? false,
     hasTilt: (state): boolean => state.overview?.groups[state.selectedGroupId]?.hasTilt ?? false,
     hasColor: (state): boolean => state.overview?.groups[state.selectedGroupId]?.hasColor ?? false,
+    hasPixels: (state): boolean =>
+      state.overview?.groups[state.selectedGroupId]?.hasPixels ?? false,
     colorOptions: (state): ColorPreference[] =>
       state.overview?.groups[state.selectedGroupId]?.colorOptions ?? [],
+    pixelOptions: (state): PixelPreference[] =>
+      state.overview?.groups[state.selectedGroupId]?.pixelOptions ?? [],
+    maxPixels: (state): number => state.overview?.groups[state.selectedGroupId]?.maxPixels ?? 1,
     groupPanBounds: (state): [number, number] =>
       state.overview?.groups[state.selectedGroupId]?.panBounds ?? [-180, 180],
     groupTiltBounds: (state): [number, number] =>

@@ -12,6 +12,7 @@ import type {
   ConfigureOverview,
   GroupConfigureInfo,
   GroupRow,
+  PixelPreference,
 } from "@/views/configure/types";
 
 import { defaultGroupSettings, useShowConfiguration } from "./show-configuration";
@@ -30,9 +31,12 @@ function makeGroupInfo(
     hasPan: false,
     hasTilt: false,
     hasColor: false,
+    hasPixels: false,
     panBounds: [-180, 180],
     tiltBounds: [-110, 110],
     colorOptions: [] as ColorPreference[],
+    pixelOptions: [] as PixelPreference[],
+    maxPixels: 1,
     settings: defaultGroupSettings(),
     ...overrides,
   };
@@ -419,6 +423,8 @@ describe("show-configuration store", () => {
     showGroups.settings = {
       1: {
         colorPreference: "Color Mix",
+        pixelPreference: "Single",
+        pixelGroupCount: 2,
         panMin: -50,
         panMax: 50,
         tiltMin: -30,

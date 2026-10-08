@@ -58,6 +58,14 @@ pub struct CompiledChannel {
     pub resolution: ChannelResolution,
     pub default_dmx: u8,
     pub shutter_open_dmx: Option<u8>,
+    pub pixel_index: Option<usize>,
+}
+
+/// A mapped pixel (cell) within a multi-cell or single fixture.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompiledFixturePixel {
+    pub index: usize,
+    pub channel_indices: Vec<usize>,
 }
 
 /// A normalized, fully resolved fixture profile ready for high-performance DMX encoding.
@@ -73,6 +81,8 @@ pub struct CompiledFixtureProfile {
     pub tilt_bounds: Option<[i32; 2]>,
     pub color_summary: ColorChannelSummary,
     pub channel_capabilities: Vec<Vec<serde_json::Value>>,
+    pub pixels: Vec<CompiledFixturePixel>,
+    pub pixel_count: usize,
 }
 
 /// Classifies a raw channel name into a base `LogicalAttribute` and whether it is a fine/LSB channel.
@@ -200,6 +210,8 @@ pub fn compile_fixture_profile(
             tilt_bounds: None,
             color_summary: ColorChannelSummary::default(),
             channel_capabilities: Vec::new(),
+            pixels: Vec::new(),
+            pixel_count: 1,
         };
     }
     let mut default_dmx = vec![0u8; footprint];
@@ -360,6 +372,7 @@ pub fn compile_fixture_profile(
                 resolution: ChannelResolution::Bits8 { offset: i },
                 default_dmx: default_dmx[i],
                 shutter_open_dmx: None,
+                pixel_index: None,
             });
             continue;
         }
@@ -411,6 +424,7 @@ pub fn compile_fixture_profile(
             resolution,
             default_dmx: default_dmx[i],
             shutter_open_dmx,
+            pixel_index: None,
         });
     }
 
@@ -456,6 +470,133 @@ pub fn compile_fixture_profile(
         }
     }
 
+    // 4. Detect pixels (cells) across channels
+    let primary_attr = if is_cmy {
+        LogicalAttribute::Cyan
+    } else {
+        LogicalAttribute::Red
+    };
+
+    let primary_indices: Vec<usize> = channels
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, ch)| {
+            if ch.attribute == primary_attr {
+                Some(idx)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let coarse_dimmer_indices: Vec<usize> = channels
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, ch)| {
+            if ch.attribute == LogicalAttribute::Dimmer {
+                Some(idx)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let mut pixels: Vec<CompiledFixturePixel> = Vec::new();
+
+    if primary_indices.len() > 1 {
+        // Multi-cell color fixture (e.g. RGB/RGBW/CMY pixel bars, washes)
+        let num_pixels = primary_indices.len();
+        let has_per_pixel_dimmer = coarse_dimmer_indices.len() == num_pixels;
+
+        for (p_idx, &start_ch) in primary_indices.iter().enumerate() {
+            let next_start = if p_idx + 1 < num_pixels {
+                primary_indices[p_idx + 1]
+            } else {
+                channels.len()
+            };
+
+            let mut cell_channels = Vec::new();
+
+            if has_per_pixel_dimmer {
+                if let Some(&dim_idx) = coarse_dimmer_indices.get(p_idx) {
+                    if dim_idx < next_start {
+                        cell_channels.push(dim_idx);
+                        channels[dim_idx].pixel_index = Some(p_idx);
+                    }
+                }
+            }
+
+            for (offset_idx, ch) in channels[start_ch..next_start].iter_mut().enumerate() {
+                let ch_idx = start_ch + offset_idx;
+                let attr = ch.attribute;
+                if matches!(
+                    attr,
+                    LogicalAttribute::Red
+                        | LogicalAttribute::Green
+                        | LogicalAttribute::Blue
+                        | LogicalAttribute::White
+                        | LogicalAttribute::Amber
+                        | LogicalAttribute::Lime
+                        | LogicalAttribute::Cyan
+                        | LogicalAttribute::Magenta
+                        | LogicalAttribute::Yellow
+                        | LogicalAttribute::UV
+                ) {
+                    cell_channels.push(ch_idx);
+                    ch.pixel_index = Some(p_idx);
+                }
+            }
+
+            pixels.push(CompiledFixturePixel {
+                index: p_idx,
+                channel_indices: cell_channels,
+            });
+        }
+    } else if primary_indices.is_empty() && coarse_dimmer_indices.len() > 1 {
+        // Multi-cell dimmer fixture (e.g. 4-cell or 8-cell blinder/sunstrip)
+        for (p_idx, &dim_idx) in coarse_dimmer_indices.iter().enumerate() {
+            channels[dim_idx].pixel_index = Some(p_idx);
+            pixels.push(CompiledFixturePixel {
+                index: p_idx,
+                channel_indices: vec![dim_idx],
+            });
+        }
+    }
+
+    if pixels.is_empty() {
+        let single_channels: Vec<usize> = channels
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, ch)| {
+                if matches!(
+                    ch.attribute,
+                    LogicalAttribute::Red
+                        | LogicalAttribute::Green
+                        | LogicalAttribute::Blue
+                        | LogicalAttribute::White
+                        | LogicalAttribute::Amber
+                        | LogicalAttribute::Lime
+                        | LogicalAttribute::Cyan
+                        | LogicalAttribute::Magenta
+                        | LogicalAttribute::Yellow
+                        | LogicalAttribute::UV
+                        | LogicalAttribute::Dimmer
+                ) {
+                    Some(idx)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        pixels.push(CompiledFixturePixel {
+            index: 0,
+            channel_indices: single_channels,
+        });
+    }
+
+    let pixel_count = pixels.len();
+
     let channel_capabilities = capabilities
         .map(|c| c.to_vec())
         .unwrap_or_else(|| vec![Vec::new(); footprint]);
@@ -471,6 +612,8 @@ pub fn compile_fixture_profile(
         tilt_bounds,
         color_summary,
         channel_capabilities,
+        pixels,
+        pixel_count,
     }
 }
 

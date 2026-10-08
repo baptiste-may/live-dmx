@@ -6,7 +6,8 @@ use crate::output::channels::{classify_channel, get_fixture_channel_name};
 use crate::output::types::ChannelType;
 use crate::show::state::AppState;
 use crate::show::types::{
-    ColorPreference, EmbeddedGdtfDefinition, FixtureGroup, GroupSettings, PatchedFixture, ShowData,
+    ColorPreference, EmbeddedGdtfDefinition, FixtureGroup, GroupSettings, PatchedFixture,
+    PixelPreference, ShowData,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -27,9 +28,12 @@ pub struct GroupConfigureInfo {
     pub has_pan: bool,
     pub has_tilt: bool,
     pub has_color: bool,
+    pub has_pixels: bool,
     pub pan_bounds: [i32; 2],
     pub tilt_bounds: [i32; 2],
     pub color_options: Vec<ColorPreference>,
+    pub pixel_options: Vec<PixelPreference>,
+    pub max_pixels: usize,
     pub settings: GroupSettings,
 }
 
@@ -343,11 +347,49 @@ pub fn get_group_color_options(fixtures: &[&PatchedFixture]) -> Vec<ColorPrefere
     options
 }
 
+pub fn get_fixture_pixel_count(fixture: &PatchedFixture) -> usize {
+    crate::output::profile::compile_from_patched_fixture(fixture).pixel_count
+}
+
+pub fn get_group_pixel_options(
+    fixtures: &[&PatchedFixture],
+) -> (bool, Vec<PixelPreference>, usize) {
+    let mut max_pixels = 1;
+    for f in fixtures {
+        let count = get_fixture_pixel_count(f);
+        if count > max_pixels {
+            max_pixels = count;
+        }
+    }
+
+    if max_pixels <= 1 {
+        (false, Vec::new(), 1)
+    } else if max_pixels <= 3 {
+        (
+            true,
+            vec![PixelPreference::Single, PixelPreference::Individual],
+            max_pixels,
+        )
+    } else {
+        (
+            true,
+            vec![
+                PixelPreference::Single,
+                PixelPreference::Individual,
+                PixelPreference::Grouped,
+            ],
+            max_pixels,
+        )
+    }
+}
+
 pub fn clamp_group_settings(
     settings: &mut GroupSettings,
     pan_bounds: [i32; 2],
     tilt_bounds: [i32; 2],
     color_options: &[ColorPreference],
+    pixel_options: &[PixelPreference],
+    max_pixels: usize,
 ) {
     settings.pan_min = settings.pan_min.clamp(pan_bounds[0], pan_bounds[1]);
     settings.pan_max = settings.pan_max.clamp(pan_bounds[0], pan_bounds[1]);
@@ -364,6 +406,15 @@ pub fn clamp_group_settings(
     if !color_options.is_empty() && !color_options.contains(&settings.color_preference) {
         settings.color_preference = color_options[0];
     }
+
+    if !pixel_options.is_empty() && !pixel_options.contains(&settings.pixel_preference) {
+        settings.pixel_preference = pixel_options[0];
+    }
+    if max_pixels >= 2 {
+        settings.pixel_group_count = settings.pixel_group_count.clamp(2, max_pixels as u32);
+    } else {
+        settings.pixel_group_count = 2;
+    }
 }
 
 pub fn default_group_settings(
@@ -373,6 +424,8 @@ pub fn default_group_settings(
 ) -> GroupSettings {
     GroupSettings {
         color_preference,
+        pixel_preference: PixelPreference::Single,
+        pixel_group_count: 2,
         pan_min: pan_bounds[0],
         pan_max: pan_bounds[1],
         tilt_min: tilt_bounds[0],
@@ -480,6 +533,8 @@ pub fn compute_group_configure_info(
     let pan_bounds = get_group_pan_bounds(&relevant_fixtures, definitions);
     let tilt_bounds = get_group_tilt_bounds(&relevant_fixtures, definitions);
 
+    let (has_pixels, pixel_options, max_pixels) = get_group_pixel_options(&relevant_fixtures);
+
     let default_color = color_options
         .first()
         .copied()
@@ -488,7 +543,14 @@ pub fn compute_group_configure_info(
         .copied()
         .unwrap_or_else(|| default_group_settings(pan_bounds, tilt_bounds, default_color));
 
-    clamp_group_settings(&mut settings, pan_bounds, tilt_bounds, &color_options);
+    clamp_group_settings(
+        &mut settings,
+        pan_bounds,
+        tilt_bounds,
+        &color_options,
+        &pixel_options,
+        max_pixels,
+    );
 
     GroupConfigureInfo {
         id: group_id,
@@ -497,9 +559,12 @@ pub fn compute_group_configure_info(
         has_pan,
         has_tilt,
         has_color,
+        has_pixels,
         pan_bounds,
         tilt_bounds,
         color_options,
+        pixel_options,
+        max_pixels,
         settings,
     }
 }

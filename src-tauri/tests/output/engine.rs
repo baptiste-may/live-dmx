@@ -1,5 +1,7 @@
 use live_dmx_lib::output::LiveEngine;
-use live_dmx_lib::show::{ColorPreference, GroupSettings, PatchedFixture, ShowData};
+use live_dmx_lib::show::{
+    ColorPreference, GroupSettings, PatchedFixture, PixelPreference, ShowData,
+};
 
 #[test]
 fn test_live_engine_default_state_and_blackout() {
@@ -645,4 +647,373 @@ fn test_position_xyz_unaffected_by_intensity() {
         "XYZ_Y must not be modulated by intensity"
     );
     assert_eq!(buf_active[1], 255);
+}
+
+#[test]
+fn test_pixel_preference_single_keeps_all_pixels_identical() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    // Fixture with Tilt (ch0), Dimmer (ch1), Shutter (ch2), and 4 RGB pixels (ch3..14)
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Pixel Bar 4".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "Tilt",
+                "Dimmer",
+                "Shutter",
+                "Red 1", "Green 1", "Blue 1",
+                "Red 2", "Green 2", "Blue 2",
+                "Red 3", "Green 3", "Blue 3",
+                "Red 4", "Green 4", "Blue 4",
+            ]
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    // Group 1 settings: Single
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            pixel_preference: PixelPreference::Single,
+            ..Default::default()
+        },
+    );
+
+    engine.set_group_color(1, Some("red".to_string()), Some(&show));
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_master(1, 100);
+
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    // Tilt is centered (128)
+    assert_eq!(buf[0], 128);
+    // Master Dimmer is 255
+    assert_eq!(buf[1], 255);
+    // Shutter is open (255)
+    assert_eq!(buf[2], 255);
+
+    // All 4 pixels are identical Red: (255, 0, 0)
+    for p in 0..4 {
+        let base = 3 + p * 3;
+        assert_eq!(buf[base], 255, "Pixel {} red", p);
+        assert_eq!(buf[base + 1], 0, "Pixel {} green", p);
+        assert_eq!(buf[base + 2], 0, "Pixel {} blue", p);
+    }
+}
+
+#[test]
+fn test_pixel_preference_individual_splits_pixels() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    // Fixture with Dimmer (ch0), Shutter (ch1), and 4 RGB pixels (ch2..13)
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Pixel Bar 4".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "Dimmer",
+                "Shutter",
+                "Red 1", "Green 1", "Blue 1",
+                "Red 2", "Green 2", "Blue 2",
+                "Red 3", "Green 3", "Blue 3",
+                "Red 4", "Green 4", "Blue 4",
+            ]
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    // Group 1 settings: Individual
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            pixel_preference: PixelPreference::Individual,
+            ..Default::default()
+        },
+    );
+
+    engine.set_group_color(1, Some("white".to_string()), Some(&show));
+    // Set a ramp_up effect with left alignment and width 100
+    engine.set_group_effect(
+        1,
+        Some("ramp_up".to_string()),
+        Some("left".to_string()),
+        false,
+    );
+    engine.set_group_effect_width(1, 100);
+    engine.set_group_master(1, 100);
+
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    // In Individual mode, at t=0 with left alignment and ramp_up:
+    // Pixel 0: phase 0/4 => 0
+    // Pixel 1: phase 1/4 => 64
+    // Pixel 2: phase 2/4 => 128
+    // Pixel 3: phase 3/4 => 191
+    assert_eq!(buf[2], 0, "Pixel 0 red");
+    assert_eq!(buf[5], 64, "Pixel 1 red");
+    assert_eq!(buf[8], 128, "Pixel 2 red");
+    assert_eq!(buf[11], 191, "Pixel 3 red");
+}
+
+#[test]
+fn test_pixel_preference_grouped_zones() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    // Fixture with Dimmer (ch0), Shutter (ch1), and 4 RGB pixels (ch2..13)
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Pixel Bar 4".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "Dimmer",
+                "Shutter",
+                "Red 1", "Green 1", "Blue 1",
+                "Red 2", "Green 2", "Blue 2",
+                "Red 3", "Green 3", "Blue 3",
+                "Red 4", "Green 4", "Blue 4",
+            ]
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    // Group 1 settings: Grouped with 2 zones (pixels 0,1 in zone 0; pixels 2,3 in zone 1)
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            pixel_preference: PixelPreference::Grouped,
+            pixel_group_count: 2,
+            ..Default::default()
+        },
+    );
+
+    engine.set_group_color(1, Some("white".to_string()), Some(&show));
+    // Set a ramp_up effect with left alignment and width 100
+    engine.set_group_effect(
+        1,
+        Some("ramp_up".to_string()),
+        Some("left".to_string()),
+        false,
+    );
+    engine.set_group_effect_width(1, 100);
+    engine.set_group_master(1, 100);
+
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    // Zone 0 (steps 0/2 => 0): Pixel 0 and Pixel 1 must be 0
+    assert_eq!(buf[2], 0, "Pixel 0 red");
+    assert_eq!(buf[5], 0, "Pixel 1 red");
+
+    // Zone 1 (steps 1/2 => 128): Pixel 2 and Pixel 3 must be 128
+    assert_eq!(buf[8], 128, "Pixel 2 red");
+    assert_eq!(buf[11], 128, "Pixel 3 red");
+}
+
+#[test]
+fn test_epix_strip_individual_global_random_chase() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    // 5-section RGB Epix strip (15 channels, 5 pixels, no dimmer channel)
+    let epix_channels = vec![
+        "Red".to_string(),
+        "Green".to_string(),
+        "Blue".to_string(),
+        "Red".to_string(),
+        "Green".to_string(),
+        "Blue".to_string(),
+        "Red".to_string(),
+        "Green".to_string(),
+        "Blue".to_string(),
+        "Red".to_string(),
+        "Green".to_string(),
+        "Blue".to_string(),
+        "Red".to_string(),
+        "Green".to_string(),
+        "Blue".to_string(),
+    ];
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 401,
+        groups: vec![4],
+        name: "EPIX 401".to_string(),
+        fixture_type: serde_json::json!({
+            "fixtureKey": "epix_strip",
+            "name": "Epix Strip IP",
+            "manufacturerKey": "chauvet"
+        }),
+        mode: serde_json::json!({
+            "name": "5 Section Mode",
+            "channels": epix_channels.clone()
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 402,
+        groups: vec![4],
+        name: "EPIX 402".to_string(),
+        fixture_type: serde_json::json!({
+            "fixtureKey": "epix_strip",
+            "name": "Epix Strip IP",
+            "manufacturerKey": "chauvet"
+        }),
+        mode: serde_json::json!({
+            "name": "5 Section Mode",
+            "channels": epix_channels
+        }),
+        universe: 1,
+        address: 16,
+    });
+
+    // Configure group 4 as Individual
+    show.groups.settings.insert(
+        4,
+        GroupSettings {
+            pixel_preference: PixelPreference::Individual,
+            ..Default::default()
+        },
+    );
+
+    engine.set_group_color(4, Some("white".to_string()), Some(&show));
+    engine.set_group_effect(
+        4,
+        Some("ramp_up".to_string()),
+        Some("left".to_string()),
+        false,
+    );
+    engine.set_group_effect_width(4, 100);
+    engine.set_group_master(4, 100);
+
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    // 10 pixels total across 2 fixtures.
+    // Fixture 401 pixels 0..4 (channels 0..14)
+    // Fixture 402 pixels 0..4 (channels 15..29)
+    // Check that each pixel has a different intensity!
+    let p0 = buf[0];
+    let p1 = buf[3];
+    let p2 = buf[6];
+    let p3 = buf[9];
+    let p4 = buf[12];
+    let p5 = buf[15];
+    let p6 = buf[18];
+    let p7 = buf[21];
+    let p8 = buf[24];
+    let p9 = buf[27];
+
+    println!(
+        "Pixels: {}, {}, {}, {}, {}, {}, {}, {}, {}, {}",
+        p0, p1, p2, p3, p4, p5, p6, p7, p8, p9
+    );
+
+    assert_eq!(p0, 0, "P0");
+    assert_eq!(p1, 26, "P1");
+    assert_eq!(p2, 51, "P2");
+    assert_eq!(p3, 77, "P3");
+    assert_eq!(p4, 102, "P4");
+    assert_eq!(p5, 128, "P5");
+    assert_eq!(p6, 153, "P6");
+    assert_eq!(p7, 179, "P7");
+    assert_eq!(p8, 204, "P8");
+    assert_eq!(p9, 230, "P9");
+}
+
+#[test]
+fn test_epix_strip_individual_global_grandma2_shuffled_rng_phase() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 501,
+        groups: vec![5],
+        name: "Epix 1".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "Pixel 1_Red", "Pixel 1_Green", "Pixel 1_Blue",
+                "Pixel 2_Red", "Pixel 2_Green", "Pixel 2_Blue",
+                "Pixel 3_Red", "Pixel 3_Green", "Pixel 3_Blue",
+                "Pixel 4_Red", "Pixel 4_Green", "Pixel 4_Blue",
+                "Pixel 5_Red", "Pixel 5_Green", "Pixel 5_Blue",
+            ]
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 502,
+        groups: vec![5],
+        name: "Epix 2".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "Pixel 1_Red", "Pixel 1_Green", "Pixel 1_Blue",
+                "Pixel 2_Red", "Pixel 2_Green", "Pixel 2_Blue",
+                "Pixel 3_Red", "Pixel 3_Green", "Pixel 3_Blue",
+                "Pixel 4_Red", "Pixel 4_Green", "Pixel 4_Blue",
+                "Pixel 5_Red", "Pixel 5_Green", "Pixel 5_Blue",
+            ]
+        }),
+        universe: 1,
+        address: 16,
+    });
+
+    show.groups.settings.insert(
+        5,
+        GroupSettings {
+            pixel_preference: PixelPreference::Individual,
+            ..Default::default()
+        },
+    );
+
+    engine.set_group_color(5, Some("white".to_string()), Some(&show));
+    engine.set_group_effect(
+        5,
+        Some("ramp_up".to_string()),
+        Some("rng".to_string()),
+        false,
+    );
+    engine.set_group_effect_width(5, 100);
+    engine.set_group_master(5, 100);
+
+    engine.compute_dmx(&show);
+
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    let intensities = vec![
+        buf[0], buf[3], buf[6], buf[9], buf[12], buf[15], buf[18], buf[21], buf[24], buf[27],
+    ];
+
+    // grandMA2 shuffle guarantee: all 10 items get distinct evenly distributed phase slots
+    let mut sorted = intensities.clone();
+    sorted.sort();
+    assert_eq!(
+        sorted,
+        vec![0, 26, 51, 77, 102, 128, 153, 179, 204, 230],
+        "All 10 pixels across both fixtures must receive distinct unique phase slots"
+    );
+
+    // Verify it is truly shuffled (not trivial left-to-right)
+    assert_ne!(
+        intensities, sorted,
+        "Shuffled order must not be identical to linear left-to-right"
+    );
 }

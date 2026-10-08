@@ -4,7 +4,7 @@ import { nextTick } from "vue";
 
 import { defaultGroupSettings, useShowConfiguration } from "@/stores/show/show-configuration.ts";
 import { useShowGroups } from "@/stores/show/show-groups.ts";
-import type { ColorPreference, GroupConfigureInfo } from "@/views/configure/types";
+import type { ColorPreference, GroupConfigureInfo, PixelPreference } from "@/views/configure/types";
 
 import ConfigureSettings from "./ConfigureSettings.vue";
 
@@ -21,9 +21,12 @@ function seedOverview(
     hasPan: false,
     hasTilt: false,
     hasColor: false,
+    hasPixels: false,
     panBounds: [-180, 180],
     tiltBounds: [-110, 110],
     colorOptions: [] as ColorPreference[],
+    pixelOptions: [] as PixelPreference[],
+    maxPixels: 1,
     settings: defaultGroupSettings(),
     ...overrides,
   });
@@ -44,6 +47,8 @@ describe("ConfigureSettings.vue", () => {
     });
     configure.settingsByGroup[0] = {
       colorPreference: "Color Mix",
+      pixelPreference: "Single",
+      pixelGroupCount: 2,
       panMin: -180,
       panMax: 180,
       tiltMin: -110,
@@ -79,6 +84,8 @@ describe("ConfigureSettings.vue", () => {
     });
     configure.settingsByGroup[0] = {
       colorPreference: "Color Mix",
+      pixelPreference: "Single",
+      pixelGroupCount: 2,
       panMin: -180,
       panMax: 180,
       tiltMin: -110,
@@ -137,6 +144,8 @@ describe("ConfigureSettings.vue", () => {
     });
     configure.settingsByGroup[0] = {
       colorPreference: "Color Mix",
+      pixelPreference: "Single",
+      pixelGroupCount: 2,
       panMin: -50,
       panMax: 50,
       tiltMin: -30,
@@ -238,9 +247,12 @@ describe("ConfigureSettings.vue", () => {
           hasPan: true,
           hasTilt: true,
           hasColor: true,
+          hasPixels: false,
           panBounds: [-270, 270],
           tiltBounds: [-104, 104],
           colorOptions: [] as ColorPreference[],
+          pixelOptions: [] as PixelPreference[],
+          maxPixels: 1,
           settings: defaultGroupSettings("Color Mix", [-270, 270], [-104, 104]),
         },
         1: {
@@ -250,9 +262,12 @@ describe("ConfigureSettings.vue", () => {
           hasPan: false,
           hasTilt: true,
           hasColor: true,
+          hasPixels: false,
           panBounds: [-180, 180],
           tiltBounds: [-92, 92],
           colorOptions: [] as ColorPreference[],
+          pixelOptions: [] as PixelPreference[],
+          maxPixels: 1,
           settings: defaultGroupSettings("Color Mix", [-180, 180], [-92, 92]),
         },
         2: {
@@ -262,9 +277,12 @@ describe("ConfigureSettings.vue", () => {
           hasPan: true,
           hasTilt: true,
           hasColor: true,
+          hasPixels: false,
           panBounds: [-270, 270],
           tiltBounds: [-104, 104],
           colorOptions: [] as ColorPreference[],
+          pixelOptions: [] as PixelPreference[],
+          maxPixels: 1,
           settings: defaultGroupSettings("Color Mix", [-270, 270], [-104, 104]),
         },
       },
@@ -284,5 +302,56 @@ describe("ConfigureSettings.vue", () => {
     expect(screen.getByLabelText("Tilt maximum")).toHaveValue(104);
     expect(screen.getByLabelText("Pan minimum")).toHaveValue(-270);
     expect(screen.getByLabelText("Pan maximum")).toHaveValue(270);
+  });
+
+  it("locks the pixel preference select to None without multi-pixel capability", () => {
+    const configure = useShowConfiguration();
+    seedOverview(configure, {
+      hasPixels: false,
+      pixelOptions: [] as PixelPreference[],
+    });
+
+    render(ConfigureSettings);
+
+    const select = screen.getByLabelText("Pixel preference");
+    expect(select).toBeDisabled();
+    expect(select).toHaveValue("None");
+  });
+
+  it("enables the pixel preference select when group has multi-pixel capability", async () => {
+    const configure = useShowConfiguration();
+    seedOverview(configure, {
+      hasPixels: true,
+      pixelOptions: ["Single", "Individual", "Grouped"],
+      maxPixels: 8,
+    });
+    configure.settingsByGroup[0] = {
+      ...defaultGroupSettings(),
+      pixelPreference: "Single",
+      pixelGroupCount: 2,
+    };
+
+    render(ConfigureSettings);
+
+    const select = screen.getByLabelText("Pixel preference");
+    expect(select).not.toBeDisabled();
+    expect(select).toHaveValue("Single");
+
+    // Group count is not rendered when pixelPreference is Single
+    expect(screen.queryByLabelText("Group count")).not.toBeInTheDocument();
+
+    // Select Grouped mode
+    await fireEvent.update(select, "Grouped");
+    await nextTick();
+
+    expect(configure.selectedSettings.pixelPreference).toBe("Grouped");
+    const groupCountInput = screen.getByLabelText("Group count");
+    expect(groupCountInput).toBeInTheDocument();
+    expect(groupCountInput).toHaveValue(2);
+
+    // Update group count
+    await fireEvent.update(groupCountInput, "4");
+    await nextTick();
+    expect(configure.selectedSettings.pixelGroupCount).toBe(4);
   });
 });

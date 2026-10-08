@@ -1,5 +1,5 @@
 use live_dmx_lib::show::{
-    ColorPreference, FixtureGroup, GroupSettings, PatchGroupsState, PatchedFixture,
+    ColorPreference, FixtureGroup, GroupSettings, PatchGroupsState, PatchedFixture, PixelPreference,
 };
 use std::collections::HashMap;
 
@@ -7,6 +7,8 @@ use std::collections::HashMap;
 fn test_group_settings_defaults() {
     let settings = GroupSettings::default();
     assert_eq!(settings.color_preference, ColorPreference::ColorMix);
+    assert_eq!(settings.pixel_preference, PixelPreference::Single);
+    assert_eq!(settings.pixel_group_count, 2);
     assert_eq!(settings.pan_min, -180);
     assert_eq!(settings.pan_max, 180);
     assert_eq!(settings.tilt_min, -110);
@@ -19,6 +21,8 @@ fn test_group_settings_defaults() {
 fn test_group_settings_serialization() {
     let settings = GroupSettings {
         color_preference: ColorPreference::ColorWheel,
+        pixel_preference: PixelPreference::Individual,
+        pixel_group_count: 4,
         pan_min: -45,
         pan_max: 90,
         tilt_min: -30,
@@ -29,6 +33,8 @@ fn test_group_settings_serialization() {
 
     let json = serde_json::to_string(&settings).unwrap();
     assert!(json.contains("\"colorPreference\":\"Color Wheel\""));
+    assert!(json.contains("\"pixelPreference\":\"Individual\""));
+    assert!(json.contains("\"pixelGroupCount\":4"));
     assert!(json.contains("\"panMin\":-45"));
     assert!(json.contains("\"panMax\":90"));
     assert!(json.contains("\"inversePan\":true"));
@@ -41,6 +47,8 @@ fn test_group_settings_serialization() {
 fn test_group_settings_deserialize_partial_json_defaults() {
     let settings: GroupSettings = serde_json::from_str(r#"{"colorPreference":"CCT"}"#).unwrap();
     assert_eq!(settings.color_preference, ColorPreference::Cct);
+    assert_eq!(settings.pixel_preference, PixelPreference::Single);
+    assert_eq!(settings.pixel_group_count, 2);
     assert_eq!(settings.pan_min, -180);
     assert_eq!(settings.pan_max, 180);
     assert!(!settings.inverse_tilt);
@@ -51,6 +59,8 @@ fn test_group_settings_update_replaces_existing_value() {
     let mut groups = PatchGroupsState::default();
     let updated = GroupSettings {
         color_preference: ColorPreference::Cct,
+        pixel_preference: PixelPreference::Grouped,
+        pixel_group_count: 3,
         pan_min: 0,
         pan_max: 360,
         tilt_min: 0,
@@ -252,6 +262,8 @@ fn test_group_settings_clamped_against_bounds() {
 
     let mut settings = GroupSettings {
         color_preference: ColorPreference::ColorMix,
+        pixel_preference: PixelPreference::Single,
+        pixel_group_count: 2,
         pan_min: -360,
         pan_max: 360,
         tilt_min: -180,
@@ -260,7 +272,7 @@ fn test_group_settings_clamped_against_bounds() {
         inverse_tilt: false,
     };
 
-    clamp_group_settings(&mut settings, pan_bounds, tilt_bounds, &[]);
+    clamp_group_settings(&mut settings, pan_bounds, tilt_bounds, &[], &[], 1);
     assert_eq!(settings.pan_min, -270);
     assert_eq!(settings.pan_max, 270);
     assert_eq!(settings.tilt_min, -100);

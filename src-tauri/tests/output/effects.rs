@@ -307,6 +307,7 @@ fn test_calculate_effect_factor_width() {
         alignment: None,
         bounce: false,
         width: 50,
+        ..Default::default()
     };
     // At elapsed 0.75 with 50% width, fixture is in inactive portion (> 0.5) -> 0.0
     let factor_50_late = calculate_effect_factor(&state_pulse, 0.75, 0, 1, 1, 60);
@@ -318,6 +319,7 @@ fn test_calculate_effect_factor_width() {
         alignment: None,
         bounce: false,
         width: 0,
+        ..Default::default()
     };
     let factor_0 = calculate_effect_factor(&state_pulse_0, 0.25, 0, 1, 1, 60);
     assert_eq!(factor_0, 0.0);
@@ -375,4 +377,93 @@ fn test_center_alignment_and_calculate_effective_fract() {
         ..Default::default()
     };
     assert!(calculate_effective_fract(&state_none, 0.0, 0, 3, 1, 60).is_none());
+}
+
+#[test]
+fn test_generate_shuffled_steps_permutation() {
+    let count = 16;
+    let steps = live_dmx_lib::output::generate_shuffled_steps(count, 0x12345678);
+    assert_eq!(steps.len(), count);
+
+    // Verify all numbers from 0..count appear exactly once (perfect permutation)
+    let mut sorted = steps.clone();
+    sorted.sort();
+    let expected: Vec<usize> = (0..count).collect();
+    assert_eq!(
+        sorted, expected,
+        "Permutation must contain each element 0..count exactly once"
+    );
+
+    // Verify different seeds give different permutations
+    let steps_other = live_dmx_lib::output::generate_shuffled_steps(count, 0x87654321);
+    assert_ne!(steps, steps_other);
+}
+
+#[test]
+fn test_is_too_structured_rejects_left_right_wing_center() {
+    use live_dmx_lib::output::is_too_structured;
+
+    // Left (strictly ascending)
+    assert!(is_too_structured(&[0, 1, 2]));
+    assert!(is_too_structured(&[0, 1, 2, 3, 4]));
+
+    // Right (strictly descending)
+    assert!(is_too_structured(&[2, 1, 0]));
+    assert!(is_too_structured(&[4, 3, 2, 1, 0]));
+
+    // Cyclic left / right sweeps
+    assert!(is_too_structured(&[1, 2, 3, 0]));
+    assert!(is_too_structured(&[3, 0, 1, 2]));
+    assert!(is_too_structured(&[2, 1, 0, 3]));
+
+    // V-shape (wing) and inverted V-shape (center)
+    assert!(is_too_structured(&[3, 1, 0, 2]));
+    assert!(is_too_structured(&[0, 2, 3, 1]));
+
+    // Interleaved outside-in
+    assert!(is_too_structured(&[0, 3, 1, 2]));
+
+    // Truly chaotic permutations should NOT be rejected
+    assert!(!is_too_structured(&[0, 2, 1]));
+    assert!(!is_too_structured(&[1, 3, 0, 2]));
+    assert!(!is_too_structured(&[2, 0, 3, 1]));
+    assert!(!is_too_structured(&[3, 0, 2, 4, 1]));
+}
+
+#[test]
+fn test_generate_shuffled_steps_forced_random() {
+    use live_dmx_lib::output::{generate_shuffled_steps, is_too_structured};
+
+    // Test across various fixture / pixel rig sizes and 50 different seeds
+    for count in [3, 4, 5, 8, 10, 16, 50] {
+        for seed_idx in 0..50 {
+            let seed = (seed_idx as u64)
+                .wrapping_mul(0x9e3779b97f4a7c15)
+                .wrapping_add(0x517cc1b727220a95);
+            let steps = generate_shuffled_steps(count, seed);
+
+            // 1. Must be a complete permutation of 0..count
+            let mut sorted = steps.clone();
+            sorted.sort();
+            let expected: Vec<usize> = (0..count).collect();
+            assert_eq!(sorted, expected);
+
+            // 2. Must NEVER be structured (no accidental left, right, wing, center)
+            assert!(
+                !is_too_structured(&steps),
+                "Permutation {:?} for count {} with seed 0x{:x} was too structured",
+                steps,
+                count,
+                seed
+            );
+
+            // 3. Must never be pure left (0..count) or right ((0..count).rev())
+            assert_ne!(steps, expected, "Permutation was identical to left sweep");
+            let rev_expected: Vec<usize> = (0..count).rev().collect();
+            assert_ne!(
+                steps, rev_expected,
+                "Permutation was identical to right sweep"
+            );
+        }
+    }
 }

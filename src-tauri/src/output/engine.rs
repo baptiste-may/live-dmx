@@ -9,7 +9,7 @@ use crate::output::color_routing::{
 use crate::output::colors::{hsv_to_rgb, resolve_color_rgb};
 use crate::output::effects::{
     calculate_effect_factor, calculate_effect_intensity, calculate_effective_fract,
-    compute_random_strobe_active,
+    compute_random_strobe_active, generate_shuffled_steps, splitmix64,
 };
 use crate::output::pipeline::{encode_fixture_dmx, LogicalFixtureState};
 use crate::output::profile::{
@@ -17,7 +17,16 @@ use crate::output::profile::{
     LogicalAttribute,
 };
 use crate::output::types::{FixtureColorTransition, FlashFadeTransition, GroupEffectState};
-use crate::show::{ColorPreference, EmbeddedGdtfMode, GroupSettings, PatchedFixture, ShowData};
+use crate::show::{
+    ColorPreference, EmbeddedGdtfMode, GroupSettings, PatchedFixture, PixelPreference, ShowData,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FixturePixelStepInfo {
+    pub step_offset: usize,
+    pub step_count: usize,
+    pub total_steps: usize,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FixtureCacheKey {
@@ -37,6 +46,7 @@ pub struct CachedFixture {
     pub groups: Vec<u32>,
     pub primary_group_id: u32,
     pub group_positions: HashMap<u32, (usize, usize)>,
+    pub group_pixel_steps: HashMap<u32, FixturePixelStepInfo>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -76,6 +86,9 @@ pub struct LiveEngine {
     pub button_states: HashMap<String, bool>,
     pub group_effects: HashMap<u32, GroupEffectState>,
     pub group_color_effects: HashMap<u32, GroupEffectState>,
+    pub group_rng_permutations: HashMap<u32, Vec<usize>>,
+    pub group_color_rng_permutations: HashMap<u32, Vec<usize>>,
+    pub rng_shuffle_seed: u64,
     pub group_masters: HashMap<u32, u8>,
     pub group_colors: HashMap<u32, Option<String>>,
     pub group_secondary_colors: HashMap<u32, Option<String>>,
@@ -95,6 +108,7 @@ pub struct LiveEngine {
     start_time: Instant,
     pub cached_fixtures: Vec<CachedFixture>,
     cached_keys: Vec<FixtureCacheKey>,
+    cached_group_settings: HashMap<u32, GroupSettings>,
 }
 
 impl Default for LiveEngine {
@@ -118,6 +132,9 @@ impl LiveEngine {
             button_states: HashMap::new(),
             group_effects: HashMap::new(),
             group_color_effects: HashMap::new(),
+            group_rng_permutations: HashMap::new(),
+            group_color_rng_permutations: HashMap::new(),
+            rng_shuffle_seed: 0x123456789abcdef0,
             group_masters: HashMap::new(),
             group_colors,
             group_secondary_colors: HashMap::new(),
@@ -137,6 +154,7 @@ impl LiveEngine {
             start_time: Instant::now(),
             cached_fixtures: Vec::new(),
             cached_keys: Vec::new(),
+            cached_group_settings: HashMap::new(),
         }
     }
 
@@ -207,6 +225,10 @@ impl LiveEngine {
         alignment: Option<String>,
         bounce: bool,
     ) {
+        if alignment.as_deref() == Some("rng") {
+            self.rng_shuffle_seed = splitmix64(self.rng_shuffle_seed);
+            self.group_rng_permutations.remove(&group_id);
+        }
         let entry = self.group_effects.entry(group_id).or_default();
         entry.effect = effect;
         entry.alignment = alignment;
@@ -422,6 +444,10 @@ impl LiveEngine {
         alignment: Option<String>,
         bounce: bool,
     ) {
+        if alignment.as_deref() == Some("rng") {
+            self.rng_shuffle_seed = splitmix64(self.rng_shuffle_seed);
+            self.group_color_rng_permutations.remove(&group_id);
+        }
         let entry = self.group_color_effects.entry(group_id).or_default();
         entry.effect = effect;
         entry.alignment = alignment;
@@ -443,11 +469,43 @@ impl LiveEngine {
     pub fn reset_group_color_effect(&mut self, group_id: u32) {
         self.group_color_effects
             .insert(group_id, GroupEffectState::default());
+        self.group_color_rng_permutations.remove(&group_id);
     }
 
     pub fn reset_group_effect(&mut self, group_id: u32) {
         self.group_effects
             .insert(group_id, GroupEffectState::default());
+        self.group_rng_permutations.remove(&group_id);
+    }
+
+    pub fn get_rng_step(&mut self, group_id: u32, step: usize, total_steps: usize) -> usize {
+        if total_steps <= 1 {
+            return 0;
+        }
+        let seed = self.rng_shuffle_seed ^ (group_id as u64);
+        let perm = self
+            .group_rng_permutations
+            .entry(group_id)
+            .or_insert_with(|| generate_shuffled_steps(total_steps, seed));
+        if perm.len() != total_steps {
+            *perm = generate_shuffled_steps(total_steps, seed);
+        }
+        perm.get(step).copied().unwrap_or(step)
+    }
+
+    pub fn get_color_rng_step(&mut self, group_id: u32, step: usize, total_steps: usize) -> usize {
+        if total_steps <= 1 {
+            return 0;
+        }
+        let seed = self.rng_shuffle_seed.wrapping_add(1) ^ (group_id as u64);
+        let perm = self
+            .group_color_rng_permutations
+            .entry(group_id)
+            .or_insert_with(|| generate_shuffled_steps(total_steps, seed));
+        if perm.len() != total_steps {
+            *perm = generate_shuffled_steps(total_steps, seed);
+        }
+        perm.get(step).copied().unwrap_or(step)
     }
 
     pub fn reset_all(&mut self) {
@@ -455,6 +513,8 @@ impl LiveEngine {
         self.button_states.clear();
         self.group_effects.clear();
         self.group_color_effects.clear();
+        self.group_rng_permutations.clear();
+        self.group_color_rng_permutations.clear();
         self.group_masters.clear();
         self.group_colors.clear();
         self.group_colors.insert(0, Some("white".to_string()));
@@ -473,6 +533,7 @@ impl LiveEngine {
         self.manual_channels.clear();
         self.cached_fixtures.clear();
         self.cached_keys.clear();
+        self.cached_group_settings.clear();
         for buf in self.universe_buffers.values_mut() {
             buf.fill(0);
         }
@@ -605,12 +666,14 @@ impl LiveEngine {
             groups: f.groups.clone(),
             primary_group_id,
             group_positions,
+            group_pixel_steps: HashMap::new(),
         }
     }
 
     fn ensure_fixtures_cache(&mut self, show_data: &ShowData) {
         let fixtures = &show_data.patch.fixtures;
         let is_cache_valid = self.cached_keys.len() == fixtures.len()
+            && self.cached_group_settings == show_data.groups.settings
             && self.cached_keys.iter().zip(fixtures.iter()).all(|(k, f)| {
                 k.id == f.id
                     && k.groups == f.groups
@@ -669,8 +732,50 @@ impl LiveEngine {
             });
         }
 
+        // Compute group_pixel_steps for each group
+        for (&group_id, f_ids) in &group_fixture_map {
+            let (pref, group_count_setting) = match show_data.groups.settings.get(&group_id) {
+                Some(s) => (s.pixel_preference, s.pixel_group_count),
+                None => (PixelPreference::Single, 2),
+            };
+
+            let mut step_counts = Vec::with_capacity(f_ids.len());
+            for &fid in f_ids {
+                let p_count = new_cached
+                    .iter()
+                    .find(|cf| cf.id == fid)
+                    .map(|cf| cf.profile.pixel_count)
+                    .unwrap_or(1)
+                    .max(1);
+                let steps = match pref {
+                    PixelPreference::Single => 1,
+                    PixelPreference::Individual => p_count,
+                    PixelPreference::Grouped => (group_count_setting as usize).min(p_count).max(1),
+                };
+                step_counts.push(steps);
+            }
+
+            let total_steps: usize = step_counts.iter().sum();
+            let mut offset = 0;
+            for (idx, &fid) in f_ids.iter().enumerate() {
+                let s_i = step_counts[idx];
+                if let Some(cf) = new_cached.iter_mut().find(|cf| cf.id == fid) {
+                    cf.group_pixel_steps.insert(
+                        group_id,
+                        FixturePixelStepInfo {
+                            step_offset: offset,
+                            step_count: s_i,
+                            total_steps,
+                        },
+                    );
+                }
+                offset += s_i;
+            }
+        }
+
         self.cached_fixtures = new_cached;
         self.cached_keys = new_keys;
+        self.cached_group_settings = show_data.groups.settings.clone();
     }
 
     pub fn compute_dmx(&mut self, show_data: &ShowData) {
@@ -726,16 +831,36 @@ impl LiveEngine {
                 .get(&active_color_group_id)
                 .unwrap_or(&(0, 1));
 
+            let intensity_pixel_steps = fixture
+                .group_pixel_steps
+                .get(&active_group_id)
+                .copied()
+                .unwrap_or(FixturePixelStepInfo {
+                    step_offset: local_index,
+                    step_count: 1,
+                    total_steps: group_count,
+                });
+
+            let color_pixel_steps = fixture
+                .group_pixel_steps
+                .get(&active_color_group_id)
+                .copied()
+                .unwrap_or(FixturePixelStepInfo {
+                    step_offset: color_local_index,
+                    step_count: 1,
+                    total_steps: color_group_count,
+                });
+
             self.compute_fixture_dmx(
                 fixture,
-                local_index,
-                group_count,
+                active_group_id,
                 &effect_state,
-                color_local_index,
-                color_group_count,
+                active_color_group_id,
                 &color_effect_state,
                 elapsed,
                 self.resolve_color_preference(fixture, &show_data.groups.settings),
+                intensity_pixel_steps,
+                color_pixel_steps,
             );
         }
 
@@ -777,14 +902,14 @@ impl LiveEngine {
     fn compute_fixture_dmx(
         &mut self,
         fixture: &CachedFixture,
-        local_index: usize,
-        group_count: usize,
+        active_group_id: u32,
         effect_state: &GroupEffectState,
-        color_local_index: usize,
-        color_group_count: usize,
+        active_color_group_id: u32,
         color_effect_state: &GroupEffectState,
         elapsed: f32,
         color_preference: ColorPreference,
+        intensity_pixel_steps: FixturePixelStepInfo,
+        color_pixel_steps: FixturePixelStepInfo,
     ) {
         if fixture.start_addr >= 512 {
             return;
@@ -823,6 +948,8 @@ impl LiveEngine {
         }) || self.is_flash_active(0, "randomStrobe")
             || self.is_flash_active(0, "random_strobe");
 
+        let fixture_u64_id = (fixture.id as u64) << 32;
+
         let is_in_strobe = is_in_strobe_group || is_in_random_strobe_group;
 
         let strobe_val = if is_in_strobe_group {
@@ -833,7 +960,7 @@ impl LiveEngine {
                 0
             }
         } else if is_in_random_strobe_group {
-            if compute_random_strobe_active(fixture.id, elapsed, self.random_strobe_rate) {
+            if compute_random_strobe_active(fixture_u64_id, elapsed, self.random_strobe_rate) {
                 255
             } else {
                 0
@@ -846,12 +973,23 @@ impl LiveEngine {
         let global_master = self.get_group_master(0) as f32 / 100.0;
         let master_multiplier = group_master * global_master;
 
+        let intensity_total = intensity_pixel_steps.total_steps.max(1);
+        let effective_intensity_index = if effect_state.alignment.as_deref() == Some("rng") {
+            self.get_rng_step(
+                active_group_id,
+                intensity_pixel_steps.step_offset,
+                intensity_total,
+            )
+        } else {
+            intensity_pixel_steps.step_offset
+        };
+
         let raw_intensity = calculate_effect_intensity(
             effect_state,
             elapsed,
-            local_index,
-            group_count,
-            fixture.id,
+            effective_intensity_index,
+            intensity_total,
+            fixture_u64_id,
             self.effect_bpm,
         );
 
@@ -889,13 +1027,24 @@ impl LiveEngine {
             secondary_rgb.2 as f32,
         );
 
+        let color_total = color_pixel_steps.total_steps.max(1);
+        let effective_color_index = if color_effect_state.alignment.as_deref() == Some("rng") {
+            self.get_color_rng_step(
+                active_color_group_id,
+                color_pixel_steps.step_offset,
+                color_total,
+            )
+        } else {
+            color_pixel_steps.step_offset
+        };
+
         let (r_f, g_f, b_f) = if color_effect_state.effect.as_deref() == Some("rainbow") {
             if let Some(fract) = calculate_effective_fract(
                 color_effect_state,
                 elapsed,
-                color_local_index,
-                color_group_count,
-                fixture.id,
+                effective_color_index,
+                color_total,
+                fixture_u64_id,
                 self.color_effect_bpm,
             ) {
                 let w = (color_effect_state.width as f32 / 100.0).clamp(0.0, 1.0);
@@ -911,9 +1060,9 @@ impl LiveEngine {
             let color_factor = calculate_effect_factor(
                 color_effect_state,
                 elapsed,
-                color_local_index,
-                color_group_count,
-                fixture.id,
+                effective_color_index,
+                color_total,
+                fixture_u64_id,
                 self.color_effect_bpm,
             );
 
@@ -1000,6 +1149,110 @@ impl LiveEngine {
             tilt_norm: None,
         };
 
+        let pixel_states = if fixture.profile.pixel_count > 1
+            && (intensity_pixel_steps.step_count > 1 || color_pixel_steps.step_count > 1)
+        {
+            let mut states = Vec::with_capacity(fixture.profile.pixel_count);
+            for p in 0..fixture.profile.pixel_count {
+                let p_intensity_step_raw = intensity_pixel_steps.step_offset
+                    + (p * intensity_pixel_steps.step_count) / fixture.profile.pixel_count;
+                let p_intensity_total = intensity_pixel_steps.total_steps.max(1);
+                let p_intensity_step = if effect_state.alignment.as_deref() == Some("rng") {
+                    self.get_rng_step(active_group_id, p_intensity_step_raw, p_intensity_total)
+                } else {
+                    p_intensity_step_raw
+                };
+
+                let p_color_step_raw = color_pixel_steps.step_offset
+                    + (p * color_pixel_steps.step_count) / fixture.profile.pixel_count;
+                let p_color_total = color_pixel_steps.total_steps.max(1);
+                let p_color_step = if color_effect_state.alignment.as_deref() == Some("rng") {
+                    self.get_color_rng_step(active_color_group_id, p_color_step_raw, p_color_total)
+                } else {
+                    p_color_step_raw
+                };
+
+                let p_id = ((fixture.id as u64) << 32) | (p as u64 + 1);
+
+                let p_raw_intensity = calculate_effect_intensity(
+                    effect_state,
+                    elapsed,
+                    p_intensity_step,
+                    p_intensity_total,
+                    p_id,
+                    self.effect_bpm,
+                );
+                let p_intensity_level =
+                    ((p_raw_intensity as f32) * master_multiplier).clamp(0.0, 255.0) as u8;
+                let p_intensity_norm = (p_intensity_level as f32) / 255.0;
+
+                let (p_rf, p_gf, p_bf) = if color_effect_state.effect.as_deref() == Some("rainbow")
+                {
+                    if let Some(fract) = calculate_effective_fract(
+                        color_effect_state,
+                        elapsed,
+                        p_color_step,
+                        p_color_total,
+                        p_id,
+                        self.color_effect_bpm,
+                    ) {
+                        let w = (color_effect_state.width as f32 / 100.0).clamp(0.0, 1.0);
+                        if w <= 0.0 || fract >= w {
+                            current_rgb_f
+                        } else {
+                            hsv_to_rgb(fract / w, 1.0, 1.0)
+                        }
+                    } else {
+                        current_rgb_f
+                    }
+                } else {
+                    let color_factor = calculate_effect_factor(
+                        color_effect_state,
+                        elapsed,
+                        p_color_step,
+                        p_color_total,
+                        p_id,
+                        self.color_effect_bpm,
+                    );
+
+                    (
+                        current_rgb_f.0 * (1.0 - color_factor) + secondary_rgb_f.0 * color_factor,
+                        current_rgb_f.1 * (1.0 - color_factor) + secondary_rgb_f.1 * color_factor,
+                        current_rgb_f.2 * (1.0 - color_factor) + secondary_rgb_f.2 * color_factor,
+                    )
+                };
+
+                let p_r_norm = (p_rf / 255.0).clamp(0.0, 1.0);
+                let p_g_norm = (p_gf / 255.0).clamp(0.0, 1.0);
+                let p_b_norm = (p_bf / 255.0).clamp(0.0, 1.0);
+
+                let p_white_accent = if p_r_norm >= 0.784 && p_g_norm >= 0.784 && p_b_norm >= 0.784
+                {
+                    1.0
+                } else {
+                    0.0
+                };
+
+                states.push(LogicalFixtureState {
+                    intensity: p_intensity_norm,
+                    color_rgb: (p_r_norm, p_g_norm, p_b_norm),
+                    white_accent: p_white_accent,
+                    flash_dimmer_factor,
+                    white_flash_factor: white_factor,
+                    is_in_strobe,
+                    strobe_val,
+                    color_wheel_dmx: None,
+                    color_macro_dmx: None,
+                    color_temp_dmx: None,
+                    pan_norm: None,
+                    tilt_norm: None,
+                });
+            }
+            Some(states)
+        } else {
+            None
+        };
+
         let buf = match self.universe_buffers.get_mut(&fixture.universe) {
             Some(b) => b,
             None => return,
@@ -1010,6 +1263,7 @@ impl LiveEngine {
             encode_fixture_dmx(
                 &fixture.profile,
                 &state,
+                pixel_states.as_deref(),
                 effective_preference,
                 &mut buf[fixture.start_addr..end_addr],
             );

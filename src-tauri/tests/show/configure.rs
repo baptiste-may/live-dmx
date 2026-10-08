@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use live_dmx_lib::show::{
     clamp_group_settings, compute_configure_overview, compute_group_configure_info,
     compute_group_rows, default_group_settings, get_group_color_options, get_group_pan_bounds,
-    get_group_tilt_bounds, is_pan_channel, is_tilt_channel, ColorPreference, FixtureGroup,
-    GroupSettings, PatchGroupsState, PatchedFixture, ShowData, ShowPatchState,
+    get_group_pixel_options, get_group_tilt_bounds, is_pan_channel, is_tilt_channel,
+    ColorPreference, FixtureGroup, GroupSettings, PatchGroupsState, PatchedFixture,
+    PixelPreference, ShowData, ShowPatchState,
 };
 
 #[test]
@@ -212,9 +213,79 @@ fn test_group_pan_tilt_bounds_calculation() {
 }
 
 #[test]
+fn test_get_group_pixel_options_detection() {
+    let empty_refs: Vec<&PatchedFixture> = vec![];
+    let (has_pixels, opts, max_p) = get_group_pixel_options(&empty_refs);
+    assert!(!has_pixels);
+    assert!(opts.is_empty());
+    assert_eq!(max_p, 1);
+
+    let single_pixel_fix = PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "PAR".to_string(),
+        fixture_type: serde_json::json!({ "name": "PAR" }),
+        mode: serde_json::json!({ "channels": ["Red", "Green", "Blue"] }),
+        universe: 1,
+        address: 1,
+    };
+    let (has_pixels, opts, max_p) = get_group_pixel_options(&[&single_pixel_fix]);
+    assert!(!has_pixels);
+    assert!(opts.is_empty());
+    assert_eq!(max_p, 1);
+
+    let two_pixel_fix = PatchedFixture {
+        id: 2,
+        groups: vec![1],
+        name: "2-Bar".to_string(),
+        fixture_type: serde_json::json!({ "name": "2-Bar" }),
+        mode: serde_json::json!({ "channels": ["Red", "Green", "Blue", "Red", "Green", "Blue"] }),
+        universe: 1,
+        address: 4,
+    };
+    let (has_pixels, opts, max_p) = get_group_pixel_options(&[&two_pixel_fix]);
+    assert!(has_pixels);
+    assert_eq!(
+        opts,
+        vec![PixelPreference::Single, PixelPreference::Individual]
+    );
+    assert_eq!(max_p, 2);
+
+    let four_pixel_fix = PatchedFixture {
+        id: 3,
+        groups: vec![1],
+        name: "4-Bar".to_string(),
+        fixture_type: serde_json::json!({ "name": "4-Bar" }),
+        mode: serde_json::json!({
+            "channels": [
+                "Red", "Green", "Blue",
+                "Red", "Green", "Blue",
+                "Red", "Green", "Blue",
+                "Red", "Green", "Blue"
+            ]
+        }),
+        universe: 1,
+        address: 10,
+    };
+    let (has_pixels, opts, max_p) = get_group_pixel_options(&[&single_pixel_fix, &four_pixel_fix]);
+    assert!(has_pixels);
+    assert_eq!(
+        opts,
+        vec![
+            PixelPreference::Single,
+            PixelPreference::Individual,
+            PixelPreference::Grouped
+        ]
+    );
+    assert_eq!(max_p, 4);
+}
+
+#[test]
 fn test_clamp_group_settings() {
     let mut settings = GroupSettings {
         color_preference: ColorPreference::ColorPresets,
+        pixel_preference: PixelPreference::Grouped,
+        pixel_group_count: 50,
         pan_min: -500,
         pan_max: 500,
         tilt_min: 200,
@@ -226,8 +297,16 @@ fn test_clamp_group_settings() {
     let pan_bounds = [-270, 270];
     let tilt_bounds = [-135, 135];
     let color_options = vec![ColorPreference::ColorMix, ColorPreference::ColorWheel];
+    let pixel_options = vec![PixelPreference::Single, PixelPreference::Individual];
 
-    clamp_group_settings(&mut settings, pan_bounds, tilt_bounds, &color_options);
+    clamp_group_settings(
+        &mut settings,
+        pan_bounds,
+        tilt_bounds,
+        &color_options,
+        &pixel_options,
+        8,
+    );
 
     assert_eq!(settings.pan_min, -270);
     assert_eq!(settings.pan_max, 270);
@@ -235,6 +314,10 @@ fn test_clamp_group_settings() {
     assert_eq!(settings.tilt_max, 135);
     // Invalid color preference was clamped to first available option
     assert_eq!(settings.color_preference, ColorPreference::ColorMix);
+    // Invalid pixel preference (Grouped not in options) clamped to first option
+    assert_eq!(settings.pixel_preference, PixelPreference::Single);
+    // Pixel group count clamped to max_pixels (8)
+    assert_eq!(settings.pixel_group_count, 8);
 }
 
 #[test]
@@ -245,6 +328,8 @@ fn test_default_group_settings() {
     assert_eq!(settings.tilt_min, -135);
     assert_eq!(settings.tilt_max, 135);
     assert_eq!(settings.color_preference, ColorPreference::ColorWheel);
+    assert_eq!(settings.pixel_preference, PixelPreference::Single);
+    assert_eq!(settings.pixel_group_count, 2);
     assert!(!settings.inverse_pan);
     assert!(!settings.inverse_tilt);
 }
@@ -271,6 +356,8 @@ fn test_compute_configure_overview_full() {
                 1,
                 GroupSettings {
                     color_preference: ColorPreference::ColorWheel,
+                    pixel_preference: PixelPreference::Single,
+                    pixel_group_count: 2,
                     pan_min: -90,
                     pan_max: 90,
                     tilt_min: -45,
@@ -378,4 +465,42 @@ fn test_compute_group_configure_info() {
     assert_eq!(info.color_options, vec![ColorPreference::ColorMix]);
     assert_eq!(info.settings.pan_min, -270);
     assert_eq!(info.settings.pan_max, 270);
+    assert!(!info.has_pixels);
+    assert_eq!(info.pixel_options, Vec::<PixelPreference>::new());
+    assert_eq!(info.max_pixels, 1);
+}
+
+#[test]
+fn test_compute_group_configure_info_multi_pixel() {
+    let defs = HashMap::new();
+    let fixtures = vec![PatchedFixture {
+        id: 10,
+        groups: vec![1],
+        name: "Pixel Bar 4".to_string(),
+        fixture_type: serde_json::json!({ "name": "Bar" }),
+        mode: serde_json::json!({
+            "channels": [
+                "Red", "Green", "Blue",
+                "Red", "Green", "Blue",
+                "Red", "Green", "Blue",
+                "Red", "Green", "Blue"
+            ],
+        }),
+        universe: 1,
+        address: 1,
+    }];
+
+    let info = compute_group_configure_info(1, "Pixel Bars", &fixtures, &defs, None);
+    assert!(info.has_pixels);
+    assert_eq!(
+        info.pixel_options,
+        vec![
+            PixelPreference::Single,
+            PixelPreference::Individual,
+            PixelPreference::Grouped
+        ]
+    );
+    assert_eq!(info.max_pixels, 4);
+    assert_eq!(info.settings.pixel_preference, PixelPreference::Single);
+    assert_eq!(info.settings.pixel_group_count, 2);
 }
