@@ -28,8 +28,8 @@ fn test_live_engine_white_flash_calculation() {
     for val in buf_flash.iter().take(5) {
         assert_eq!(*val, 255);
     }
-    assert_eq!(buf_flash[5], 0); // Pan stays 0
-    assert_eq!(buf_flash[6], 0); // Tilt stays 0
+    assert_eq!(buf_flash[5], 128); // Pan defaults to center (128)
+    assert_eq!(buf_flash[6], 128); // Tilt defaults to center (128)
 
     // Release White Flash
     engine.set_flash(1, "master".to_string(), false);

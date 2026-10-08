@@ -42,48 +42,68 @@ impl LiveEngineRunner {
             let mut kinet_sender = crate::output::protocols::KinetSender::new();
             let mut opc_sender = crate::output::protocols::OpcSender::new();
             let mut physical_sender = crate::output::interfaces::PhysicalDmxSender::new();
+            let mut send_buffers: std::collections::HashMap<u16, (String, Vec<u8>)> =
+                std::collections::HashMap::new();
 
             while running.load(Ordering::SeqCst) {
                 let start = Instant::now();
 
-                match show_state.lock() {
+                let transmissions: Vec<(u16, String)> = match show_state.lock() {
                     Ok(show) => {
-                        let show_snapshot = show.clone();
-                        drop(show);
-                        if let Ok(mut eng) = engine.lock() {
-                            eng.compute_dmx(&show_snapshot);
+                        let configs: Vec<(u16, bool, String)> = show
+                            .output
+                            .universes
+                            .iter()
+                            .map(|u| (u.universe as u16, u.enabled, u.output.clone()))
+                            .collect();
 
-                            for universe_cfg in &show_snapshot.output.universes {
-                                if !universe_cfg.enabled {
-                                    continue;
-                                }
-                                let u_val = universe_cfg.universe as u16;
-                                if let Some(buf) = eng.universe_buffers.get(&u_val) {
-                                    match universe_cfg.output.as_str() {
-                                        "none" => {}
-                                        "artnet" => artnet_sender.send_universe(u_val, buf),
-                                        "sacn" => {
-                                            if let Some(sender) = &mut sacn_sender {
-                                                let _ = sender.send_universe(u_val, buf);
-                                            }
-                                        }
-                                        "osc" => osc_sender.send_universe(u_val, buf),
-                                        "kinet" => kinet_sender.send_universe(u_val, buf),
-                                        "opc" => {
-                                            let _ = opc_sender.send_universe(u_val, buf);
-                                        }
-                                        target => {
-                                            let _ = physical_sender.send_to_target(target, buf);
-                                        }
+                        let mut to_send = Vec::new();
+                        if let Ok(mut eng) = engine.lock() {
+                            eng.compute_dmx(&show);
+
+                            for (u_val, enabled, output) in configs {
+                                if enabled && output != "none" {
+                                    if let Some(buf) = eng.universe_buffers.get(&u_val) {
+                                        let entry = send_buffers
+                                            .entry(u_val)
+                                            .or_insert_with(|| (output.clone(), vec![0u8; 512]));
+                                        entry.0 = output.clone();
+                                        entry.1.copy_from_slice(buf);
+                                        to_send.push((u_val, output));
                                     }
                                 }
                             }
                         }
+                        drop(show);
+                        to_send
                     }
                     Err(err) => {
                         log::error!(target: "live-dmx::engine", "live engine loop stopping: show state lock poisoned: {err}");
                         running.store(false, Ordering::SeqCst);
                         break;
+                    }
+                };
+
+                // Network & Serial I/O completely outside show and engine locks!
+                for (u_val, output) in transmissions {
+                    if let Some((_, buf)) = send_buffers.get(&u_val) {
+                        match output.as_str() {
+                            "none" => {}
+                            "artnet" => artnet_sender.send_universe(u_val, buf),
+                            "sacn" => {
+                                if let Some(sender) = &mut sacn_sender {
+                                    let _ = sender.send_universe(u_val, buf);
+                                }
+                            }
+                            "osc" => osc_sender.send_universe(u_val, buf),
+                            "kinet" => kinet_sender.send_universe(u_val, buf),
+                            "opc" => {
+                                let _ = opc_sender.send_universe(u_val, buf);
+                            }
+                            target => {
+                                let _ = physical_sender.send_to_target(target, buf);
+                            }
+                        }
                     }
                 }
 

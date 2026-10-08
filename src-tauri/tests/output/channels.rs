@@ -32,9 +32,18 @@ fn test_classify_channel() {
     assert_eq!(classify_channel("Dimmer fine"), ChannelType::Other);
     assert_eq!(classify_channel("Red Fine"), ChannelType::Other);
     assert_eq!(classify_channel("Green LSB"), ChannelType::Other);
-    assert_eq!(classify_channel("Pan (16 bit)"), ChannelType::Other);
-    assert_eq!(classify_channel("Pan"), ChannelType::Other);
-    assert_eq!(classify_channel("Tilt"), ChannelType::Other);
+    assert_eq!(classify_channel("Pan (16 bit)"), ChannelType::PanFine);
+    assert_eq!(classify_channel("Pan"), ChannelType::Pan);
+    assert_eq!(classify_channel("Pan Fine"), ChannelType::PanFine);
+    assert_eq!(classify_channel("Tilt"), ChannelType::Tilt);
+    assert_eq!(classify_channel("Tilt Fine"), ChannelType::TiltFine);
+    assert_eq!(classify_channel("XYZ_Y"), ChannelType::PositionXYZ);
+    assert_eq!(classify_channel("Lime"), ChannelType::Lime);
+    assert_eq!(classify_channel("ColorAdd_GY"), ChannelType::Lime);
+    assert_eq!(classify_channel("DimmerCurve"), ChannelType::Other);
+    assert_eq!(classify_channel("Dimmer Mode"), ChannelType::Other);
+    assert_eq!(classify_channel("Dimmer Speed"), ChannelType::Other);
+    assert_eq!(classify_channel("Dimmer Time"), ChannelType::Other);
 }
 
 #[test]

@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 use iota_stronghold::Client;
@@ -121,6 +120,7 @@ fn write_key_file(path: &Path, key: &[u8; 32]) -> Result<(), String> {
 
 #[cfg(unix)]
 fn write_key_file_contents(path: &Path, key: &[u8; 32]) -> std::io::Result<()> {
+    use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
     let mut opts = fs::OpenOptions::new();
     opts.write(true).create(true).truncate(true).mode(0o600);

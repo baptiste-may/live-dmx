@@ -169,7 +169,7 @@ fn test_group_color_options_detection() {
 #[test]
 fn test_group_pan_tilt_bounds_calculation() {
     let defs = HashMap::new();
-    let fixtures = vec![
+    let fixtures = [
         PatchedFixture {
             id: 1,
             groups: vec![1],
@@ -251,63 +251,64 @@ fn test_default_group_settings() {
 
 #[test]
 fn test_compute_configure_overview_full() {
-    let mut show = ShowData::default();
-    show.groups = PatchGroupsState {
-        groups: vec![
-            FixtureGroup {
-                id: 0,
-                name: "All".to_string(),
-            },
-            FixtureGroup {
-                id: 1,
-                name: "Moving Heads".to_string(),
-            },
-            FixtureGroup {
-                id: 2,
-                name: "Static RGB".to_string(),
-            },
-        ],
-        settings: HashMap::from([(
-            1,
-            GroupSettings {
-                color_preference: ColorPreference::ColorWheel,
-                pan_min: -90,
-                pan_max: 90,
-                tilt_min: -45,
-                tilt_max: 45,
-                inverse_pan: true,
-                inverse_tilt: false,
-            },
-        )]),
-    };
-
-    show.patch = ShowPatchState {
-        fixtures: vec![
-            PatchedFixture {
-                id: 1,
-                groups: vec![1],
-                name: "Spot 1".to_string(),
-                fixture_type: serde_json::json!({ "name": "Spot" }),
-                mode: serde_json::json!({
-                    "channels": ["Pan", "Tilt", "Color Wheel"],
-                    "panBounds": [-270, 270],
-                    "tiltBounds": [-135, 135]
-                }),
-                universe: 1,
-                address: 1,
-            },
-            PatchedFixture {
-                id: 2,
-                groups: vec![2],
-                name: "PAR 1".to_string(),
-                fixture_type: serde_json::json!({ "name": "PAR" }),
-                mode: serde_json::json!({
-                    "channels": ["Red", "Green", "Blue"],
-                }),
-                universe: 1,
-                address: 20,
-            },
-        ],
+    let show = ShowData {
+        groups: PatchGroupsState {
+            groups: vec![
+                FixtureGroup {
+                    id: 0,
+                    name: "All".to_string(),
+                },
+                FixtureGroup {
+                    id: 1,
+                    name: "Moving Heads".to_string(),
+                },
+                FixtureGroup {
+                    id: 2,
+                    name: "Static RGB".to_string(),
+                },
+            ],
+            settings: HashMap::from([(
+                1,
+                GroupSettings {
+                    color_preference: ColorPreference::ColorWheel,
+                    pan_min: -90,
+                    pan_max: 90,
+                    tilt_min: -45,
+                    tilt_max: 45,
+                    inverse_pan: true,
+                    inverse_tilt: false,
+                },
+            )]),
+        },
+        patch: ShowPatchState {
+            fixtures: vec![
+                PatchedFixture {
+                    id: 1,
+                    groups: vec![1],
+                    name: "Spot 1".to_string(),
+                    fixture_type: serde_json::json!({ "name": "Spot" }),
+                    mode: serde_json::json!({
+                        "channels": ["Pan", "Tilt", "Color Wheel"],
+                        "panBounds": [-270, 270],
+                        "tiltBounds": [-135, 135]
+                    }),
+                    universe: 1,
+                    address: 1,
+                },
+                PatchedFixture {
+                    id: 2,
+                    groups: vec![2],
+                    name: "PAR 1".to_string(),
+                    fixture_type: serde_json::json!({ "name": "PAR" }),
+                    mode: serde_json::json!({
+                        "channels": ["Red", "Green", "Blue"],
+                    }),
+                    universe: 1,
+                    address: 20,
+                },
+            ],
+        },
+        ..Default::default()
     };
 
     let overview = compute_configure_overview(&show);

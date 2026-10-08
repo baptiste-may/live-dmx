@@ -292,6 +292,8 @@ fn test_show_file_with_embedded_gdtf_definitions() {
                 short_name: Some("Std".to_string()),
                 channel_count: 24,
                 channels: vec!["Pan".to_string(), "Tilt".to_string(), "Dimmer".to_string()],
+                channel_defaults: None,
+                shutter_open_values: None,
                 pan_bounds: Some([-270, 270]),
                 tilt_bounds: Some([-135, 135]),
             }],

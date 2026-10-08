@@ -330,6 +330,8 @@ fn fallback_fixture_definition(name: &str) -> ParsedGdtfFixture {
             short_name: Some("1ch".to_string()),
             channel_count: 1,
             channels: vec!["Dimmer".to_string()],
+            channel_defaults: None,
+            shutter_open_values: None,
             pan_bounds: None,
             tilt_bounds: None,
         }],
@@ -396,6 +398,8 @@ fn resolve_fixture_gdtf_and_mode(
                             short_name: None,
                             channel_count: 1,
                             channels: vec!["Dimmer".to_string()],
+                            channel_defaults: None,
+                            shutter_open_values: None,
                             pan_bounds: None,
                             tilt_bounds: None,
                         }
@@ -408,6 +412,8 @@ fn resolve_fixture_gdtf_and_mode(
                     short_name: None,
                     channel_count: 1,
                     channels: vec!["Dimmer".to_string()],
+                    channel_defaults: None,
+                    shutter_open_values: None,
                     pan_bounds: None,
                     tilt_bounds: None,
                 }
@@ -832,6 +838,8 @@ pub fn import_mvr_from_bytes_with_progress(
                             short_name: m.short_name.clone(),
                             channel_count: m.channel_count,
                             channels: m.channels.clone(),
+                            channel_defaults: m.channel_defaults.clone(),
+                            shutter_open_values: m.shutter_open_values.clone(),
                             pan_bounds: m.pan_bounds,
                             tilt_bounds: m.tilt_bounds,
                         })
@@ -896,6 +904,18 @@ pub fn import_mvr_from_bytes_with_progress(
             "channels".to_string(),
             serde_json::to_value(&mode.channels).unwrap_or_default(),
         );
+        if let Some(ref channel_defaults) = mode.channel_defaults {
+            mode_map.insert(
+                "channelDefaults".to_string(),
+                serde_json::to_value(channel_defaults).unwrap_or_default(),
+            );
+        }
+        if let Some(ref shutter_open_values) = mode.shutter_open_values {
+            mode_map.insert(
+                "shutterOpenValues".to_string(),
+                serde_json::to_value(shutter_open_values).unwrap_or_default(),
+            );
+        }
         if let Some(pan_bounds) = mode.pan_bounds {
             mode_map.insert(
                 "panBounds".to_string(),

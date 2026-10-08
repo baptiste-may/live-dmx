@@ -231,7 +231,7 @@ fn test_group_settings_clamped_against_bounds() {
         clamp_group_settings, get_group_pan_bounds, get_group_tilt_bounds,
     };
 
-    let fixtures = vec![PatchedFixture {
+    let fixtures = [PatchedFixture {
         id: 1,
         groups: vec![1],
         name: "Spot".to_string(),

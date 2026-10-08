@@ -549,3 +549,100 @@ fn test_cct_preference_falls_back_to_rgb_on_mix_fixture() {
     assert_eq!(buf[2], 255); // Green
     assert_eq!(buf[1], 0); // Red
 }
+
+#[test]
+fn test_moving_head_pan_tilt_defaults_and_shutter_open() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Test Moving Head".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "Dimmer",
+                "Pan",
+                "Pan Fine",
+                "Tilt",
+                "Tilt Fine",
+                "Strobe",
+                "Red",
+                "Green",
+                "Blue",
+                "Lime"
+            ],
+            "channelDefaults": [0, 128, 0, 128, 0, 0, 0, 0, 0, 0],
+            "shutterOpenValues": {"5": 32}
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    // 1. Initial / dark state (Dimmer = 0)
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 0); // Dimmer closed
+    assert_eq!(buf[1], 128); // Pan coarse center
+    assert_eq!(buf[2], 0); // Pan fine
+    assert_eq!(buf[3], 128); // Tilt coarse center
+    assert_eq!(buf[4], 0); // Tilt fine
+    assert_eq!(buf[5], 0); // Shutter closed when intensity is 0
+
+    // 2. Active full intensity (Dimmer = 255, Color = White)
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_color(1, Some("white".to_string()), Some(&show));
+    engine.compute_dmx(&show);
+
+    let buf_active = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf_active[0], 255); // Dimmer open
+    assert_eq!(buf_active[1], 128); // Pan stays centered
+    assert_eq!(buf_active[2], 0);
+    assert_eq!(buf_active[3], 128); // Tilt stays centered
+    assert_eq!(buf_active[4], 0);
+    assert_eq!(buf_active[5], 32); // Shutter opens to open value!
+    assert_eq!(buf_active[6], 255); // Red
+    assert_eq!(buf_active[7], 255); // Green
+    assert_eq!(buf_active[8], 255); // Blue
+    assert_eq!(buf_active[9], 0); // Lime stays 0 on neutral white!
+}
+
+#[test]
+fn test_position_xyz_unaffected_by_intensity() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "DMX Mover".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({
+            "channels": [
+                "XYZ_Y",
+                "XYZ_Y Fine"
+            ]
+        }),
+        universe: 1,
+        address: 1,
+    });
+
+    // 1. With no effect / master 0
+    engine.set_group_master(1, 0);
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255, "XYZ_Y should default to 255 (top)");
+    assert_eq!(buf[1], 255, "XYZ_Y Fine should default to 255");
+
+    // 2. With full intensity on group 1
+    engine.set_group_master(1, 100);
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.compute_dmx(&show);
+    let buf_active = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(
+        buf_active[0], 255,
+        "XYZ_Y must not be modulated by intensity"
+    );
+    assert_eq!(buf_active[1], 255);
+}

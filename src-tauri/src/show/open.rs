@@ -127,6 +127,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn accepts_file_url() {
         assert_eq!(
             extract_show_path("file:///home/user/show.ldmx"),
@@ -135,10 +136,29 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
+    fn accepts_file_url() {
+        assert_eq!(
+            extract_show_path("file:///C:/user/show.ldmx"),
+            Some("C:\\user\\show.ldmx".to_string())
+        );
+    }
+
+    #[test]
+    #[cfg(not(windows))]
     fn accepts_file_url_with_encoded_space() {
         assert_eq!(
             extract_show_path("file:///home/user/my%20show.ldmx"),
             Some("/home/user/my show.ldmx".to_string())
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn accepts_file_url_with_encoded_space() {
+        assert_eq!(
+            extract_show_path("file:///C:/user/my%20show.ldmx"),
+            Some("C:\\user\\my show.ldmx".to_string())
         );
     }
 

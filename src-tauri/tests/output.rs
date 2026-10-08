@@ -5,6 +5,7 @@ mod output {
     mod colors;
     mod effects;
     mod engine;
+    mod fixtures_integration;
     mod interfaces;
     mod kinet;
     mod opc;

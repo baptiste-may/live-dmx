@@ -1,9 +1,11 @@
+use serde::{Deserialize, Serialize};
+
 use crate::output::types::ChannelType;
 use crate::show::ColorPreference;
 
 /// Precomputed color-channel capability summary for a fixture, derived from its
 /// stable channel list once instead of scanned on every frame.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ColorChannelSummary {
     pub has_mix: bool,
     pub has_wheel: bool,

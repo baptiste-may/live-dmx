@@ -32,6 +32,8 @@ pub struct ParsedGdtfMode {
     name, short_name: Option<String>,
     channel_count: usize,
     channels: Vec<String>,             // human-readable channel names
+    channel_defaults: Option<Vec<u8>>, // parsed default DMX values per channel
+    shutter_open_values: Option<HashMap<usize, u8>>, // channel index -> open DMX value
     pan_bounds: Option<[i32; 2]>,      // degrees, e.g. [-270, 270]
     tilt_bounds: Option<[i32; 2]>,     // degrees, e.g. [-135, 135]
 }
@@ -91,12 +93,28 @@ Available generics (manufacturer `"Generic"`):
 
 - **Channel mapping** — `map_gdtf_attribute_to_name(attribute, is_fine)` converts
   DIN SPEC 15800 `ChannelFunction` `Attribute` refs into human-readable names
-  (`ColorAdd_R`/`ColorAdd_RY` → `Red`, `ColorAdd_G`/`ColorAdd_GY` → `Green`,
+  (`ColorAdd_R`/`ColorAdd_RY` → `Red`, `ColorAdd_G` → `Green`, `ColorAdd_GY` → `Lime`,
   `ColorAdd_B`/`ColorAdd_BC` → `Blue`, `ColorAdd_W`/`ColorAdd_WW`/`ColorAdd_CW` →
   `White`, `ColorAdd_A` → `Amber`, `ColorAdd_UV` → `UV`, `ColorSub_C/M/Y` →
   Cyan/Magenta/Yellow, `Shutter*`/`StrobeRate` → `Strobe`, otherwise passthrough).
   A `Fine` suffix (or the `is_fine` flag from multi-byte offsets) appends
   `" Fine"`.
+- **Multi-cell geometry expansion** — per DIN SPEC 15800, multi-cell/bar fixtures
+  (such as pixel strips, multi-cell washlights, and bar fixtures) declare cell
+  channels on a sub-geometry (e.g. `RGB Cluster` or `Pixel`) with relative offsets,
+  instantiated through `<GeometryReference Geometry="...">` and one or more
+  `<Break DMXBreak="N" DMXOffset="...">` elements. Geometry references are keyed
+  by `(root_geometry, target_geometry, dmx_break)`, enabling mode-specific root trees
+  and break offsets to resolve accurately. The parser expands each channel definition
+  across all matching instance offsets (`inst_offset = bo + rel_off - 1`), ensuring
+  full cell footprint coverage without fixture-specific logic.
+- **Channel defaults & shutter open values** — parses GDTF `ChannelFunction` `Default`
+  attributes (supporting single-byte and 16-bit fraction syntax like `128/1`, `32768/2`
+  scaled down to channel byte resolution) into `channel_defaults`. Additionally,
+  extracts open shutter values (`"Open"`, `"No function"`, `"On"`, etc., rejecting effect/strobe
+  keywords) from `ChannelSet` into `shutter_open_values` (strictly 0-indexed channel offsets
+  matching engine and live output conventions). Both `channelDefaults` and `shutterOpenValues`
+  are preserved across show serialization and mutations (`clean_mode`).
 - **Multi-byte offsets** — Coarse/Fine/Ultra channels are combined into a single
   channel line with the `Fine` qualifier.
 - **Physical bounds** — `parse_physical_bounds(from, to)` derives `pan_bounds`/

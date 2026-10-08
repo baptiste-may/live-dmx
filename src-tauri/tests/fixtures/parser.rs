@@ -303,3 +303,102 @@ fn test_parse_gdtf_xml_with_logical_channel_bounds() {
     assert_eq!(mode.pan_bounds, Some([-180, 180]));
     assert_eq!(mode.tilt_bounds, Some([-110, 110]));
 }
+
+#[test]
+fn test_parse_gdtf_xml_geometry_reference_multi_cell() {
+    let xml = r#"<GDTF DataVersion="1.2">
+    <FixtureType Name="Multi-Cell Bar" Manufacturer="Test Lighting">
+        <Geometries>
+            <GeometryReference Name="Cell 1" Geometry="RGB Cluster">
+                <Break DMXBreak="1" DMXOffset="1"/>
+            </GeometryReference>
+            <GeometryReference Name="Cell 2" Geometry="RGB Cluster">
+                <Break DMXBreak="1" DMXOffset="4"/>
+            </GeometryReference>
+        </Geometries>
+        <DMXModes>
+            <DMXMode Name="6ch Mode">
+                <DMXChannels>
+                    <DMXChannel Offset="1" Geometry="RGB Cluster">
+                        <LogicalChannel Attribute="NoFeature"/>
+                    </DMXChannel>
+                    <DMXChannel Offset="2" Geometry="RGB Cluster">
+                        <LogicalChannel Attribute="NoFeature"/>
+                    </DMXChannel>
+                    <DMXChannel Offset="3" Geometry="RGB Cluster">
+                        <LogicalChannel Attribute="NoFeature"/>
+                    </DMXChannel>
+                </DMXChannels>
+            </DMXMode>
+        </DMXModes>
+    </FixtureType>
+</GDTF>"#;
+
+    let parsed = parse_gdtf_xml(xml).expect("Should parse multi-cell GDTF XML");
+    let mode = &parsed.modes[0];
+    assert_eq!(mode.channel_count, 6);
+    assert_eq!(
+        mode.channels,
+        vec![
+            "Red".to_string(),
+            "Green".to_string(),
+            "Blue".to_string(),
+            "Red".to_string(),
+            "Green".to_string(),
+            "Blue".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn test_parse_gdtf_xml_shutter_open_and_defaults() {
+    let xml = r#"<GDTF DataVersion="1.2">
+    <FixtureType Name="Moving Spot Pro" Manufacturer="Test Lighting">
+        <DMXModes>
+            <DMXMode Name="Extended">
+                <DMXChannels>
+                    <DMXChannel Offset="1,2">
+                        <LogicalChannel Attribute="Pan">
+                            <ChannelFunction Attribute="Pan" Default="32768/2"/>
+                        </LogicalChannel>
+                    </DMXChannel>
+                    <DMXChannel Offset="3">
+                        <LogicalChannel Attribute="Shutter1">
+                            <ChannelFunction Attribute="Shutter1" Default="0/1">
+                                <ChannelSet Name="Closed" DMXFrom="0/1"/>
+                                <ChannelSet Name="Open" DMXFrom="32/1"/>
+                            </ChannelFunction>
+                        </LogicalChannel>
+                    </DMXChannel>
+                    <DMXChannel Offset="4">
+                        <LogicalChannel Attribute="Dimmer">
+                            <ChannelFunction Attribute="Dimmer" Default="0/1"/>
+                        </LogicalChannel>
+                    </DMXChannel>
+                </DMXChannels>
+            </DMXMode>
+        </DMXModes>
+    </FixtureType>
+</GDTF>"#;
+
+    let parsed = parse_gdtf_xml(xml).expect("Should parse GDTF XML with shutter and defaults");
+    let mode = &parsed.modes[0];
+    assert_eq!(mode.channel_count, 4);
+    assert_eq!(
+        mode.channels,
+        vec![
+            "Pan".to_string(),
+            "Pan Fine".to_string(),
+            "Strobe".to_string(),
+            "Dimmer".to_string(),
+        ]
+    );
+    // Pan coarse is 128, fine is 0
+    let defaults = mode.channel_defaults.as_ref().unwrap();
+    assert_eq!(defaults[0], 128);
+    assert_eq!(defaults[1], 0);
+
+    // Shutter open value extracted for Ch 3 (0-indexed channel offset 2)
+    let shutter_opens = mode.shutter_open_values.as_ref().unwrap();
+    assert_eq!(shutter_opens.get(&2), Some(&32));
+}

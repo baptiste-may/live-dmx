@@ -71,6 +71,10 @@ pub struct EmbeddedGdtfMode {
     pub channel_count: usize,
     pub channels: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_defaults: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shutter_open_values: Option<HashMap<usize, u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pan_bounds: Option<[i32; 2]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tilt_bounds: Option<[i32; 2]>,
@@ -367,6 +371,18 @@ pub fn clean_mode(val: &serde_json::Value) -> serde_json::Value {
     }
     if let Some(tilt_bounds) = clean_bounds(val.get("tiltBounds")) {
         map.insert("tiltBounds".to_string(), tilt_bounds);
+    }
+    if let Some(channel_defaults) = val.get("channelDefaults").and_then(|v| v.as_array()) {
+        map.insert(
+            "channelDefaults".to_string(),
+            serde_json::Value::Array(channel_defaults.clone()),
+        );
+    }
+    if let Some(shutter_open_values) = val.get("shutterOpenValues").and_then(|v| v.as_object()) {
+        map.insert(
+            "shutterOpenValues".to_string(),
+            serde_json::Value::Object(shutter_open_values.clone()),
+        );
     }
     serde_json::Value::Object(map)
 }

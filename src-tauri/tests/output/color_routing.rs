@@ -189,7 +189,7 @@ fn test_rgb_to_color_temperature_clamped() {
     assert_eq!(rgb_to_color_temperature(0, 0, 0), 3200.0);
     // Extreme blue/pure colors are clamped into the 2000..10000 range.
     let blue = rgb_to_color_temperature(0, 0, 255);
-    assert!(blue >= 2000.0 && blue <= 10000.0, "got {blue}");
+    assert!((2000.0..=10000.0).contains(&blue), "got {blue}");
 }
 
 #[test]

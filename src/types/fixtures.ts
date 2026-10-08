@@ -26,6 +26,8 @@ export interface ParsedGdtfMode {
   shortName?: string;
   channelCount: number;
   channels: string[];
+  channelDefaults?: number[];
+  shutterOpenValues?: Record<number, number>;
   panBounds?: [number, number];
   tiltBounds?: [number, number];
 }
@@ -35,6 +37,8 @@ export interface EmbeddedGdtfMode {
   shortName?: string;
   channelCount: number;
   channels: string[];
+  channelDefaults?: number[];
+  shutterOpenValues?: Record<number, number>;
   panBounds?: [number, number];
   tiltBounds?: [number, number];
 }
