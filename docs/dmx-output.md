@@ -95,7 +95,9 @@ needs registration there — see the checklist in `docs/backend-architecture.md`
 ## Network protocols (src-tauri/src/output/protocols/)
 
 Each sender implements an internal `send_universe(universe, &[u8; 512])`. Tests
-live in `src-tauri/tests/output/` (one file per protocol).
+live in `src-tauri/tests/output/` (one file per protocol). To add a new protocol
+end to end, follow the `add-dmx-protocol` skill
+(`.agents/skills/add-dmx-protocol/SKILL.md`).
 
 | Protocol             | File        | Port       | Notes                            |
 | -------------------- | ----------- | ---------- | -------------------------------- |

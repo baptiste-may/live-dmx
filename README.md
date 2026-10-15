@@ -68,7 +68,7 @@ bun run tauri build
 
 ## 🤝 Contributing
 
-Contributions are welcome! If you're interested in adding new fixture definitions or improving the live interface, please check out our `AGENTS.md` for project-specific instructions and coding standards.
+Contributions are welcome! If you're interested in adding new fixture definitions or improving the live interface, please check out our `AGENTS.md` for project-specific instructions and coding standards, and the task procedures under `.agents/skills/`.
 
 ## 📄 License
 

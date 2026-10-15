@@ -108,24 +108,12 @@ Custom app commands (the ones in `lib.rs`) don't need an entry here — only
 **plugin** commands do. If a new plugin appears (or you call a plugin API not
 yet covered by `:default`), add the permission.
 
-### Checklist — adding a new Tauri backend command
+### Adding a new Tauri backend command
 
-1. **Rust:** implement the `#[tauri::command]` in the right module (thin
-   handler → dedicated logic). Return `Result<T, String>`.
-2. **Register:** add it to `tauri::generate_handler![...]` in
-   `src-tauri/src/lib.rs`. (Forget this → `Command X not found`.)
-3. **Permissions:** only for _plugin_ commands — if your command calls a plugin
-   API, add the matching permission to `src-tauri/capabilities/default.json`.
-4. **Frontend:** call it with `invoke("command_name", { camelCaseArgs })` via
-   `@tauri-apps/api/core` (see `docs/frontend-architecture.md`). Wire state
-   through a Pinia store (`docs/frontend-architecture.md`).
-5. **Tests:** add Rust coverage (cargo test, e.g. under `src-tauri/tests/`) and
-   mock the `invoke` in frontend tests (`vi.mocked(invoke)`, doc conventions in
-   `docs/frontend-architecture.md`).
-6. **Events:** if the command changes show state, use `apply_mutation` so the
-   snapshot event fires.
-7. **Docs:** update `AGENTS.md` list of commands/the relevant `docs/` module
-   section if your command is a new area.
+Follow the `add-tauri-command` skill
+(`.agents/skills/add-tauri-command/SKILL.md`) — full checklist: module,
+`generate_handler!` registration, plugin permissions, frontend wiring, tests on
+both sides, `apply_mutation`, docs.
 
 ## Debug tooling — MCP bridge (dev only)
 
@@ -135,25 +123,17 @@ companion `@hypothesi/tauri-mcp-server` MCP server drive a **running dev app**
 
 - Registered **only in debug builds** (`#[cfg(debug_assertions)]` in `lib.rs`),
   so it is never part of a release binary.
-- Bound to `127.0.0.1` via
-  `Builder::new().bind_address("127.0.0.1").build()` — the plugin defaults to
-  `0.0.0.0`, which would expose command/JS execution on the network.
-- Permission `mcp-bridge:default` in `capabilities/default.json` (plugin
-  commands need an entry; custom app commands don't).
-- `app.withGlobalTauri: true` is **required**: the injected `bridge.js` calls
-  `window.__TAURI__.*`, so without the global every eval-based feature
-  (execute_js, screenshots, DOM/interaction, execute_command) silently times
-  out. Pure Rust commands (e.g. `get_backend_state`) work either way since they
-  don't go through the webview.
-- That flag lives in `src-tauri/tauri.dev.conf.json` (not the base config), so
-  it stays out of release builds. Launch dev with `bun run dev:app` (which
-  passes `--config`). Plain `tauri dev` skips that file: the bridge and its
-  Rust commands still work, but `app.withGlobalTauri` is off, so the
-  eval-based features above break.
+- Bound to `127.0.0.1` explicitly (the plugin defaults to `0.0.0.0`, which
+  would expose command/JS execution on the network).
+- Needs the `mcp-bridge:default` permission and, for eval-based features,
+  `app.withGlobalTauri: true` — which lives in `src-tauri/tauri.dev.conf.json`,
+  so launch dev with `bun run dev:app`, not plain `tauri dev`.
 - Client config lives **outside the repo**, in
   `~/.config/opencode/opencode.jsonc` (`mcp.tauri` →
-  `npx @hypothesi/tauri-mcp-server`). Start the app with `bun run dev:app`,
-  then connect from the tooling side.
+  `npx @hypothesi/tauri-mcp-server`).
+
+For the full driver loop (what works, pitfalls), use the `app-debug-loop` skill
+(`.agents/skills/app-debug-loop/SKILL.md`).
 
 ## Patch & batch (src-tauri/src/show/patch/)
 

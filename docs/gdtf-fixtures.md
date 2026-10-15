@@ -62,29 +62,12 @@ Available generics (manufacturer `"Generic"`):
 | Moving Head Spot | `generic-mh-spot`  | `Moving Head`, `Spot`  | 16ch, pan `[-270,270]`, tilt `[-135,135]`   |
 | Moving Head Wash | `generic-mh-wash`  | `Moving Head`, `Wash`  | 12ch, pan `[-270,270]`, tilt `[-135,135]`   |
 
-### How to add a built-in generic fixture
+### Adding a built-in generic fixture
 
-1. Add a new `ParsedGdtfFixture` entry to the `vec![...]` in
-   `build_generic_fixtures()` (src-tauri/src/fixtures/generic.rs).
-   - Pick a stable kebab-case `fixture_type_id` (convention: `generic-<name>`,
-     e.g. `generic-dimmer`).
-   - List `categories` using the exact DIN SPEC 15800 LightCategories strings so
-     the icon mapping works (see below).
-   - Give moving heads `pan_bounds`/`tilt_bounds`; pure static fixtures leave
-     them `None`.
-   - Channel names should be human-readable (`"Pan"`, `"Pan Fine"`, `"Red"`,
-     `"Dimmer"`, ...). For moving heads with fine channels, mirror the existing
-     `"Pan"`/`"Pan Fine"` convention — the engine resolves Fine channels by
-     suffix.
-2. No icon work is needed if the `categories` match an existing SVG key (the
-   mapping in `FixtureIcon.vue` covers the current set). If you add a **new**
-   category, create an SVG in `src/assets/icons/fixtures/<key>.svg` and add a
-   `categoryKeyMap` entry + a `priorityKeys` entry in `src/components/icons/FixtureIcon.vue`.
-3. Generics flow into the browser through `GdtfCatalogManager.load_local_fixtures()`
-   (they are injected as always-installed items). No `.gdtf` archive is involved.
-4. Tests: add catalog-level coverage in `src-tauri/tests/fixtures/catalog.rs` if
-   you change how generics are exposed; channel/parser coverage lives in
-   `src-tauri/tests/fixtures/parser.rs`.
+Follow the `add-generic-fixture` skill
+(`.agents/skills/add-generic-fixture/SKILL.md`) — entry shape, `generic-*` id
+convention, DIN categories, pan/tilt bounds, icon plumbing for new categories,
+and tests.
 
 ## GDTF parser (src-tauri/src/fixtures/parser.rs)
 

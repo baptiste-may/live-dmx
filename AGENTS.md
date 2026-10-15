@@ -8,7 +8,8 @@ below) and should be read on demand.
 > This file is a living document. **Documentation must be updated on every
 > change — not just major features.** Whenever you implement a feature, change
 > project structure, or identify a new pattern, update this file (or the
-> relevant `docs/` file) in the same change.
+> relevant `docs/` file or skill) in the same change. Procedures live in
+> `.agents/skills/`, reference material in `docs/`.
 
 ## Documentation index — read these when relevant
 
@@ -20,6 +21,29 @@ below) and should be read on demand.
 | `docs/releasing.md`             | Versioning, auto-updates, CI/publish workflows, signing, release procedure                                                                     |
 | `docs/frontend-architecture.md` | Any Vue/TypeScript work: stores, views, components, conventions, testing                                                                       |
 | `docs/backend-architecture.md`  | Any Rust/Tauri work: modules, state/history, command patterns, capabilities, backend tests, adding a Tauri command                             |
+
+## Skills — task procedures
+
+Procedures live in `.agents/skills/<name>/SKILL.md` (cross-client Agent Skills
+format; auto-discovered by OpenCode, Claude Code, Cursor, ...). Tools without
+skill support can read the Markdown directly. **Never re-duplicate a procedure
+into `docs/` — link the skill.**
+
+| Skill                 | Use when...                                                     |
+| --------------------- | --------------------------------------------------------------- |
+| `add-tauri-command`   | adding/changing a Tauri backend command                         |
+| `add-generic-fixture` | adding a built-in generic fixture                               |
+| `add-dmx-protocol`    | adding a DMX output protocol end to end                         |
+| `add-vue-component`   | creating a Vue component or view (conventions + mandatory test) |
+| `add-pinia-store`     | adding a Pinia store                                            |
+| `add-setting`         | adding a user setting                                           |
+| `migrate-show-format` | changing the `.ldmx` persisted show format                      |
+| `write-frontend-test` | writing or fixing frontend tests                                |
+| `verify-changes`      | before committing/handing off (gates + doc rule)                |
+| `debug-live-output`   | DMX not reaching fixtures or wrong output                       |
+| `debug-gdtf-share`    | GDTF-Share catalog/login/vault problems                         |
+| `app-debug-loop`      | driving the running dev app through the Tauri MCP bridge        |
+| `publish-release`     | preparing or publishing a release                               |
 
 ## Project overview
 
@@ -110,8 +134,9 @@ Automation: Husky + lint-staged on commit · CI runs
 
 ## How to contribute as an agent
 
-1. **Research:** explore the codebase and read the relevant `docs/` file from the
-   index above before editing.
+1. **Research:** check `.agents/skills/` for a matching task procedure, then
+   explore the codebase and read the relevant `docs/` file from the index above
+   before editing.
 2. **Implement:** follow the conventions above.
    - **Mandatory:** ALWAYS add a `Component.test.ts`/`Component.test.vue` when you
      create or modify a Vue component.
@@ -121,6 +146,6 @@ Automation: Husky + lint-staged on commit · CI runs
    `src`/`src-tauri` don't drift from CI (`release:version -- --check` when you
    touch versions).
 4. **Document — mandatory on every change:** always update this `AGENTS.md` or the
-   matching `docs/` file whenever your change affects behavior, structure,
-   conventions, or workflows (not only subsystems/major features). Do it in the
-   same change as the code.
+   matching `docs/` file (or skill, for procedures) whenever your change affects
+   behavior, structure, conventions, or workflows (not only subsystems/major
+   features). Do it in the same change as the code.

@@ -1,0 +1,16 @@
+import { render, screen } from "@testing-library/vue";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import ComponentName from "./ComponentName.vue";
+
+describe("ComponentName", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders the label", () => {
+    render(ComponentName, { props: { label: "Hello" } });
+
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+  });
+});

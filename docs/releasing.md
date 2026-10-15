@@ -36,21 +36,12 @@ latest/download/latest.json`. The public key is embedded in `tauri.conf.json`;
 
 ## Release procedure
 
-1. `bun run release:version <x.y.z>`
-2. Commit + tag `v<x.y.z>` and push.
-3. GitHub Actions runs `.github/workflows/publish.yml`
-   (`tauri-apps/tauri-action@v1`), matrix:
-   - `macos-latest` — `x86_64-apple-darwin` and `aarch64-apple-darwin`
-   - `ubuntu-22.04`
-   - `windows-latest`
-
-   It builds bundles, signs the updater artifacts, and publishes a **draft**
-   GitHub Release.
-
-4. Publishing the draft makes the release live and `latest.json` reachable (the
-   endpoint pins `releases/latest`).
-
-`workflow_dispatch` is also available for manual builds.
+Follow the `publish-release` skill (`.agents/skills/publish-release/SKILL.md`):
+`bun run release:version <x.y.z>` → validate with `release:version -- --check` →
+commit + tag `v<x.y.z>` + push → CI `publish.yml` builds and signs a **draft**
+GitHub Release → publishing the draft makes `latest.json` reachable (the
+endpoint pins `releases/latest`). `workflow_dispatch` is also available for
+manual builds.
 
 ## Signing secrets (GitHub Actions)
 
@@ -88,11 +79,6 @@ Runs on PRs and `main` on `ubuntu-22.04`:
 
 ## Release checklist for agents
 
-If you change anything that touches versioning, updater, or CI:
-
-- Keep `package.json` and `tauri.conf.json` versions in sync (run
-  `release:version -- --check`).
-- Do not hand-edit versions; always go through `scripts/release.mjs`.
-- Do not commit signing secrets; never add the private key to the repo.
-- If you add a new workflow step that needs native deps, mirror the `apt-get`
-  line so both CI and publish workflows stay buildable.
+The operational checklist — version sync, no hand-edits, signing secrets, CI
+native deps — lives in the `publish-release` skill
+(`.agents/skills/publish-release/SKILL.md`).

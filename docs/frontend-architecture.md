@@ -129,19 +129,14 @@ Do not move domain computation to this store — keep it a thin view-model.
 
 - Vitest + Vue Testing Library; test files named `Component.test.ts` /
   `Component.test.vue` **colocated next to the component**.
-- `src/test-setup.ts` installs a **testing Pinia globally**
-  (`createTestingPinia({ stubActions: false })`) and stubs `@tauri-apps/api/core`
-  (`invoke`), `@tauri-apps/api/window`, global-shortcut, and plugin-log.
-- **Mocking conventions:** declare typed mock refs at the top of the file
-  (`const mockInvoke = vi.mocked(invoke);`), clear mocks with
-  `vi.clearAllMocks()` in `beforeEach`.
-- If a component needs custom store state, build it in the test via the real
-  store composable (e.g. `store.setShow(mockData)`). Remember `@tauri-apps/api/app`
-  must be mocked when updater/version APIs are touched.
+- `src/test-setup.ts` installs a testing Pinia globally and stubs the Tauri
+  APIs — open it before mocking anything.
+- Mocking conventions, shared mocks, and commands live in the
+  `write-frontend-test` skill (`.agents/skills/write-frontend-test/SKILL.md`).
 
 ## Adding a new store/component
 
-1. Colocate tests next to the new file.
-2. Wrap store-interaction tests with `createTestingPinia({ stubActions: false })`
-   (already global — just use the composables).
-3. Update this doc and `AGENTS.md`'s directory map if you add a significant area.
+Follow the `add-vue-component` and `add-pinia-store` skills
+(`.agents/skills/…`) — scaffolding, conventions, mandatory colocated tests, and
+the store patterns. Update this doc and `AGENTS.md`'s directory map if you add a
+significant area.
