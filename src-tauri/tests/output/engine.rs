@@ -125,6 +125,171 @@ fn test_live_engine_group_master_scaling() {
 }
 
 #[test]
+fn test_live_engine_group_max_power_scales_master() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_master(1, 100);
+
+    // Without a max power setting the group is not limited
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255);
+
+    // max_power scales the group master down: 100% master * 50% limit = 50%
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            max_power: 50,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 127);
+
+    // The global "All" group limit multiplies on top of the group limit
+    show.groups.settings.insert(
+        0,
+        GroupSettings {
+            max_power: 25,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 31);
+}
+
+#[test]
+fn test_live_engine_global_max_power_applied_once_without_groups() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![],
+        name: "Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_group_effect(0, Some("full".to_string()), None, false);
+    engine.set_group_master(0, 100);
+
+    show.groups.settings.insert(
+        0,
+        GroupSettings {
+            max_power: 50,
+            ..GroupSettings::default()
+        },
+    );
+
+    // The "All" limit applies once even though primary_group_id defaults to 0
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 127);
+}
+
+#[test]
+fn test_live_engine_max_power_caps_simple_flash() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_master(1, 100);
+    engine.set_flash(1, "simple".to_string(), true);
+
+    // Without max power the flash reaches full
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 255);
+
+    // With a max power limit the flash is capped at the limit
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            max_power: 50,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[0], 128);
+}
+
+#[test]
+fn test_live_engine_max_power_caps_strobe() {
+    let mut engine = LiveEngine::new();
+    let mut show = ShowData::default();
+
+    show.patch.fixtures.push(PatchedFixture {
+        id: 1,
+        groups: vec![1],
+        name: "Spot".to_string(),
+        fixture_type: serde_json::json!({}),
+        mode: serde_json::json!({"channels": ["Dimmer"]}),
+        universe: 1,
+        address: 1,
+    });
+
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            max_power: 50,
+            ..GroupSettings::default()
+        },
+    );
+
+    engine.set_group_effect(1, Some("full".to_string()), None, false);
+    engine.set_group_master(1, 100);
+    engine.set_flash(1, "strobe".to_string(), true);
+
+    // Sample the strobe until both phases were seen: the on-phase must open at
+    // the max power ceiling and never at full.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
+    let (mut saw_on, mut saw_off) = (false, false);
+    while std::time::Instant::now() < deadline && !(saw_on && saw_off) {
+        engine.compute_dmx(&show);
+        match engine.universe_buffers.get(&1).unwrap()[0] {
+            0 => saw_off = true,
+            128 => saw_on = true,
+            other => panic!("strobe dimmer exceeded the max power ceiling: {other}"),
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+
+    assert!(saw_on, "strobe phase never reached the 50% ceiling");
+    assert!(saw_off, "strobe phase never went dark");
+}
+
+#[test]
 fn test_live_engine_buttons_and_reset() {
     let mut engine = LiveEngine::new();
     engine.set_button("btn_1".to_string(), true);
@@ -764,6 +929,23 @@ fn test_pixel_preference_individual_splits_pixels() {
     assert_eq!(buf[5], 64, "Pixel 1 red");
     assert_eq!(buf[8], 128, "Pixel 2 red");
     assert_eq!(buf[11], 191, "Pixel 3 red");
+
+    // A max power limit halves the per-pixel dimming
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            pixel_preference: PixelPreference::Individual,
+            max_power: 50,
+            ..Default::default()
+        },
+    );
+
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[2], 0, "Pixel 0 red");
+    assert_eq!(buf[5], 32, "Pixel 1 red");
+    assert_eq!(buf[8], 64, "Pixel 2 red");
+    assert_eq!(buf[11], 95, "Pixel 3 red");
 }
 
 #[test]
@@ -822,6 +1004,24 @@ fn test_pixel_preference_grouped_zones() {
     // Zone 1 (steps 1/2 => 128): Pixel 2 and Pixel 3 must be 128
     assert_eq!(buf[8], 128, "Pixel 2 red");
     assert_eq!(buf[11], 128, "Pixel 3 red");
+
+    // A max power limit halves the zone dimming
+    show.groups.settings.insert(
+        1,
+        GroupSettings {
+            pixel_preference: PixelPreference::Grouped,
+            pixel_group_count: 2,
+            max_power: 50,
+            ..Default::default()
+        },
+    );
+
+    engine.compute_dmx(&show);
+    let buf = engine.universe_buffers.get(&1).unwrap();
+    assert_eq!(buf[2], 0, "Pixel 0 red");
+    assert_eq!(buf[5], 0, "Pixel 1 red");
+    assert_eq!(buf[8], 64, "Pixel 2 red");
+    assert_eq!(buf[11], 64, "Pixel 3 red");
 }
 
 #[test]

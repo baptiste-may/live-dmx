@@ -858,6 +858,7 @@ impl LiveEngine {
                 active_color_group_id,
                 &color_effect_state,
                 elapsed,
+                &show_data.groups.settings,
                 self.resolve_color_preference(fixture, &show_data.groups.settings),
                 intensity_pixel_steps,
                 color_pixel_steps,
@@ -907,6 +908,7 @@ impl LiveEngine {
         active_color_group_id: u32,
         color_effect_state: &GroupEffectState,
         elapsed: f32,
+        settings: &HashMap<u32, GroupSettings>,
         color_preference: ColorPreference,
         intensity_pixel_steps: FixturePixelStepInfo,
         color_pixel_steps: FixturePixelStepInfo,
@@ -969,9 +971,25 @@ impl LiveEngine {
             0
         };
 
-        let group_master = self.get_group_master(fixture.primary_group_id) as f32 / 100.0;
-        let global_master = self.get_group_master(0) as f32 / 100.0;
+        // A fixture without groups has `primary_group_id == 0`: the limit is then
+        // already applied through `global_max_power` and must not be squared.
+        let group_max_power = if fixture.primary_group_id == 0 {
+            100
+        } else {
+            settings
+                .get(&fixture.primary_group_id)
+                .map_or(100u8, |s| s.max_power)
+        };
+        let global_max_power = settings.get(&0).map_or(100u8, |s| s.max_power);
+
+        let group_master = (self.get_group_master(fixture.primary_group_id) as f32 / 100.0)
+            * (group_max_power as f32 / 100.0);
+        let global_master =
+            (self.get_group_master(0) as f32 / 100.0) * (global_max_power as f32 / 100.0);
         let master_multiplier = group_master * global_master;
+        // Absolute ceiling from the group settings only (masters excluded):
+        // flash and strobe boosts must not exceed the configured max power.
+        let max_power_factor = (group_max_power as f32 / 100.0) * (global_max_power as f32 / 100.0);
 
         let intensity_total = intensity_pixel_steps.total_steps.max(1);
         let effective_intensity_index = if effect_state.alignment.as_deref() == Some("rng") {
@@ -1136,6 +1154,7 @@ impl LiveEngine {
 
         let state = LogicalFixtureState {
             intensity: intensity_norm,
+            max_power_factor,
             color_rgb: (r_norm, g_norm, b_norm),
             white_accent,
             flash_dimmer_factor,
@@ -1235,6 +1254,7 @@ impl LiveEngine {
 
                 states.push(LogicalFixtureState {
                     intensity: p_intensity_norm,
+                    max_power_factor,
                     color_rgb: (p_r_norm, p_g_norm, p_b_norm),
                     white_accent: p_white_accent,
                     flash_dimmer_factor,

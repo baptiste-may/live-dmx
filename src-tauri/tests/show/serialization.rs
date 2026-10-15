@@ -236,6 +236,7 @@ fn test_show_file_group_settings_round_trip() {
                     tilt_max: 45,
                     inverse_pan: true,
                     inverse_tilt: false,
+                    max_power: 80,
                 },
             )]),
         },
@@ -256,6 +257,7 @@ fn test_show_file_group_settings_round_trip() {
     assert_eq!(stored.tilt_max, 45);
     assert!(stored.inverse_pan);
     assert!(!stored.inverse_tilt);
+    assert_eq!(stored.max_power, 80);
 }
 
 #[test]

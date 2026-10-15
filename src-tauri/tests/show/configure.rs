@@ -292,6 +292,7 @@ fn test_clamp_group_settings() {
         tilt_max: -200,
         inverse_pan: false,
         inverse_tilt: false,
+        max_power: 200,
     };
 
     let pan_bounds = [-270, 270];
@@ -318,6 +319,7 @@ fn test_clamp_group_settings() {
     assert_eq!(settings.pixel_preference, PixelPreference::Single);
     // Pixel group count clamped to max_pixels (8)
     assert_eq!(settings.pixel_group_count, 8);
+    assert_eq!(settings.max_power, 100);
 }
 
 #[test]
@@ -332,6 +334,7 @@ fn test_default_group_settings() {
     assert_eq!(settings.pixel_group_count, 2);
     assert!(!settings.inverse_pan);
     assert!(!settings.inverse_tilt);
+    assert_eq!(settings.max_power, 100);
 }
 
 #[test]
@@ -364,6 +367,7 @@ fn test_compute_configure_overview_full() {
                     tilt_max: 45,
                     inverse_pan: true,
                     inverse_tilt: false,
+                    max_power: 80,
                 },
             )]),
         },
@@ -426,6 +430,7 @@ fn test_compute_configure_overview_full() {
     assert_eq!(head_info.settings.pan_min, -90);
     assert_eq!(head_info.settings.pan_max, 90);
     assert!(head_info.settings.inverse_pan);
+    assert_eq!(head_info.settings.max_power, 80);
 
     let par_info = overview.groups.get(&2).unwrap();
     assert_eq!(par_info.id, 2);
@@ -434,6 +439,7 @@ fn test_compute_configure_overview_full() {
     assert!(!par_info.has_tilt);
     assert!(par_info.has_color);
     assert_eq!(par_info.color_options, vec![ColorPreference::ColorMix]);
+    assert_eq!(par_info.settings.max_power, 100);
 }
 
 #[test]
@@ -468,6 +474,7 @@ fn test_compute_group_configure_info() {
     assert!(!info.has_pixels);
     assert_eq!(info.pixel_options, Vec::<PixelPreference>::new());
     assert_eq!(info.max_pixels, 1);
+    assert_eq!(info.settings.max_power, 100);
 }
 
 #[test]
@@ -503,4 +510,5 @@ fn test_compute_group_configure_info_multi_pixel() {
     assert_eq!(info.max_pixels, 4);
     assert_eq!(info.settings.pixel_preference, PixelPreference::Single);
     assert_eq!(info.settings.pixel_group_count, 2);
+    assert_eq!(info.settings.max_power, 100);
 }

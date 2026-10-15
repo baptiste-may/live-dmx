@@ -415,6 +415,8 @@ pub fn clamp_group_settings(
     } else {
         settings.pixel_group_count = 2;
     }
+
+    settings.max_power = settings.max_power.min(100);
 }
 
 pub fn default_group_settings(
@@ -432,6 +434,7 @@ pub fn default_group_settings(
         tilt_max: tilt_bounds[1],
         inverse_pan: false,
         inverse_tilt: false,
+        max_power: 100,
     }
 }
 

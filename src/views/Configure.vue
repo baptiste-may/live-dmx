@@ -12,7 +12,7 @@ useShowConfigurationSync();
 <template>
   <div class="text-base-content flex h-full w-full gap-4 overflow-hidden p-4">
     <h1 class="sr-only">Configure</h1>
-    <div class="flex h-full w-sm flex-col gap-4">
+    <div class="flex h-full w-lg flex-col gap-4">
       <ConfigureSelection />
       <ConfigureSettings />
     </div>

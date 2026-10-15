@@ -431,6 +431,7 @@ describe("show-configuration store", () => {
         tiltMax: 30,
         inversePan: true,
         inverseTilt: true,
+        maxPower: 100,
       },
     };
     await nextTick();

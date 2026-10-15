@@ -43,6 +43,7 @@ export const defaultGroupSettings = (
   tiltMax: tiltBounds[1],
   inversePan: false,
   inverseTilt: false,
+  maxPower: 100,
 });
 
 function ensureSettings(state: ShowConfigurationState, groupId: number): GroupSettings {

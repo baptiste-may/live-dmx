@@ -55,6 +55,7 @@ describe("ConfigureSettings.vue", () => {
       tiltMax: 110,
       inversePan: false,
       inverseTilt: false,
+      maxPower: 100,
     };
     render(ConfigureSettings);
 
@@ -92,6 +93,7 @@ describe("ConfigureSettings.vue", () => {
       tiltMax: 110,
       inversePan: false,
       inverseTilt: false,
+      maxPower: 100,
     };
     render(ConfigureSettings);
 
@@ -152,6 +154,7 @@ describe("ConfigureSettings.vue", () => {
       tiltMax: 30,
       inversePan: false,
       inverseTilt: false,
+      maxPower: 100,
     };
     render(ConfigureSettings);
 
@@ -353,5 +356,28 @@ describe("ConfigureSettings.vue", () => {
     await fireEvent.update(groupCountInput, "4");
     await nextTick();
     expect(configure.selectedSettings.pixelGroupCount).toBe(4);
+  });
+
+  it("edits the group max power via the fader", async () => {
+    const configure = useShowConfiguration();
+    seedOverview(configure, {
+      settings: defaultGroupSettings(),
+    });
+    configure.settingsByGroup[0] = {
+      ...defaultGroupSettings(),
+      maxPower: 100,
+    };
+    render(ConfigureSettings);
+
+    const maxPower = screen.getByRole("slider", { name: "Max Power" });
+    expect(maxPower).toHaveValue("100");
+    expect(screen.getByText("0%")).toBeInTheDocument();
+    expect(screen.getByText("25%")).toBeInTheDocument();
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("75%")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+
+    await fireEvent.update(maxPower, "75");
+    expect(configure.selectedSettings.maxPower).toBe(75);
   });
 });

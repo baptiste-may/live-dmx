@@ -46,8 +46,8 @@ composables, or frontend tests.
   (`PatchVisualizer.vue`, universe grids), `patch/groups/` (`PatchGroups.vue`,
   group organization with `PatchGroupsEditModal`, list/table subviews).
   Design focus: speed — quick manufacturer search, batch adding.
-- **`Configure.vue`** — fixture parameters (Dimmer, Pan/Tilt limits, inversions).
-  Children: `configure/selection/` (group tree), `configure/settings/`
+- **`Configure.vue`** — fixture parameters (Dimmer, Pan/Tilt limits, inversions,
+  Max Power). Children: `configure/selection/` (group tree), `configure/settings/`
   (`ConfigureSettings.vue` = per-group limits). See **configuration store**
   below.
 - **`Input.vue`** — input triggers and controller mapping (triggers/controllers).

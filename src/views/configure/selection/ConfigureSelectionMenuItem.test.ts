@@ -32,6 +32,7 @@ function buildOverview(): ConfigureOverview {
       tiltMax: 110,
       inversePan: false,
       inverseTilt: false,
+      maxPower: 100,
     },
   });
   return {

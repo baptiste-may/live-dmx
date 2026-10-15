@@ -124,6 +124,17 @@ live in `src-tauri/tests/output/` (one file per protocol).
   `set_dmx_*` (applied after computation).
 - Per-group live state: masters, effects (bpm/width/bounce/alignment), colors
   (with `FixtureColorTransition` fades), flash buttons and transition state.
+- Per-group configured limits from `ShowData.groups.settings`: `max_power`
+  (0–100, default 100) scales the fixture intensity down — a group limited to 50%
+  never lights at full even with the master fader at 100. Applied in
+  `compute_fixture_dmx` through `master_multiplier` for both the primary group
+  and the global "All" group (id 0), which also covers per-pixel intensities
+  (Individual/Grouped pixel preferences); fixtures without groups fall back to
+  the All group and are limited once. The combined limit is forwarded to the
+  encoder as `LogicalFixtureState::max_power_factor`: flash and strobe boosts
+  are clamped to it (`effective_dimmer`), and every pixel state is capped by the
+  same fixture-wide ceiling, so a limited group never exceeds its max power,
+  even while flashing or strobing.
 
 Key entry points: `compute_dmx(&ShowData)`, `set_group_color`, `set_group_effect`,
 `set_flash`, `reset_all`, `reset_group_*`. It must stay resettable when the patch

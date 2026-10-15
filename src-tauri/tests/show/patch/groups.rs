@@ -29,6 +29,7 @@ fn test_group_settings_serialization() {
         tilt_max: 30,
         inverse_pan: true,
         inverse_tilt: false,
+        max_power: 75,
     };
 
     let json = serde_json::to_string(&settings).unwrap();
@@ -38,6 +39,7 @@ fn test_group_settings_serialization() {
     assert!(json.contains("\"panMin\":-45"));
     assert!(json.contains("\"panMax\":90"));
     assert!(json.contains("\"inversePan\":true"));
+    assert!(json.contains("\"maxPower\":75"));
 
     let deserialized: GroupSettings = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized, settings);
@@ -52,6 +54,7 @@ fn test_group_settings_deserialize_partial_json_defaults() {
     assert_eq!(settings.pan_min, -180);
     assert_eq!(settings.pan_max, 180);
     assert!(!settings.inverse_tilt);
+    assert_eq!(settings.max_power, 100);
 }
 
 #[test]
@@ -67,6 +70,7 @@ fn test_group_settings_update_replaces_existing_value() {
         tilt_max: 180,
         inverse_pan: false,
         inverse_tilt: true,
+        max_power: 90,
     };
 
     groups.settings.insert(1, updated);
@@ -270,6 +274,7 @@ fn test_group_settings_clamped_against_bounds() {
         tilt_max: 180,
         inverse_pan: true,
         inverse_tilt: false,
+        max_power: 150,
     };
 
     clamp_group_settings(&mut settings, pan_bounds, tilt_bounds, &[], &[], 1);
@@ -277,4 +282,5 @@ fn test_group_settings_clamped_against_bounds() {
     assert_eq!(settings.pan_max, 270);
     assert_eq!(settings.tilt_min, -100);
     assert_eq!(settings.tilt_max, 100);
+    assert_eq!(settings.max_power, 100);
 }

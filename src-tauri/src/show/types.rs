@@ -165,6 +165,10 @@ fn default_pixel_group_count() -> u32 {
     2
 }
 
+fn default_max_power() -> u8 {
+    100
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupSettings {
@@ -186,6 +190,8 @@ pub struct GroupSettings {
     pub inverse_pan: bool,
     #[serde(default)]
     pub inverse_tilt: bool,
+    #[serde(default = "default_max_power")]
+    pub max_power: u8,
 }
 
 impl Default for GroupSettings {
@@ -200,6 +206,7 @@ impl Default for GroupSettings {
             tilt_max: default_tilt_max(),
             inverse_pan: false,
             inverse_tilt: false,
+            max_power: default_max_power(),
         }
     }
 }

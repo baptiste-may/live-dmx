@@ -6,6 +6,10 @@ use crate::show::ColorPreference;
 pub struct LogicalFixtureState {
     /// Normalized master intensity: 0.0 .. 1.0 (effects * masters)
     pub intensity: f32,
+    /// Normalized max power ceiling from the group settings: 0.0 .. 1.0
+    /// (group limit * global limit). Flash and strobe boosts are clamped to it
+    /// so a limited group never exceeds its configured max power.
+    pub max_power_factor: f32,
     /// Normalized color in RGB: 0.0 .. 1.0
     pub color_rgb: (f32, f32, f32),
     /// Normalized white emitter accent: 0.0 .. 1.0
@@ -34,6 +38,7 @@ impl Default for LogicalFixtureState {
     fn default() -> Self {
         Self {
             intensity: 0.0,
+            max_power_factor: 1.0,
             color_rgb: (1.0, 1.0, 1.0),
             white_accent: 0.0,
             flash_dimmer_factor: 0.0,
@@ -47,6 +52,40 @@ impl Default for LogicalFixtureState {
             tilt_norm: None,
         }
     }
+}
+
+/// Normalizes a raw max power factor into a safe ceiling (0.0 .. 1.0). A NaN
+/// factor falls back to the full ceiling instead of panicking downstream.
+fn normalize_max_power_factor(value: f32) -> f32 {
+    if value.is_nan() {
+        1.0
+    } else {
+        value.clamp(0.0, 1.0)
+    }
+}
+
+/// Normalized ceiling imposed by the group max power settings (0.0 .. 1.0),
+/// further capped by the fixture-wide ceiling (the master state's factor).
+fn max_power_ceiling(state: &LogicalFixtureState, fixture_ceiling: f32) -> f32 {
+    normalize_max_power_factor(state.max_power_factor).min(fixture_ceiling)
+}
+
+/// Effective dimmer for a fixture state: flash and strobe boosts are clamped to
+/// the group max power ceiling so a limited group never exceeds it.
+fn effective_dimmer(state: &LogicalFixtureState, fixture_ceiling: f32) -> f32 {
+    let ceiling = max_power_ceiling(state, fixture_ceiling);
+    let dimmer = if state.flash_dimmer_factor > 0.0 {
+        state.intensity + (1.0 - state.intensity) * state.flash_dimmer_factor
+    } else if state.is_in_strobe {
+        if state.strobe_val > 0 {
+            ceiling
+        } else {
+            0.0
+        }
+    } else {
+        state.intensity
+    };
+    dimmer.clamp(0.0, ceiling)
 }
 
 /// Pure DMX encoding function: translates `LogicalFixtureState` into DMX bytes
@@ -71,39 +110,18 @@ pub fn encode_fixture_dmx(
     // 2. Check if pixel individual state evaluation is active
     let has_pixel_states = pixel_states.is_some_and(|ps| !ps.is_empty());
 
+    // The group max power ceiling is fixture-wide: pixel states must never
+    // exceed the master's ceiling, even when their own factor is higher.
+    let fixture_ceiling = normalize_max_power_factor(state.max_power_factor);
+
     // Compute effective dimmer level for master state
-    let master_effective_dimmer = if state.flash_dimmer_factor > 0.0 {
-        state.intensity + (1.0 - state.intensity) * state.flash_dimmer_factor
-    } else if state.is_in_strobe {
-        if state.strobe_val > 0 {
-            1.0
-        } else {
-            0.0
-        }
-    } else {
-        state.intensity
-    }
-    .clamp(0.0, 1.0);
+    let master_effective_dimmer = effective_dimmer(state, fixture_ceiling);
 
     let max_pixel_effective_dimmer = if has_pixel_states {
         pixel_states
             .map(|ps| {
                 ps.iter()
-                    .map(|p_state| {
-                        if p_state.flash_dimmer_factor > 0.0 {
-                            p_state.intensity
-                                + (1.0 - p_state.intensity) * p_state.flash_dimmer_factor
-                        } else if p_state.is_in_strobe {
-                            if p_state.strobe_val > 0 {
-                                1.0
-                            } else {
-                                0.0
-                            }
-                        } else {
-                            p_state.intensity
-                        }
-                        .clamp(0.0, 1.0)
-                    })
+                    .map(|p_state| effective_dimmer(p_state, fixture_ceiling))
                     .fold(0.0, f32::max)
             })
             .unwrap_or(0.0)
@@ -141,18 +159,7 @@ pub fn encode_fixture_dmx(
             LogicalAttribute::Dimmer => {
                 let dim_level = if let Some(p) = ch.pixel_index {
                     let p_state = pixel_states.and_then(|ps| ps.get(p)).unwrap_or(state);
-                    if p_state.flash_dimmer_factor > 0.0 {
-                        p_state.intensity + (1.0 - p_state.intensity) * p_state.flash_dimmer_factor
-                    } else if p_state.is_in_strobe {
-                        if p_state.strobe_val > 0 {
-                            1.0
-                        } else {
-                            0.0
-                        }
-                    } else {
-                        p_state.intensity
-                    }
-                    .clamp(0.0, 1.0)
+                    effective_dimmer(p_state, fixture_ceiling)
                 } else if has_pixel_states {
                     // Master dimmer with pixel individual control:
                     // If any pixel is active, flash, or strobe, master dimmer is fully open (1.0)
@@ -247,22 +254,24 @@ pub fn encode_fixture_dmx(
                     None => (state, profile.has_dimmer),
                 };
 
-                let ch_effective_dimmer = if ch_state.flash_dimmer_factor > 0.0 {
-                    ch_state.intensity + (1.0 - ch_state.intensity) * ch_state.flash_dimmer_factor
-                } else if ch_state.is_in_strobe {
-                    if ch_state.strobe_val > 0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
+                let ch_effective_dimmer = effective_dimmer(ch_state, fixture_ceiling);
+                // A dedicated dimmer channel carries the intensity for this
+                // channel (its cell dimmer for indexed pixels, the master
+                // dimmer otherwise), so the color gate must stay fully open.
+                let dimmer_carries_intensity = if has_pixel_states {
+                    pixel_has_own_dimmer
                 } else {
-                    ch_state.intensity
-                }
-                .clamp(0.0, 1.0);
+                    profile.has_dimmer
+                };
 
                 let color_gate = if ch_state.is_in_strobe {
                     if ch_state.strobe_val > 0 {
-                        1.0
+                        if dimmer_carries_intensity {
+                            1.0
+                        } else {
+                            // The gate is the intensity path: honor the ceiling
+                            max_power_ceiling(ch_state, fixture_ceiling)
+                        }
                     } else {
                         0.0
                     }
@@ -504,6 +513,153 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_fixture_flash_and_strobe_clamped_to_max_power() {
+        let channel_names = vec!["Dimmer".to_string(), "Shutter".to_string()];
+        let profile = compile_fixture_profile(&channel_names, None, None, None, None, None);
+
+        let mut buf = vec![0u8; 2];
+        let mut state = LogicalFixtureState {
+            intensity: 0.5,
+            max_power_factor: 0.5,
+            flash_dimmer_factor: 1.0,
+            ..Default::default()
+        };
+
+        // Flash boosts the dimmer but never past the 50% max power ceiling
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 128);
+        assert_eq!(buf[1], 255);
+
+        // Strobe on-phase opens at the ceiling, not at full
+        state.flash_dimmer_factor = 0.0;
+        state.is_in_strobe = true;
+        state.strobe_val = 255;
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 128);
+        assert_eq!(buf[1], 255);
+
+        // Strobe off-phase stays dark
+        state.strobe_val = 0;
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 0);
+        assert_eq!(buf[1], 0);
+    }
+
+    #[test]
+    fn test_encode_fixture_nan_max_power_factor_is_ignored() {
+        // A NaN max power factor must not panic the encoder (defensive): it
+        // falls back to the full ceiling.
+        let channel_names = vec!["Dimmer".to_string()];
+        let profile = compile_fixture_profile(&channel_names, None, None, None, None, None);
+
+        let mut buf = vec![0u8; 1];
+        let state = LogicalFixtureState {
+            intensity: 1.0,
+            max_power_factor: f32::NAN,
+            flash_dimmer_factor: 1.0,
+            ..Default::default()
+        };
+
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 255);
+    }
+
+    #[test]
+    fn test_encode_color_gate_clamped_to_max_power() {
+        // Dimmer-less fixture: the color channels are gated by the dimmer
+        let channel_names = vec!["Red".to_string(), "Green".to_string(), "Blue".to_string()];
+        let profile = compile_fixture_profile(&channel_names, None, None, None, None, None);
+
+        let mut buf = vec![0u8; 3];
+        let mut state = LogicalFixtureState {
+            intensity: 0.25,
+            max_power_factor: 0.5,
+            is_in_strobe: true,
+            strobe_val: 255,
+            color_rgb: (1.0, 0.0, 0.0),
+            ..Default::default()
+        };
+
+        // Strobe on-phase gates the color at the ceiling, not at full
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 128);
+        assert_eq!(buf[1], 0);
+        assert_eq!(buf[2], 0);
+
+        // Steady state is gated by the (already limited) intensity
+        state.is_in_strobe = false;
+        state.strobe_val = 0;
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 64);
+    }
+
+    #[test]
+    fn test_encode_strobe_with_dimmer_keeps_color_gate_open() {
+        // Fixture with both RGB and a dimmer: the dimmer carries the max power
+        // ceiling, so the color gate must stay fully open and the limit must
+        // not be applied twice.
+        let channel_names = vec![
+            "Dimmer".to_string(),
+            "Red".to_string(),
+            "Green".to_string(),
+            "Blue".to_string(),
+        ];
+        let profile = compile_fixture_profile(&channel_names, None, None, None, None, None);
+
+        let mut buf = vec![0u8; 4];
+        let mut state = LogicalFixtureState {
+            intensity: 0.5,
+            max_power_factor: 0.5,
+            is_in_strobe: true,
+            strobe_val: 255,
+            color_rgb: (1.0, 0.0, 0.0),
+            ..Default::default()
+        };
+
+        // Strobe on-phase: the dimmer opens at the ceiling, colors stay open
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 128);
+        assert_eq!(buf[1], 255);
+        assert_eq!(buf[2], 0);
+        assert_eq!(buf[3], 0);
+
+        // Strobe off-phase: everything dark
+        state.strobe_val = 0;
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 0);
+        assert_eq!(buf[1], 0);
+    }
+
+    #[test]
+    fn test_encode_strobe_master_dimmer_with_indexed_colors_keeps_gate_open() {
+        // Master dimmer + indexed RGB cells without pixel states: the master
+        // dimmer carries the ceiling, the gate must not apply it again.
+        let channel_names = vec![
+            "Dimmer".to_string(),
+            "Red 1".to_string(),
+            "Green 1".to_string(),
+            "Blue 1".to_string(),
+        ];
+        let profile = compile_fixture_profile(&channel_names, None, None, None, None, None);
+
+        let mut buf = vec![0u8; 4];
+        let state = LogicalFixtureState {
+            intensity: 0.5,
+            max_power_factor: 0.5,
+            is_in_strobe: true,
+            strobe_val: 255,
+            color_rgb: (1.0, 0.0, 0.0),
+            ..Default::default()
+        };
+
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+        assert_eq!(buf[0], 128, "master dimmer opens at the ceiling");
+        assert_eq!(buf[1], 255, "color gate stays fully open");
+        assert_eq!(buf[2], 0);
+        assert_eq!(buf[3], 0);
+    }
+
+    #[test]
     fn test_encode_fixture_cmy_subtractive() {
         let channel_names = vec![
             "Dimmer".to_string(),
@@ -613,6 +769,63 @@ mod tests {
         assert_eq!(buf[5], 0);
         assert_eq!(buf[6], 0);
         assert_eq!(buf[7], 0);
+    }
+
+    #[test]
+    fn test_encode_pixel_states_capped_by_fixture_ceiling() {
+        // Pixel states are capped by the fixture-wide max power ceiling (the
+        // master state's factor) even when their own factor keeps the default.
+        let channel_names = vec![
+            "Dimmer".to_string(),
+            "Red 1".to_string(),
+            "Green 1".to_string(),
+            "Blue 1".to_string(),
+            "Red 2".to_string(),
+            "Green 2".to_string(),
+            "Blue 2".to_string(),
+        ];
+        let profile = compile_fixture_profile(&channel_names, None, None, None, None, None);
+        assert_eq!(profile.pixel_count, 2);
+
+        let mut buf = vec![0u8; 7];
+        let master_state = LogicalFixtureState {
+            intensity: 0.5,
+            max_power_factor: 0.5,
+            ..Default::default()
+        };
+        let pixel_states = vec![
+            // Pixel 0: Full Red, 100% intensity
+            LogicalFixtureState {
+                intensity: 1.0,
+                color_rgb: (1.0, 0.0, 0.0),
+                ..Default::default()
+            },
+            // Pixel 1: Full Green, 0% intensity (off)
+            LogicalFixtureState {
+                intensity: 0.0,
+                color_rgb: (0.0, 1.0, 0.0),
+                ..Default::default()
+            },
+        ];
+
+        encode_fixture_dmx(
+            &profile,
+            &master_state,
+            Some(&pixel_states),
+            ColorPreference::ColorMix,
+            &mut buf,
+        );
+
+        // Master dimmer is open because pixel 0 is active
+        assert_eq!(buf[0], 255);
+        // Pixel 0 color is capped by the master's ceiling
+        assert_eq!(buf[1], 128);
+        assert_eq!(buf[2], 0);
+        assert_eq!(buf[3], 0);
+        // Pixel 1 is off
+        assert_eq!(buf[4], 0);
+        assert_eq!(buf[5], 0);
+        assert_eq!(buf[6], 0);
     }
 
     #[test]

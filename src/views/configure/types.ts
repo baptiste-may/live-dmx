@@ -11,6 +11,7 @@ export type GroupSettings = {
   tiltMax: number;
   inversePan: boolean;
   inverseTilt: boolean;
+  maxPower: number;
 };
 
 export type GroupRow = {
