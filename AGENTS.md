@@ -121,6 +121,22 @@ Details per domain (file-level maps, data flows, conventions) are in the docs.
 - **Fixtures:** built-in generics + on-demand GDTF-Share fetch, cached locally
   and embedded in `.ldmx` (portable/offline). MVR import available.
 
+## Issue intake
+
+GitHub Issues are the intake for bugs and feature requests, using the Issue
+Forms in `.github/ISSUE_TEMPLATE/`:
+
+- `bug_report.yml` requires reproduction steps, expected/actual behaviour,
+  version and OS, and applies `bug`.
+- `feature_request.yml` requires the problem, proposed behaviour and area, and
+  applies `enhancement`.
+- `config.yml` keeps blank issues available and links the documentation.
+
+The area dropdown mirrors the `ui`, `backend`, `dmx`, `fixtures`, `live`,
+`show`, `ci`, `security`, `performance` and `tooling` labels, but GitHub does not
+apply a label from a dropdown: triage sets the area label manually. Keep the
+forms product-facing; do not mention internal planning tools or workflows.
+
 ## Quality assurance
 
 Frontend:
