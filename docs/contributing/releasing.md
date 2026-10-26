@@ -6,9 +6,10 @@ or build/signing configuration.
 ## Version source of truth
 
 - **`package.json`** is the single source of truth.
-- Bump with: `bun run release:version <x.y.z>` → `node scripts/release.mjs
-<version>`. It updates both `package.json` and `src-tauri/tauri.conf.json` and
-  fails on drift. It also accepts `v` prefixes and validates semver.
+- Bump with `bun run release:version <x.y.z>`, a wrapper around
+  `node scripts/release.mjs <version>`. It updates both `package.json` and
+  `src-tauri/tauri.conf.json` and fails on drift. It also accepts `v` prefixes
+  and validates semver.
 - `node scripts/release.mjs --check` only validates the sync (used by CI).
 - `Cargo.toml`/`Cargo.lock` keep their own `0.1.0` and are **intentionally left
   untouched**.
@@ -76,6 +77,29 @@ Runs on PRs and `main` on `ubuntu-22.04`:
 5. `bun run check` (typecheck + lint + format + unit/cargo tests + build).
 6. `bun run build:app` — real `tauri build --no-bundle` to validate the release
    build without needing the signing key.
+
+## Documentation site (`.github/workflows/docs.yml`)
+
+The user manual and the contributor docs are published as a VitePress site
+built from `docs/`:
+
+- `bun run docs:build` checks every nav/sidebar target
+  (`scripts/check-docs-links.mjs`) and builds `docs/.vitepress/dist`; `docs:dev`
+  serves it with hot reload, `docs:preview` serves the built output.
+- `docs.yml` runs on pushes to `main`, pull requests and manual dispatch,
+  filtered to `docs/**`, `scripts/check-docs-links.mjs`, `package.json`,
+  `bun.lock` and the workflow itself. The `build` job installs with
+  `--frozen-lockfile --ignore-scripts` and runs `bun run docs:build`; the
+  `deploy` job runs on `main` only and uses `actions/deploy-pages`.
+- `DOCS_BASE` sets the site base path. It defaults to `/live-dmx/` locally, and
+  the workflow sets it to `/<repository-name>/` so forks work. Set it to `/`
+  when a custom domain is configured.
+- **Pages must be enabled once**: repository Settings → Pages → Source =
+  **GitHub Actions**. Without it the `build` job still proves the site is valid
+  but the `deploy` job fails.
+- GitHub Pages is only available for **private** repositories on a paid plan.
+  While this repository is private on the Free plan, the deploy job stays red;
+  the site becomes reachable once the repository is public or the plan changes.
 
 ## Release checklist for agents
 

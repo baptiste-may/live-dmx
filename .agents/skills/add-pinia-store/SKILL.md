@@ -5,7 +5,7 @@ description: "Use when adding a new Pinia store under src/stores/: event-sourced
 
 # Add a Pinia store
 
-Stores are small, single-purpose and **event-sourced from backend snapshots**. Reference: `docs/frontend-architecture.md` (store map).
+Stores are small, single-purpose and **event-sourced from backend snapshots**. Reference: `docs/contributing/frontend.md` (store map).
 
 ## Pattern
 

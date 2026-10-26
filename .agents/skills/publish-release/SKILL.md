@@ -5,7 +5,7 @@ description: "Use when preparing or publishing a live-dmx release: version bump 
 
 # Prepare and publish a release
 
-Reference: `docs/releasing.md` (versioning rules, auto-updates, signing, CI details).
+Reference: `docs/contributing/releasing.md` (versioning rules, auto-updates, signing, CI details).
 
 ## Procedure
 
@@ -23,6 +23,12 @@ Reference: `docs/releasing.md` (versioning rules, auto-updates, signing, CI deta
 - Never commit the signing key (`~/.tauri/live-dmx.key`); the password secret is an empty string by design.
 - Updater constraints: Linux AppImage only (deb/rpm manual), Windows self-closes before install, macOS unsigned builds warn via Gatekeeper.
 - CI must stay green: `bun run check` + `bun run build:app` run on PRs; new native deps require mirroring the `apt-get` line in both workflows.
+
+## Manual check
+
+- [ ] `bun run docs:build` passes (it also catches dead links).
+- [ ] Every UI label quoted in `docs/manual/` still exists in `src/views` — grep the bold labels before tagging.
+- [ ] Screenshots under `docs/public/screens/`, if any, still match the released UI.
 
 ## Verify
 

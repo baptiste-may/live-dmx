@@ -5,7 +5,7 @@ description: "Use when driving or inspecting the running dev app through the Tau
 
 # Debug the running app (Tauri MCP bridge)
 
-The dev app can be driven from the outside by the `tauri` MCP server (`@hypothesi/tauri-mcp-server`, configured in `~/.config/opencode/opencode.jsonc`). Reference: `docs/backend-architecture.md`.
+The dev app can be driven from the outside by the `tauri` MCP server (`@hypothesi/tauri-mcp-server`, configured in `~/.config/opencode/opencode.jsonc`). Reference: `docs/contributing/architecture.md`.
 
 ## Start the app
 

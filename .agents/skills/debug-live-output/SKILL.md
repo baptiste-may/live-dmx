@@ -5,7 +5,7 @@ description: "Use when DMX output is wrong or missing: lights do not respond, a 
 
 # Debug the live DMX output
 
-Work top-down: show state → engine computation → transport. Reference: `docs/dmx-output.md`.
+Work top-down: show state → engine computation → transport. Reference: `docs/contributing/dmx-output.md`.
 
 ## 1. Is the show state sending?
 
@@ -23,7 +23,7 @@ Work top-down: show state → engine computation → transport. Reference: `docs
 - Shutter/strobe: whenever dimmer > 0 the shutter opens; at 0 it returns to default. A strobe channel driven continuously open instead of pulsing is expected during washes.
 - Dual-emitter fixtures: `BeamDimmer`/`BeamWhite` sections stay at 0 during intensity/wash looks by design (the white strobe tube stays off). If a hybrid fixture misses a section, check this classification first.
 - CMY fixtures: white flash pulls Cyan/Magenta/Yellow down to 0 (open aperture) — expected, not a bug.
-- Moving heads default Pan/Tilt to center (128, fine 0), not 0 — fixtures with unassigned channels get heuristic assignment (see `docs/dmx-output.md` §Channel resolution).
+- Moving heads default Pan/Tilt to center (128, fine 0), not 0 — fixtures with unassigned channels get heuristic assignment (see `docs/contributing/dmx-output.md` §Channel resolution).
 
 ## 4. Logs
 

@@ -5,7 +5,7 @@ description: "Use when adding a new DMX-over-network output protocol (Art-Net, s
 
 # Add a DMX output protocol
 
-The output path: `LiveEngineRunner` (44 Hz) computes universe buffers and transmits each enabled universe to its target. The target is the `output` string of `UniverseOutputConfig` (`src-tauri/src/show/types.rs`). Reference: `docs/dmx-output.md`.
+The output path: `LiveEngineRunner` (44 Hz) computes universe buffers and transmits each enabled universe to its target. The target is the `output` string of `UniverseOutputConfig` (`src-tauri/src/show/types.rs`). Reference: `docs/contributing/dmx-output.md`.
 
 ## Checklist
 
@@ -16,7 +16,7 @@ The output path: `LiveEngineRunner` (44 Hz) computes universe buffers and transm
 3. **Wire the runner** — in `src-tauri/src/output/runner.rs`: instantiate the sender next to the others (loop setup) and add a match arm on the target string in the transmit loop. The UI id and the arm string must match exactly; unknown ids fall through to the physical USB sender.
 4. **Backend tests** — add `src-tauri/tests/output/<name>.rs` and register `mod <name>;` inside the `mod output { ... }` block of `src-tauri/tests/output.rs`. Follow existing protocol tests (bind a local socket, receive, assert the frame bytes).
 5. **Frontend** — add the option to `VIRTUAL_PROTOCOLS` in `src/types/output.ts`, and a label in `targetLabel` in `src/views/output/dmx/OutputUniverseCard.vue`. Update affected tests (`OutputTargetSelect.test.ts`, `OutputUniverseCard.test.ts`, `OutputUniverseRow.test.ts`).
-6. **Docs** — add a row to the protocol table in `docs/dmx-output.md` (file, port, notes).
+6. **Docs** — add a row to the protocol table in `docs/contributing/dmx-output.md` (file, port, notes).
 7. If the protocol needs new commands or plugin permissions, follow the `add-tauri-command` skill.
 
 ## Gotchas

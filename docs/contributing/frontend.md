@@ -101,7 +101,7 @@ Do not move domain computation to this store — keep it a thin view-model.
 
 ## Composables & libs (src/libs/)
 
-- `show-opener.ts` — `useShowOpener()` (see `docs/show-openers.md`)
+- `show-opener.ts` — `useShowOpener()` (see `docs/contributing/show-openers.md`)
 - `show-configuration-sync.ts` — Configure store sync logic
 - `logger.ts` — `initLogger()`: attaches webview console to backend logs
 - `shortcuts.ts`, `date.ts`, `fixture.ts` — small utilities

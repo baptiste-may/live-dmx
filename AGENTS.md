@@ -10,17 +10,23 @@ below) and should be read on demand.
 > project structure, or identify a new pattern, update this file (or the
 > relevant `docs/` file or skill) in the same change. Procedures live in
 > `.agents/skills/`, reference material in `docs/`.
+>
+> **Everything under `docs/` is publishable.** The directory is the source of the
+> public VitePress site (`docs/manual/` for users, `docs/contributing/` for
+> developers), built with `bun run docs:build`. It must stay in English, free of
+> secrets, absolute paths and internal-only notes.
 
 ## Documentation index — read these when relevant
 
-| Doc                             | Read when...                                                                                                                                   |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/gdtf-fixtures.md`         | Fixture parsing, generic fixtures, categories/icon plumbing, GDTF-Share catalog & credentials vault, MVR import, `.ldmx` fixture serialization |
-| `docs/dmx-output.md`            | `LiveEngine`/runner, universe routing, protocols (Art-Net/sACN/OSC/KiNET/OPC), USB interfaces, live commands                                   |
-| `docs/show-openers.md`          | Deep-link/file-association/single-instance, `.ldmx` opening flow, logging config                                                               |
-| `docs/releasing.md`             | Versioning, auto-updates, CI/publish workflows, signing, release procedure                                                                     |
-| `docs/frontend-architecture.md` | Any Vue/TypeScript work: stores, views, components, conventions, testing                                                                       |
-| `docs/backend-architecture.md`  | Any Rust/Tauri work: modules, state/history, command patterns, capabilities, backend tests, adding a Tauri command                             |
+| Doc                                 | Read when...                                                                                                                                   |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/contributing/fixtures.md`     | Fixture parsing, generic fixtures, categories/icon plumbing, GDTF-Share catalog & credentials vault, MVR import, `.ldmx` fixture serialization |
+| `docs/contributing/dmx-output.md`   | `LiveEngine`/runner, universe routing, protocols (Art-Net/sACN/OSC/KiNET/OPC), USB interfaces, live commands                                   |
+| `docs/contributing/rendering.md`    | Profile compilation, channel classification, colour mixing/routing, effects, alignments, pixel preferences, RNG                                |
+| `docs/contributing/show-openers.md` | Deep-link/file-association/single-instance, `.ldmx` opening flow, logging config                                                               |
+| `docs/contributing/releasing.md`    | Versioning, auto-updates, CI/publish workflows, signing, release procedure                                                                     |
+| `docs/contributing/frontend.md`     | Any Vue/TypeScript work: stores, views, components, conventions, testing                                                                       |
+| `docs/contributing/architecture.md` | Any Rust/Tauri work: modules, state/history, command patterns, capabilities, backend tests, adding a Tauri command                             |
 
 ## Skills — task procedures
 
@@ -72,6 +78,11 @@ src-tauri/          Rust backend
   src/capabilities/ Tauri v2 permissions (default.json)
   tests/            backend integration tests
 fixtures/           cache dir (<app_data_dir>/fixtures/), GDTF catalog + archives
+docs/               VitePress site root — everything here is published
+  .vitepress/       site config (navigation, sidebar, search, base path)
+  manual/           English user manual (setup/, live/, reference/)
+  contributing/     developer documentation (architecture, frontend, ...)
+  public/           static assets (screenshots)
 ```
 
 Details per domain (file-level maps, data flows, conventions) are in the docs.
@@ -131,6 +142,14 @@ Backend:
 
 Automation: Husky + lint-staged on commit · CI runs
 `bun run check` (typecheck, lint, format, tests, build).
+
+Documentation:
+
+- Preview `bun run docs:dev` · Build `bun run docs:build` (also catches dead
+  links and missing sidebar targets) · Serve the build with
+  `bun run docs:preview`.
+- Published in English only (`lang: "en-US"`), on GitHub Pages, by the `Docs`
+  workflow. `DOCS_BASE` overrides the site base path (default `/live-dmx/`).
 
 ## How to contribute as an agent
 

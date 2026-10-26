@@ -5,7 +5,7 @@ description: 'Use when adding or editing a built-in generic fixture (manufacture
 
 # Add a built-in generic fixture
 
-Reference: `docs/gdtf-fixtures.md`. Generics are available offline immediately (no `.gdtf` archive, no download) and are injected into the browser by `GdtfCatalogManager.load_local_fixtures()`.
+Reference: `docs/contributing/fixtures.md`. Generics are available offline immediately (no `.gdtf` archive, no download) and are injected into the browser by `GdtfCatalogManager.load_local_fixtures()`.
 
 ## Steps
 

@@ -5,7 +5,7 @@ description: "Use when GDTF-Share misbehaves: login or credentials failures, fix
 
 # Debug GDTF-Share (catalog, download, credentials)
 
-Reference: `docs/gdtf-fixtures.md`. Backend lives in `src-tauri/src/fixtures/gdtf_share/`; commands in `src-tauri/src/fixtures/commands.rs`.
+Reference: `docs/contributing/fixtures.md`. Backend lives in `src-tauri/src/fixtures/gdtf_share/`; commands in `src-tauri/src/fixtures/commands.rs`.
 
 ## Fixture resolution order (`gdtf_fetch_mode`)
 

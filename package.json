@@ -12,6 +12,10 @@
     "tauri": "tauri",
     "dev:app": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "build:app": "tauri build --no-bundle",
+    "docs:check": "bun scripts/check-docs-links.mjs",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "bun run docs:check && vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "release:version": "node scripts/release.mjs",
     "lint:front": "eslint .",
     "lint:back": "cd src-tauri && cargo clippy -- -D warnings",
@@ -72,6 +76,7 @@
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.58.1",
     "vite": "8.0.16",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.4",
     "vue-tsc": "^2.1.10"
   }

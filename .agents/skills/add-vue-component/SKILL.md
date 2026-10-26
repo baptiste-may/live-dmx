@@ -5,7 +5,7 @@ description: "Use when creating a new Vue 3 component or view under src/ in this
 
 # Add a Vue component or view
 
-Reference: `docs/frontend-architecture.md`. Start from the templates in `assets/`.
+Reference: `docs/contributing/frontend.md`. Start from the templates in `assets/`.
 
 ## Steps
 

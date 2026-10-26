@@ -5,7 +5,7 @@ description: "Use when changing the .ldmx persisted show format: adding or renam
 
 # Change the .ldmx show format
 
-Files: `src-tauri/src/show/types.rs` (`ShowData`, `ShowFileContent`, `clean_*` helpers), `src-tauri/src/show/commands.rs` (`show_save` / `show_load`, `write_show_file`). Reference: `docs/backend-architecture.md` §Show model.
+Files: `src-tauri/src/show/types.rs` (`ShowData`, `ShowFileContent`, `clean_*` helpers), `src-tauri/src/show/commands.rs` (`show_save` / `show_load`, `write_show_file`). Reference: `docs/contributing/architecture.md` §Show model.
 
 ## Rules
 

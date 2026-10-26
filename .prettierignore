@@ -6,6 +6,10 @@ target
 src-tauri/target
 src-tauri/gen
 
+# VitePress build output and cache
+docs/.vitepress/dist
+docs/.vitepress/cache
+
 # Binary files
 *.png
 *.jpg
