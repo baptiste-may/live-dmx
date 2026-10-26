@@ -7,15 +7,7 @@ body:
       value: |
         Thanks for the suggestion. Please search existing issues first.
 
-        Describe the problem and the behaviour you need; implementation details are optional.
-  - type: textarea
-    id: problem
-    attributes:
-      label: Problem
-      description: What is difficult, missing or frustrating today?
-      placeholder: I cannot reorder fixtures without recreating them...
-    validations:
-      required: true
+        Describe the behaviour you would like; implementation details are optional.
   - type: textarea
     id: proposed-behaviour
     attributes:
@@ -30,25 +22,6 @@ body:
       description: Workarounds or other approaches you tried.
     validations:
       required: false
-  - type: dropdown
-    id: area
-    attributes:
-      label: Area
-      description: Which part of Live DMX does this concern? The area is used for triage; the matching label is applied manually.
-      options:
-        - UI
-        - Backend
-        - DMX output
-        - Fixtures
-        - Live
-        - Show files
-        - CI
-        - Security
-        - Performance
-        - Tooling
-        - Not sure
-    validations:
-      required: true
   - type: textarea
     id: context
     attributes:

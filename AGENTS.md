@@ -126,16 +126,16 @@ Details per domain (file-level maps, data flows, conventions) are in the docs.
 GitHub Issues are the intake for bugs and feature requests, using the Issue
 Forms in `.github/ISSUE_TEMPLATE/`:
 
-- `bug_report.yml` requires reproduction steps, expected/actual behaviour,
-  version and OS, and applies `bug`.
-- `feature_request.yml` requires the problem, proposed behaviour and area, and
-  applies `enhancement`.
+- `bug_report.yml` requires reproduction steps and expected/actual behaviour,
+  and applies `bug`.
+- `feature_request.yml` requires the proposed behaviour, and applies
+  `enhancement`.
 - `config.yml` keeps blank issues available and links the documentation.
 
-The area dropdown mirrors the `ui`, `backend`, `dmx`, `fixtures`, `live`,
-`show`, `ci`, `security`, `performance` and `tooling` labels, but GitHub does not
-apply a label from a dropdown: triage sets the area label manually. Keep the
-forms product-facing; do not mention internal planning tools or workflows.
+Release versions are tracked with GitHub milestones, not with a form field.
+Area labels are applied manually during triage; the forms do not ask for an
+area, version or operating system. Keep the forms product-facing; do not
+mention internal planning tools or workflows.
 
 ## Quality assurance
 

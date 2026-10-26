@@ -49,40 +49,6 @@ body:
       render: shell
     validations:
       required: false
-  - type: dropdown
-    id: area
-    attributes:
-      label: Area
-      description: Which part of Live DMX is affected? The area is used for triage; the matching label is applied manually.
-      options:
-        - UI
-        - Backend
-        - DMX output
-        - Fixtures
-        - Live
-        - Show files
-        - CI
-        - Security
-        - Performance
-        - Tooling
-        - Not sure
-    validations:
-      required: true
-  - type: input
-    id: version
-    attributes:
-      label: Live DMX version
-      description: Shown in the app or in the release you installed.
-      placeholder: 0.1.0-dev
-    validations:
-      required: true
-  - type: input
-    id: os
-    attributes:
-      label: Operating system
-      placeholder: Windows 11, macOS 15, Ubuntu 24.04...
-    validations:
-      required: true
   - type: textarea
     id: context
     attributes:
