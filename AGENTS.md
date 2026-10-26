@@ -157,7 +157,8 @@ Backend:
   (rustfmt) · Tests `bun run test:back` (cargo test, `src-tauri/tests/`).
 
 Automation: Husky + lint-staged on commit · CI runs
-`bun run check` (typecheck, lint, format, tests, build).
+`bun run check` (typecheck, lint, format, tests, build) · Review requests:
+`.github/CODEOWNERS` assigns every path to `@baptiste-may`.
 
 Documentation:
 

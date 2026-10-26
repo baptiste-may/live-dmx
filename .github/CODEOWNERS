@@ -1,0 +1,3 @@
+# Default owner for every path. Add narrower rules above this line when
+# additional maintainers join.
+* @baptiste-may
