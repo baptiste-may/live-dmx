@@ -17,9 +17,9 @@ use output::{
     live_set_white_flash_fade, scan_output_interfaces, set_dmx_channel, set_dmx_data,
 };
 use show::{
-    get_pending_open_path, get_recent_shows, handle_open_request, remove_recent_show,
-    save_recent_show, show_configure_get_group, show_configure_get_overview, show_create,
-    show_get_data, show_group_create, show_group_remove, show_group_rename,
+    clean_recent_shows, get_pending_open_path, get_recent_shows, handle_open_request,
+    remove_recent_show, save_recent_show, show_configure_get_group, show_configure_get_overview,
+    show_create, show_get_data, show_group_create, show_group_remove, show_group_rename,
     show_group_update_settings, show_identity_update, show_import_mvr, show_load,
     show_output_add_universe, show_output_get_universes, show_output_remove_universe,
     show_output_set_enabled, show_output_set_target, show_patch_batch, show_patch_fixture,
@@ -189,6 +189,7 @@ pub fn run() {
             get_recent_shows,
             save_recent_show,
             remove_recent_show,
+            clean_recent_shows,
             show_get_data,
             show_create,
             show_load,
