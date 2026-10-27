@@ -45,5 +45,15 @@ export const useRecentShows = defineStore("recentShows", {
         useToastStore().addToast(`Failed to remove recent show: ${String(error)}`, ToastType.ERROR);
       }
     },
+    async clean() {
+      try {
+        const updated = await invoke<RecentShow[]>("clean_recent_shows");
+        if (Array.isArray(updated)) {
+          this.shows = updated;
+        }
+      } catch (error: unknown) {
+        useToastStore().addToast(`Failed to clean recent shows: ${String(error)}`, ToastType.ERROR);
+      }
+    },
   },
 });
