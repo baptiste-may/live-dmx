@@ -22,7 +22,7 @@ Reference: `docs/contributing/releasing.md` (versioning rules, auto-updates, sig
 - Prereleases: `releases/latest` resolves to the latest non-prerelease — a lone prerelease release 404s the updater endpoint until a stable release exists. The first stable release must be ≥ `0.1.0`.
 - Never commit the signing key (`~/.tauri/live-dmx.key`); the password secret is an empty string by design.
 - Updater constraints: Linux AppImage only (deb/rpm manual), Windows self-closes before install, macOS unsigned builds warn via Gatekeeper.
-- CI must stay green: the checks in `ci.yml` run on PRs (`bun run check` equivalent, split in parallel jobs) and `build.yml` (`bun run build:app`) runs weekly/manually; new native deps require mirroring the `apt-get` line in `setup/action.yml` and `publish.yml`.
+- CI must stay green: the checks in `ci.yml` run on PRs (`bun run check` equivalent, split in parallel jobs) and `build.yml` (`bun run build:app`) runs on every push to `main`; new native deps require mirroring the `apt-get` line in `setup/action.yml` and `publish.yml`.
 
 ## Manual check
 

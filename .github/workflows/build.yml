@@ -1,11 +1,9 @@
 name: Build App
 
-# Not run on every push: CI already compiles the backend and publish.yml builds
-# every release. Run it manually (or weekly) to catch release-profile issues.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: "0 3 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

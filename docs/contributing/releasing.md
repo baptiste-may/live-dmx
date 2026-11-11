@@ -97,9 +97,8 @@ Shared setup lives in the `./.github/actions/setup` composite action:
 (`CARGO_PROFILE_{DEV,TEST}_DEBUG=0`) for faster compilation and smaller caches.
 
 `.github/workflows/build.yml` runs a real `tauri build --no-bundle` (no signing
-key needed). It is **not** triggered on push: clippy/tests already compile the
-backend and `publish.yml` builds every release. It runs weekly and on manual
-dispatch.
+key needed) on every push to `main` and on manual dispatch. It uses
+`free-disk-space` and its own `build` cache key.
 
 ## Documentation site (`.github/workflows/docs.yml`)
 
