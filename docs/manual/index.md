@@ -17,6 +17,12 @@ when a newer release is available.
 | Settings        | Opens the general settings modal.                                              |
 | Exit            | Closes the application.                                                        |
 
+Recents keeps the five most recently opened shows, newest first. An entry whose
+file was moved or deleted stays in the list with a **File not found** hint and
+cannot be opened; use its trash button to remove it. The brush button in the
+Recents header removes every unavailable entry at once, while valid entries
+stay in the list.
+
 Opening, creating or closing a show with unsaved changes asks whether to cancel,
 discard the changes, or save before continuing.
 

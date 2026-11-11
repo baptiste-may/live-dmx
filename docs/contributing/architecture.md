@@ -164,21 +164,30 @@ Every command is declared once, in `lib.rs` `generate_handler!`; a `pub fn`
 that is not listed there is not callable from the frontend. Handlers must be
 **thin** and delegate to modules.
 
-| Domain     | Examples                                                                          | Module                                |
-| ---------- | --------------------------------------------------------------------------------- | ------------------------------------- |
-| Show       | `show_get_data`, `show_load`, `show_save`, `show_create`, `show_unload`           | `show/commands.rs`                    |
-| History    | `show_undo`, `show_redo`                                                          | `show/commands.rs`                    |
-| Identity   | `show_identity_update`                                                            | `show/identity.rs`                    |
-| Configure  | `show_configure_get_overview`, `show_configure_get_group`                         | `show/configure.rs`                   |
-| Patch      | `show_patch_fixture`, `show_patch_batch`, `show_patch_update_*`                   | `show/patch/`                         |
-| Groups     | `show_group_create`, `show_group_remove`, `show_group_rename`                     | `show/patch/`                         |
-| Output     | `show_output_get_universes`, `show_output_set_target`, `show_output_add_universe` | `show/output/`                        |
-| Live       | `live_set_*`, `live_reset_*`                                                      | `output/commands.rs`                  |
-| Direct DMX | `set_dmx_channel`, `set_dmx_data`, `get_dmx_data`, `get_all_dmx_data`             | `output/commands.rs`                  |
-| Fixtures   | `gdtf_search`, `gdtf_fetch_mode`, `gdtf_sync_catalog`, `reload_fixtures`          | `fixtures/commands.rs`                |
-| Interfaces | `get_output_interfaces`, `scan_output_interfaces`                                 | `output/interfaces/`                  |
-| Opening    | `get_pending_open_path`, `get_recent_shows`, `save_recent_show`                   | `show/open.rs`, `show/recent.rs`      |
-| Import     | `show_import_mvr`, `gdtf_import_file`                                             | `show/mvr.rs`, `fixtures/commands.rs` |
+| Domain     | Examples                                                                                                    | Module                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Show       | `show_get_data`, `show_load`, `show_save`, `show_create`, `show_unload`                                     | `show/commands.rs`                    |
+| History    | `show_undo`, `show_redo`                                                                                    | `show/commands.rs`                    |
+| Identity   | `show_identity_update`                                                                                      | `show/identity.rs`                    |
+| Configure  | `show_configure_get_overview`, `show_configure_get_group`                                                   | `show/configure.rs`                   |
+| Patch      | `show_patch_fixture`, `show_patch_batch`, `show_patch_update_*`                                             | `show/patch/`                         |
+| Groups     | `show_group_create`, `show_group_remove`, `show_group_rename`                                               | `show/patch/`                         |
+| Output     | `show_output_get_universes`, `show_output_set_target`, `show_output_add_universe`                           | `show/output/`                        |
+| Live       | `live_set_*`, `live_reset_*`                                                                                | `output/commands.rs`                  |
+| Direct DMX | `set_dmx_channel`, `set_dmx_data`, `get_dmx_data`, `get_all_dmx_data`                                       | `output/commands.rs`                  |
+| Fixtures   | `gdtf_search`, `gdtf_fetch_mode`, `gdtf_sync_catalog`, `reload_fixtures`                                    | `fixtures/commands.rs`                |
+| Interfaces | `get_output_interfaces`, `scan_output_interfaces`                                                           | `output/interfaces/`                  |
+| Opening    | `get_pending_open_path`, `get_recent_shows`, `save_recent_show`, `remove_recent_show`, `clean_recent_shows` | `show/open.rs`, `show/recent.rs`      |
+| Import     | `show_import_mvr`, `gdtf_import_file`                                                                       | `show/mvr.rs`, `fixtures/commands.rs` |
+
+Recent shows (`show/recent.rs`) are capped at five entries (`MAX_RECENT_SHOWS`):
+reads return the five newest without rewriting storage, and a successful open
+persists at most five. `available` is recomputed from the filesystem on every
+read and sent to the frontend, while `recent_shows.json` keeps only
+`displayName`, `path` and `updatedAt` through a private storage shape, so a
+moved or deleted show is reported as unavailable without losing its entry.
+`clean_recent_shows` removes every unavailable entry in one write; available
+entries stay in the list.
 
 Rules:
 

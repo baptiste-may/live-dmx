@@ -105,6 +105,10 @@ Do not move domain computation to this store — keep it a thin view-model.
 - `show-configuration-sync.ts` — Configure store sync logic
 - `logger.ts` — `initLogger()`: attaches webview console to backend logs
 - `shortcuts.ts`, `date.ts`, `fixture.ts` — small utilities
+- `utils.ts` — `sliceString` preserves short strings and prefixes truncated
+  suffixes with `...` (the ellipsis is additional to the length limit).
+  A zero limit currently prefixes the entire nonempty string, because
+  JavaScript treats `slice(-0)` as `slice(0)`.
 
 ## Conventions (non-negotiable)
 
