@@ -38,6 +38,10 @@ runs:
       run: |
         # Recommends (gstreamer, ...) are not needed to compile and slow the install;
         # retries/timeouts keep a stalled Azure mirror from hanging the job.
+        if ! curl -fsS -m 10 -o /dev/null http://azure.archive.ubuntu.com/ubuntu/dists/jammy/InRelease; then
+          echo "Azure mirror unreachable, falling back to archive.ubuntu.com"
+          echo "http://archive.ubuntu.com/ubuntu/ priority:1" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+        fi
         APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15"
         sudo apt-get $APT_OPTS update
         sudo apt-get $APT_OPTS install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils build-essential libssl-dev libudev-dev
