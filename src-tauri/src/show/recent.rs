@@ -159,7 +159,7 @@ pub fn remove_recent_show(app: AppHandle, path: String) -> Result<Vec<RecentShow
 #[tauri::command]
 pub fn clean_recent_shows(app: AppHandle) -> Result<Vec<RecentShow>, String> {
     let file_path = get_recent_shows_file_path(&app)?;
-    let mut shows = read_recent_shows_from_path(&file_path).unwrap_or_default();
+    let mut shows = read_recent_shows_from_path(&file_path)?;
 
     remove_unavailable_recent_shows(&mut shows);
     shows.truncate(MAX_RECENT_SHOWS);
