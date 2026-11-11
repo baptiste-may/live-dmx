@@ -79,9 +79,8 @@ Shared setup lives in the `./.github/actions/setup` composite action:
 - `system-deps`: Linux packages (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`,
   `librsvg2-dev`, `patchelf`, `xdg-utils`, `build-essential`, `libssl-dev`,
   `libudev-dev` — serialport needs `libudev-dev`/`libssl-dev`), installed with
-  `--no-install-recommends` and apt retries/timeouts, and a probe that picks the
-  first reachable Ubuntu mirror (Azure, then `archive.ubuntu.com`, ...), so a stalled mirror
-  cannot hang the job.
+  `--no-install-recommends` and apt retries/timeouts and `timeout` on each apt command, so a stalled
+  mirror fails fast instead of hanging the job.
 - `rust`: `dtolnay/rust-toolchain@stable` with **explicit `clippy` + `rustfmt`
   components** (not included by default) and `Swatinem/rust-cache`. Each job uses
   its own `cache-key` (`lint`, `test`, `build`) because clippy and test produce
