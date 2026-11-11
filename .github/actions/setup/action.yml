@@ -4,13 +4,21 @@ description: Install the toolchain (system deps, Bun, Rust) needed by a job. Req
 
 inputs:
   system-deps:
-    description: Install Linux system dependencies (webkit2gtk etc.) and free runner disk space.
+    description: Install Linux system dependencies (webkit2gtk etc.).
+    required: false
+    default: "false"
+  free-disk-space:
+    description: Remove large preinstalled toolchains (Android, .NET, Haskell) to free runner disk space. Only needed for full Tauri builds.
     required: false
     default: "false"
   rust:
     description: Install the Rust toolchain and restore the cargo cache.
     required: false
     default: "false"
+  cache-key:
+    description: Rust cache key, so jobs with different build artifacts (clippy vs test) do not overwrite each other.
+    required: false
+    default: "default"
   install:
     description: Run bun install --frozen-lockfile --ignore-scripts.
     required: false
@@ -20,15 +28,19 @@ runs:
   using: composite
   steps:
     - name: 💾 Free disk space
-      if: inputs.system-deps == 'true'
-      uses: jlumbroso/free-disk-space@v2
+      if: inputs.free-disk-space == 'true'
+      shell: bash
+      run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
 
     - name: 🐧 Install Linux dependencies
       if: inputs.system-deps == 'true'
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils build-essential libssl-dev libudev-dev
+        # Recommends (gstreamer, ...) are not needed to compile and slow the install;
+        # retries and `timeout` keep a stalled Azure mirror from hanging the job.
+        APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15"
+        sudo timeout 300 apt-get $APT_OPTS update
+        sudo timeout 600 apt-get $APT_OPTS install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils build-essential libssl-dev libudev-dev
 
     - uses: oven-sh/setup-bun@v2
 
@@ -49,3 +61,6 @@ runs:
       if: inputs.rust == 'true'
       with:
         workspaces: "./src-tauri -> target"
+        shared-key: ${{ inputs.cache-key }}
+        # PRs restore the cache saved by main but never write their own.
+        save-if: ${{ github.ref == 'refs/heads/main' }}

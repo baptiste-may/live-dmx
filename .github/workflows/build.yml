@@ -23,7 +23,9 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           system-deps: true
+          free-disk-space: true
           rust: true
+          cache-key: build
           install: true
 
       - name: 🏗️ Build app (no bundle)

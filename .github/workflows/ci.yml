@@ -5,18 +5,42 @@ on:
     branches: [main]
   pull_request:
 
+# Runs on main are never cancelled so the Rust cache is always saved.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
+
 jobs:
-  check-frontend:
-    name: 🔍 Frontend
+  format:
+    name: ✨ Format
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+        with:
+          install: true
+
+      - name: ✨ Frontend
+        run: bun run format:front
+
+      - name: ✨ Backend
+        run: bun run format:back
+
+  front-lint:
+    name: 🔍 Frontend lint
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -30,17 +54,25 @@ jobs:
       - name: 🧹 Lint
         run: bun run lint:front
 
-      - name: ✨ Format
-        run: bun run format:front
+      - name: 🏗️ Typecheck and build
+        run: bun run build
+
+  front-test:
+    name: 🧪 Frontend tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+        with:
+          install: true
 
       - name: 🧪 Tests
         run: bun run test:front
 
-      - name: 🏗️ Build
-        run: bun run build
-
-  check-backend:
-    name: 🦀 Backend
+  back-lint:
+    name: 🦀 Backend lint
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -50,12 +82,23 @@ jobs:
         with:
           system-deps: true
           rust: true
+          cache-key: lint
 
-      - name: 🧹 Lint
+      - name: 🧹 Clippy
         run: bun run lint:back
 
-      - name: ✨ Format
-        run: bun run format:back
+  back-test:
+    name: 🦀 Backend tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+        with:
+          system-deps: true
+          rust: true
+          cache-key: test
 
       - name: 🧪 Tests
         run: bun run test:back

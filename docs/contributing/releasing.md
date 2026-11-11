@@ -61,22 +61,44 @@ manual builds.
 
 ## CI (`.github/workflows/ci.yml`)
 
-Runs on PRs and `main` on `ubuntu-22.04`:
+Runs on PRs and `main` on `ubuntu-22.04`. Independent jobs run in parallel, so
+the total time is that of the slowest job (GitHub Actions has no shared
+workspace between jobs; the equivalent of GitLab artifacts is not needed, the
+Rust cache is used instead):
 
-1. Linux deps installed (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`,
-   `librsvg2-dev`, `patchelf`, `xdg-utils`, `build-essential`, `libssl-dev`
-   `libudev-dev` — serialport needs `libudev-dev`/`libssl-dev`).
-2. `oven-sh/setup-bun`, `dtolnay/rust-toolchain@stable` with \*\*explicit `clippy`
-   - `rustfmt` components\*\* (not included by default), `Swatinem/rust-cache` for
-     `./src-tauri -> target`.
-3. `bun install --frozen-lockfile --ignore-scripts` — scripts are skipped because
-   native deps pulled transitively (`better-sqlite3` via `daisy-ui-kit` →
-   `@nuxt/content`, `canvas`) are unused at build/test time; skipping keeps CI
-   deterministic and avoids native builds.
-4. Version sync guard: `bun run release:version -- --check`.
-5. `bun run check` (typecheck + lint + format + unit/cargo tests + build).
-6. `bun run build:app` — real `tauri build --no-bundle` to validate the release
-   build without needing the signing key.
+| Job          | Content                                                                               |
+| ------------ | ------------------------------------------------------------------------------------- |
+| `format`     | `format:front` (Prettier) + `format:back` (rustfmt)                                   |
+| `front-lint` | version sync guard (`release:version -- --check`), ESLint, `build` (`vue-tsc` + Vite) |
+| `front-test` | Vitest                                                                                |
+| `back-lint`  | `cargo clippy -D warnings`                                                            |
+| `back-test`  | `cargo test`                                                                          |
+
+Shared setup lives in the `./.github/actions/setup` composite action:
+
+- `system-deps`: Linux packages (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`,
+  `librsvg2-dev`, `patchelf`, `xdg-utils`, `build-essential`, `libssl-dev`,
+  `libudev-dev` — serialport needs `libudev-dev`/`libssl-dev`), installed with
+  `--no-install-recommends` and apt retries/timeouts and `timeout` on each apt command, so a stalled
+  mirror fails fast instead of hanging the job.
+- `rust`: `dtolnay/rust-toolchain@stable` with **explicit `clippy` + `rustfmt`
+  components** (not included by default) and `Swatinem/rust-cache`. Each job uses
+  its own `cache-key` (`lint`, `test`, `build`) because clippy and test produce
+  different artifacts. The cache is **only saved on `main`**; PRs restore it
+  read-only. Runs on `main` are never cancelled so the cache is always saved.
+- `install`: `bun install --frozen-lockfile --ignore-scripts` — scripts are
+  skipped because native deps pulled transitively (`better-sqlite3` via
+  `daisy-ui-kit` → `@nuxt/content`, `canvas`) are unused at build/test time;
+  skipping keeps CI deterministic and avoids native builds.
+- `free-disk-space`: removes Android/.NET/Haskell toolchains. Only the full
+  Tauri build needs it.
+
+`ci.yml` sets `CARGO_INCREMENTAL=0` and disables debug info
+(`CARGO_PROFILE_{DEV,TEST}_DEBUG=0`) for faster compilation and smaller caches.
+
+`.github/workflows/build.yml` runs a real `tauri build --no-bundle` (no signing
+key needed) on every push to `main` and on manual dispatch. It uses
+`free-disk-space` and its own `build` cache key.
 
 ## Documentation site (`.github/workflows/docs.yml`)
 
