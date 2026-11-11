@@ -1,3 +1,12 @@
+//! Compilation of a fixture mode into a normalized [`CompiledFixtureProfile`].
+//!
+//! Raw channel names (plus optional defaults, shutter-open values, pan/tilt bounds and
+//! capabilities) are classified into [`LogicalAttribute`]s, 16-bit coarse/fine channels are
+//! paired and pixels (cells) are detected. The result is what `pipeline.rs` encodes into DMX
+//! bytes, so all GDTF/name quirks are resolved here once instead of every frame.
+//!
+//! See `docs/contributing/rendering.md`.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -7,42 +16,79 @@ use crate::show::{EmbeddedGdtfMode, PatchedFixture};
 /// Normalized logical lighting attribute of a DMX channel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LogicalAttribute {
+    /// Master intensity (or per-pixel intensity on multi-cell fixtures).
     Dimmer,
+    /// Intensity of a separate beam/strobe section of a hybrid fixture.
     BeamDimmer,
+    /// White emitter belonging to a beam section.
     BeamWhite,
+    /// Pan axis.
     Pan,
+    /// Tilt axis.
     Tilt,
+    /// Position along an XYZ axis; defaults to 255 rather than centred.
     PositionXYZ,
+    /// Red emitter.
     Red,
+    /// Green emitter.
     Green,
+    /// Blue emitter.
     Blue,
+    /// White emitter.
     White,
+    /// Amber emitter.
     Amber,
+    /// Lime (green-yellow) emitter.
     Lime,
+    /// Cyan colour-mixing channel.
     Cyan,
+    /// Magenta colour-mixing channel.
     Magenta,
+    /// Yellow colour-mixing channel.
     Yellow,
+    /// Ultraviolet emitter.
     UV,
+    /// Strobe or shutter; has a "shutter open" DMX value.
     Shutter,
+    /// Colour wheel position.
     ColorWheel,
+    /// Colour macro or preset selector.
     ColorMacro,
+    /// Colour temperature (CCT/CTO/CTB) control.
     ColorTemperature,
+    /// Gobo wheel.
     Gobo,
+    /// Prism.
     Prism,
+    /// Zoom.
     Zoom,
+    /// Focus.
     Focus,
+    /// Control or reset channel.
     Control,
+    /// Anything not recognised above, including unpaired fine channels.
     Other,
 }
 
 /// DMX channel byte resolution and address pairing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChannelResolution {
-    Bits8 { offset: usize },
-    Bits16 { coarse: usize, fine: usize },
+    /// Single byte channel.
+    Bits8 {
+        /// 0-based offset of the byte within the fixture footprint.
+        offset: usize,
+    },
+    /// 16-bit value split over two consecutive channels.
+    Bits16 {
+        /// 0-based offset of the most significant byte within the footprint.
+        coarse: usize,
+        /// 0-based offset of the least significant byte (always `coarse + 1`).
+        fine: usize,
+    },
 }
 
 impl ChannelResolution {
+    /// Footprint offset of the byte that matters on its own: the sole byte, or the coarse one.
     pub fn primary_offset(&self) -> usize {
         match *self {
             ChannelResolution::Bits8 { offset } => offset,
@@ -54,38 +100,64 @@ impl ChannelResolution {
 /// A compiled, ready-to-encode channel definition within a fixture's footprint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompiledChannel {
+    /// What the channel controls.
     pub attribute: LogicalAttribute,
+    /// Where its byte(s) sit within the footprint.
     pub resolution: ChannelResolution,
+    /// DMX value (0-255) of the coarse/only byte when the fixture is idle.
     pub default_dmx: u8,
+    /// DMX value (16-255) that opens the shutter; only set for `Shutter` channels.
     pub shutter_open_dmx: Option<u8>,
+    /// Pixel (cell) the channel belongs to, or `None` for fixture-wide channels.
     pub pixel_index: Option<usize>,
 }
 
 /// A mapped pixel (cell) within a multi-cell or single fixture.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompiledFixturePixel {
+    /// 0-based pixel number.
     pub index: usize,
+    /// Indices into `CompiledFixtureProfile::channels` (not DMX offsets) of the channels
+    /// that drive this pixel's colour and intensity.
     pub channel_indices: Vec<usize>,
 }
 
 /// A normalized, fully resolved fixture profile ready for high-performance DMX encoding.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompiledFixtureProfile {
+    /// Number of DMX channels the fixture occupies in its mode.
     pub footprint: usize,
+    /// Logical channels; a 16-bit pair counts once, so this can be shorter than `footprint`.
     pub channels: Vec<CompiledChannel>,
+    /// Idle value (0-255) of every DMX channel of the footprint, fine bytes included.
     pub default_dmx: Vec<u8>,
+    /// Whether at least one coarse `Dimmer` channel exists.
     pub has_dimmer: bool,
+    /// Whether a single-channel fixture without dimmer or position channel is driven as a dimmer.
     pub treat_first_as_dimmer: bool,
+    /// Whether the fixture mixes colour with cyan/magenta/yellow instead of RGB.
     pub is_cmy: bool,
+    /// Pan range `[min, max]` in degrees, when the mode declares it.
     pub pan_bounds: Option<[i32; 2]>,
+    /// Tilt range `[min, max]` in degrees, when the mode declares it.
     pub tilt_bounds: Option<[i32; 2]>,
+    /// Which colour mechanisms (mix, wheel, macro, temperature) the fixture offers.
     pub color_summary: ColorChannelSummary,
+    /// Raw capability JSON per DMX channel of the footprint (empty when unknown).
     pub channel_capabilities: Vec<Vec<serde_json::Value>>,
+    /// Detected pixels (cells); never empty for a non-empty footprint.
     pub pixels: Vec<CompiledFixturePixel>,
+    /// Length of `pixels`, at least 1.
     pub pixel_count: usize,
 }
 
 /// Classifies a raw channel name into a base `LogicalAttribute` and whether it is a fine/LSB channel.
+///
+/// Matching is by case-insensitive substring and the order of the checks matters (for example
+/// `lime` before `green`, pan/tilt before everything else). A fine channel that is not
+/// pan, tilt, dimmer or a colour becomes `Other`. Names containing `curve`, `mode`, `speed`,
+/// `time` or `duration` are never treated as dimmer or shutter. Does not apply the contextual
+/// heuristics of `compile_fixture_profile`.
 pub fn parse_channel_name(name: &str) -> (LogicalAttribute, bool) {
     let lower = name.to_lowercase();
     let is_fine = lower.contains("fine")
@@ -189,6 +261,15 @@ pub fn parse_channel_name(name: &str) -> (LogicalAttribute, bool) {
 }
 
 /// Compiles raw channel definitions into a normalized `CompiledFixtureProfile`.
+///
+/// `channel_names` defines the footprint. The optional inputs are indexed by 0-based channel
+/// offset: `channel_defaults` (explicit idle values; a 0 is ignored in favour of the attribute
+/// default, 128 for coarse pan/tilt and 255 for XYZ), `shutter_open_values` (DMX value that opens
+/// each shutter channel) and `capabilities` (raw JSON copied through, or empty vectors when
+/// `None`). `pan_bounds`/`tilt_bounds` are stored as given. An empty `channel_names` yields a
+/// footprint-0 profile with no channels or pixel entries (`pixel_count` is still 1). Several fallback heuristics repair incomplete GDTF
+/// modes (tilt bars, placeholder shutters, hybrid beam/wash dimmers); see
+/// `docs/contributing/rendering.md`.
 pub fn compile_fixture_profile(
     channel_names: &[String],
     channel_defaults: Option<&[u8]>,
@@ -617,7 +698,7 @@ pub fn compile_fixture_profile(
     }
 }
 
-/// Helper to compile an `EmbeddedGdtfMode` with optional capability data.
+/// Compiles an `EmbeddedGdtfMode` (the mode copy stored in the show) with optional capability data.
 pub fn compile_from_embedded_mode(
     mode: &EmbeddedGdtfMode,
     capabilities: Option<&[Vec<serde_json::Value>]>,
@@ -632,7 +713,12 @@ pub fn compile_from_embedded_mode(
     )
 }
 
-/// Helper to extract mode information from a `PatchedFixture` and compile it.
+/// Extracts the mode JSON of a `PatchedFixture` and compiles it.
+///
+/// Reads `channels` (plain strings or objects with `name`/`channel` and `capabilities`/
+/// `capability`), `channelDefaults`, `shutterOpenValues` (object keyed by channel offset) and
+/// two-element `panBounds`/`tiltBounds`. Missing or malformed entries are skipped rather than
+/// reported, so a mode without channels compiles to an empty profile.
 pub fn compile_from_patched_fixture(fixture: &PatchedFixture) -> CompiledFixtureProfile {
     let mut channel_names = Vec::new();
     let mut capabilities = Vec::new();

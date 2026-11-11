@@ -1,9 +1,20 @@
+//! Open Pixel Control (OPC) output: packet builder and a lazily connecting TCP sender.
+//!
+//! Each universe maps to one OPC channel on a server at `127.0.0.1`. See
+//! `docs/contributing/dmx-output.md` for the protocol overview.
+
 use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
 use std::time::{Duration, Instant};
 
+/// TCP port of the OPC server.
 pub const OPC_PORT: u16 = 7890;
 
+/// Builds an OPC "set pixel colors" message for one channel.
+///
+/// Layout: channel byte, command byte `0x00` (set 8-bit pixel colors), 16-bit
+/// big-endian payload length, then the payload. `data` is truncated to 65535
+/// bytes, the maximum the length field can express.
 pub fn build_opc_packet(channel: u8, data: &[u8]) -> Vec<u8> {
     let len = data.len().min(65535) as u16;
     let mut packet = Vec::with_capacity(4 + len as usize);
@@ -15,8 +26,13 @@ pub fn build_opc_packet(channel: u8, data: &[u8]) -> Vec<u8> {
     packet
 }
 
+/// OPC client that keeps one TCP connection to the local server.
+///
+/// The connection is opened lazily and dropped on write errors.
 pub struct OpcSender {
+    /// Open connection to the OPC server, if any.
     stream: Option<TcpStream>,
+    /// Time of the last connection attempt, used to limit retries to one per second.
     last_reconnect_attempt: Option<Instant>,
 }
 
@@ -27,6 +43,7 @@ impl Default for OpcSender {
 }
 
 impl OpcSender {
+    /// Creates a sender without a connection; it connects on the first send.
     pub fn new() -> Self {
         Self {
             stream: None,
@@ -34,6 +51,18 @@ impl OpcSender {
         }
     }
 
+    /// Sends one universe as OPC channel `universe - 1`.
+    ///
+    /// When disconnected, tries to connect to `127.0.0.1:7890` (20 ms connect
+    /// timeout, at most once per second) and enables `TCP_NODELAY` plus a 20 ms
+    /// write timeout. The calling thread may block for up to those timeouts. On
+    /// a write failure the connection is dropped so a later call reconnects.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if `universe` is outside `1..=256`, if no connection could
+    /// be established (including while waiting out the retry delay), or if the
+    /// write to the server fails.
     pub fn send_universe(&mut self, universe: u16, data: &[u8]) -> Result<(), String> {
         if !(1..=256).contains(&universe) {
             return Err(format!(
