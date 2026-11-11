@@ -1,3 +1,13 @@
+//! MVR (My Virtual Rig, DIN SPEC 15801) import: builds a whole `ShowData` from a `.mvr` archive.
+//!
+//! An `.mvr` is a ZIP holding `GeneralSceneDescription.xml` (layers and fixtures) and embedded
+//! `.gdtf` fixture definitions. The import parses the scene, resolves each fixture to a GDTF,
+//! generic or fallback definition, allocates ids, names and DMX addresses, turns layers into
+//! groups and reports coarse progress. It replaces the current show rather than merging with it;
+//! the Tauri command that applies the result lives in `show/commands.rs`.
+//!
+//! See `docs/contributing/fixtures.md` (MVR import section).
+
 use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read};
 use std::path::Path;
@@ -16,34 +26,53 @@ use crate::show::types::{
 /// Callback reporting `(percent, message)` while a long MVR import runs.
 pub type MvrProgressCallback<'a> = &'a dyn Fn(u8, &str);
 
+/// One DMX address of an MVR fixture, as read from an `Address` element.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MvrAddress {
+    /// DMX break (`break` attribute, `0` when missing); breaks `0` and `1` are the primary one.
     pub break_id: u32,
+    /// Universe, clamped to `1..=512`.
     pub universe: u32,
+    /// Start address within the universe, clamped to `1..=512`.
     pub address: u32,
 }
 
+/// A fixture as described in the MVR scene, before it is resolved to a patched fixture.
 #[derive(Debug, Clone, Default)]
 pub struct MvrFixture {
+    /// Display name (`name` attribute); may be empty or duplicated across fixtures.
     pub name: String,
+    /// MVR `uuid` attribute; kept in the model but unused by the patch.
     pub uuid: Option<String>,
+    /// `FixtureID` text from the plot, as written (not necessarily numeric).
     pub fixture_id: Option<String>,
+    /// `FixtureIDNumeric` value; preferred over `fixture_id` when allocating ids.
     pub fixture_id_numeric: Option<u32>,
+    /// `UnitNumber` value; collected but unused by the patch.
     pub unit_number: Option<u32>,
+    /// `GDTFSpec`: file name, path or identifier of the fixture definition.
     pub gdtf_spec: Option<String>,
+    /// `GDTFMode`: name of the DMX mode to use within the definition.
     pub gdtf_mode: Option<String>,
+    /// Every `Address` found, in document order.
     pub addresses: Vec<MvrAddress>,
 }
 
+/// A layer of the MVR scene, which becomes a group on import.
 #[derive(Debug, Clone, Default)]
 pub struct MvrLayer {
+    /// Layer name (`Layer N` when the attribute is missing or empty).
     pub name: String,
+    /// MVR `uuid` attribute; unused by the import.
     pub uuid: Option<String>,
+    /// Fixtures of the layer in document order.
     pub fixtures: Vec<MvrFixture>,
 }
 
+/// The parsed `GeneralSceneDescription.xml`.
 #[derive(Debug, Clone, Default)]
 pub struct MvrScene {
+    /// Layers in document order; fixtures outside any layer are merged into the first one.
     pub layers: Vec<MvrLayer>,
 }
 
@@ -52,6 +81,9 @@ pub struct MvrScene {
 /// - "Universe.Address" (e.g. "1.1", "2.100")
 /// - "Universe/Address" or "Universe,Address"
 /// - Absolute integer address (e.g. 1 -> 1.1, 512 -> 1.512, 513 -> 2.1)
+///
+/// Returns `(universe, address)`, both 1-based and clamped to `1..=512`. Empty, `0` or
+/// unparsable input yields `(1, 1)` rather than an error, so a malformed plot still imports.
 pub fn parse_dmx_address(text: &str) -> (u32, u32) {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -80,18 +112,33 @@ pub fn parse_dmx_address(text: &str) -> (u32, u32) {
     (1, 1)
 }
 
+/// XML element whose text content `parse_mvr_xml` is currently reading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TagState {
+    /// Not inside a tracked element; text is ignored.
     None,
+    /// Inside `GDTFSpec`.
     GdtfSpec,
+    /// Inside `GDTFMode`.
     GdtfMode,
+    /// Inside `FixtureID`.
     FixtureId,
+    /// Inside `FixtureIDNumeric`.
     FixtureIdNumeric,
+    /// Inside `UnitNumber`.
     UnitNumber,
+    /// Inside `Address`.
     Address,
 }
 
-/// Parses GeneralSceneDescription.xml into an MvrScene structure.
+/// Parses `GeneralSceneDescription.xml` into an `MvrScene` structure.
+///
+/// Fixtures found outside any `Layer` are appended to the first layer, or to a `Default` layer
+/// created for them when the scene has none. Unparsable numeric fields are skipped silently.
+///
+/// # Errors
+///
+/// Returns an error if the XML is malformed (with the byte position of the failure).
 pub fn parse_mvr_xml(xml: &str) -> Result<MvrScene, String> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -264,6 +311,11 @@ pub fn parse_mvr_xml(xml: &str) -> Result<MvrScene, String> {
     Ok(scene)
 }
 
+/// Infers a built-in generic fixture from a free-form spec or fixture name.
+///
+/// Matching is a deliberately simple, ordered keyword search (dimmer, rgbw, rgbaw or the whole
+/// word `uv`, rgb, spot, wash, strobe). `uv` must be a standalone token so names such as
+/// "Chauvet" do not match. Returns `None` when nothing matches.
 fn find_matching_generic_fixture(query: &str) -> Option<ParsedGdtfFixture> {
     let lower = query.to_lowercase();
     let generics = get_generic_fixtures();
@@ -317,6 +369,7 @@ fn find_matching_generic_fixture(query: &str) -> Option<ParsedGdtfFixture> {
     None
 }
 
+/// Builds a one-channel dimmer definition named `name`, used when no definition can be resolved.
 fn fallback_fixture_definition(name: &str) -> ParsedGdtfFixture {
     ParsedGdtfFixture {
         name: name.to_string(),
@@ -338,6 +391,12 @@ fn fallback_fixture_definition(name: &str) -> ParsedGdtfFixture {
     }
 }
 
+/// Resolves the definition and DMX mode of an MVR fixture.
+///
+/// The definition is, in order: an embedded GDTF matching `GDTFSpec` (full name, file name or
+/// stem), a generic inferred from the spec, a generic inferred from the fixture name, then a
+/// fallback dimmer. The mode is matched case-insensitively on name or short name, otherwise the
+/// first mode of the definition (or a synthetic one-channel dimmer mode if it has none).
 fn resolve_fixture_gdtf_and_mode(
     mvr_fixture: &MvrFixture,
     gdtf_files: &HashMap<String, ParsedGdtfFixture>,
@@ -423,6 +482,11 @@ fn resolve_fixture_gdtf_and_mode(
     (gdtf_def, mode)
 }
 
+/// Finds the first universe/address with `channel_count` contiguous free channels.
+///
+/// `occupied_ranges` maps a universe to its reserved inclusive `(start, end)` ranges. Universes
+/// are scanned from 1 to 512; if every one is full it returns `(1, 1)` (overlapping rather than
+/// failing the import). `channel_count` is clamped to `1..=512`.
 fn find_first_free_span(
     occupied_ranges: &HashMap<u32, Vec<(u32, u32)>>,
     channel_count: u32,
@@ -451,6 +515,8 @@ fn find_first_free_span(
 
 /// Sanitizes a group name by trimming whitespace and removing decorative characters
 /// often found in CAD exports (e.g., ">> BANK <<" -> "BANK", "[Front Truss]" -> "Front Truss").
+///
+/// An empty result becomes `"Group"`.
 pub fn sanitize_group_name(name: &str) -> String {
     let chars = [
         '>', '<', '[', ']', '*', '~', '-', '_', ' ', '\t', '\r', '\n',
@@ -490,6 +556,10 @@ pub fn is_default_layer(name: &str) -> bool {
     )
 }
 
+/// Fuzzy-matches a group name against a fixture model name (case-insensitive).
+///
+/// True on equality, prefix/suffix containment in either direction, or a shared word of at
+/// least 3 characters. Empty names never match.
 fn is_model_group_match(group_name: &str, model_name: &str) -> bool {
     let g = group_name.trim().to_lowercase();
     let m = model_name.trim().to_lowercase();
@@ -507,6 +577,10 @@ fn is_model_group_match(group_name: &str, model_name: &str) -> bool {
     !g_words.is_disjoint(&m_words) && g_words.iter().any(|w| w.len() >= 3 && m_words.contains(w))
 }
 
+/// Finds the existing group to which fixtures of `model_name` should be added.
+///
+/// Prefers an exact case-insensitive name match, then `is_model_group_match`. The "All" group
+/// (id `0`) is never returned.
 fn find_matching_group_id(groups: &[FixtureGroup], model_name: &str) -> Option<u32> {
     let model_lower = model_name.trim().to_lowercase();
     if model_lower.is_empty() {
@@ -536,6 +610,8 @@ fn find_matching_group_id(groups: &[FixtureGroup], model_name: &str) -> Option<u
     None
 }
 
+/// Returns the model name of a fixture: its name, else the part of `GDTFSpec` after the last
+/// `@`, else `"Fixture"`.
 fn extract_model_name(fixture: &MvrFixture) -> &str {
     let name = fixture.name.trim();
     if !name.is_empty() {
@@ -631,13 +707,26 @@ pub fn disambiguate_fixture_name(
     }
 }
 
-/// Parses an in-memory MVR ZIP archive and builds a ShowData structure.
+/// Parses an in-memory MVR ZIP archive and builds a `ShowData` structure.
+///
+/// # Errors
+///
+/// See `import_mvr_from_bytes_with_progress`.
 pub fn import_mvr_from_bytes(data: &[u8], show_name: &str) -> Result<ShowData, String> {
     import_mvr_from_bytes_with_progress(data, show_name, None)
 }
 
 /// Same as [`import_mvr_from_bytes`], reporting coarse progress through `on_progress`
 /// as `(percent, message)`.
+///
+/// Progress goes from 10 to 95 percent; the caller is responsible for the final transition to the
+/// loaded state. Invalid embedded `.gdtf` entries are skipped. The returned show is `Loaded`,
+/// dirty, has no file path and routes every used universe to the `"none"` output.
+///
+/// # Errors
+///
+/// Returns an error if the data is not a readable ZIP, a ZIP entry or the scene description
+/// cannot be read, `GeneralSceneDescription.xml` is missing, or its XML is malformed.
 pub fn import_mvr_from_bytes_with_progress(
     data: &[u8],
     show_name: &str,
@@ -989,6 +1078,15 @@ pub fn import_mvr_from_bytes_with_progress(
 }
 
 /// Imports an MVR file from the file system, optionally caching bundled GDTFs into the local app data.
+///
+/// With an `app` handle, the embedded `.gdtf` archives are saved in the local GDTF catalog
+/// (failures are ignored) and progress is emitted as `show-state-changed` partial snapshots with
+/// status `Loading`. The show name is the file stem.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, or if the archive import fails (see
+/// `import_mvr_from_bytes_with_progress`).
 pub fn import_mvr_file(path_str: &str, app: Option<&AppHandle>) -> Result<ShowData, String> {
     let path = Path::new(path_str);
     let bytes = std::fs::read(path)

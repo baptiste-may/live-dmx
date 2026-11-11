@@ -1,8 +1,14 @@
+//! Recent shows list, persisted as `recent_shows.json` in the app data directory.
+//!
+//! The list is most-recent-first and capped at [`MAX_RECENT_SHOWS`] entries.
+//! Independent of the open show: it never touches `AppState`.
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
+/// Maximum number of recent shows kept in the list.
 pub const MAX_RECENT_SHOWS: usize = 5;
 
 /// Wire shape returned to the frontend. `available` is computed on every read
@@ -10,17 +16,26 @@ pub const MAX_RECENT_SHOWS: usize = 5;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentShow {
+    /// Show name at the time it was last saved or opened.
     pub display_name: String,
+    /// Path of the `.ldmx` file.
     pub path: String,
+    /// Last-update time as milliseconds since the Unix epoch, as a decimal string
+    /// (empty if the system clock was unusable).
     pub updated_at: String,
+    /// Whether the file currently exists on disk; computed on read, never stored.
     pub available: bool,
 }
 
+/// Persisted shape of one recent show; `available` is recomputed on read.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredRecentShow {
+    /// Show name at the time it was last saved or opened.
     display_name: String,
+    /// Path of the `.ldmx` file.
     path: String,
+    /// Last-update time as milliseconds since the Unix epoch, as a decimal string.
     updated_at: String,
 }
 
@@ -45,6 +60,11 @@ impl From<StoredRecentShow> for RecentShow {
     }
 }
 
+/// Resolves the path of `recent_shows.json`, creating the app data directory if needed.
+///
+/// # Errors
+///
+/// Returns an error if the app data directory cannot be resolved or created.
 pub fn get_recent_shows_file_path(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data = app
         .path()
@@ -59,6 +79,13 @@ pub fn get_recent_shows_file_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data.join("recent_shows.json"))
 }
 
+/// Reads the recent shows list from `file_path`.
+///
+/// A missing file yields an empty list.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or does not contain a valid JSON list.
 pub fn read_recent_shows_from_path(file_path: &PathBuf) -> Result<Vec<RecentShow>, String> {
     if !file_path.exists() {
         return Ok(Vec::new());
@@ -70,6 +97,11 @@ pub fn read_recent_shows_from_path(file_path: &PathBuf) -> Result<Vec<RecentShow
     Ok(stored.into_iter().map(RecentShow::from).collect())
 }
 
+/// Writes `shows` to `file_path` as pretty-printed JSON, replacing the file.
+///
+/// # Errors
+///
+/// Returns an error if serialization or the file write fails.
 pub fn write_recent_shows_to_path(file_path: &PathBuf, shows: &[RecentShow]) -> Result<(), String> {
     let stored: Vec<StoredRecentShow> = shows.iter().map(StoredRecentShow::from).collect();
     let json_str = serde_json::to_string_pretty(&stored)
@@ -110,6 +142,11 @@ pub fn limit_recent_shows(shows: Vec<RecentShow>) -> Vec<RecentShow> {
     shows.into_iter().take(MAX_RECENT_SHOWS).collect()
 }
 
+/// Tauri command: returns the recent shows list, most recent first.
+///
+/// # Errors
+///
+/// Returns an error if the app data directory is unavailable or the file is unreadable/invalid.
 #[tauri::command]
 pub fn get_recent_shows(app: AppHandle) -> Result<Vec<RecentShow>, String> {
     let file_path = get_recent_shows_file_path(&app)?;
@@ -118,6 +155,16 @@ pub fn get_recent_shows(app: AppHandle) -> Result<Vec<RecentShow>, String> {
     Ok(shows)
 }
 
+/// Tauri command: moves or adds `path` at the top of the recent shows list and
+/// returns the updated list.
+///
+/// An existing entry with the same path is replaced; the list is truncated to
+/// [`MAX_RECENT_SHOWS`] entries. An unreadable existing file is treated as an
+/// empty list (and overwritten).
+///
+/// # Errors
+///
+/// Returns an error if the app data directory is unavailable or the file cannot be written.
 #[tauri::command]
 pub fn save_recent_show(
     app: AppHandle,
@@ -145,6 +192,14 @@ pub fn save_recent_show(
     Ok(shows)
 }
 
+/// Tauri command: removes the entry for `path` from the recent shows list and
+/// returns the updated list.
+///
+/// An unreadable existing file is treated as an empty list (and overwritten).
+///
+/// # Errors
+///
+/// Returns an error if the app data directory is unavailable or the file cannot be written.
 #[tauri::command]
 pub fn remove_recent_show(app: AppHandle, path: String) -> Result<Vec<RecentShow>, String> {
     let file_path = get_recent_shows_file_path(&app)?;
@@ -156,6 +211,13 @@ pub fn remove_recent_show(app: AppHandle, path: String) -> Result<Vec<RecentShow
     Ok(shows)
 }
 
+/// Tauri command: removes entries whose files no longer exist and returns the
+/// updated list.
+///
+/// # Errors
+///
+/// Returns an error if the app data directory is unavailable or the file cannot
+/// be read or written.
 #[tauri::command]
 pub fn clean_recent_shows(app: AppHandle) -> Result<Vec<RecentShow>, String> {
     let file_path = get_recent_shows_file_path(&app)?;

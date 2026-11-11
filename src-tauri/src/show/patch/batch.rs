@@ -1,3 +1,15 @@
+//! Patch mutations: single and batch fixture patching, renaming, re-addressing and group toggling.
+//!
+//! Every Tauri command here goes through `AppState::apply_mutation`: the closure edits a
+//! `ShowData` under lock, an `Err` rolls the show back untouched, and a real change is pushed on
+//! the undo stack, resets the live engine (patch changes) and emits `show-state-changed`.
+//!
+//! Addressing is 1-based: universes are `1..=512` and DMX addresses `1..=512`. Batch and
+//! re-addressing operations work on an "absolute address" (`(universe - 1) * 512 + (address - 1)`)
+//! so fixtures that do not fit in the rest of a universe flow to the start of the next one.
+//!
+//! See `docs/contributing/architecture.md`.
+
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
@@ -5,18 +17,30 @@ use crate::show::{
     clean_fixture_type, clean_mode, AppState, FixtureGroup, PatchRequest, PatchedFixture,
 };
 
+/// Frontend request to patch `count` identical fixtures in one go (camelCase on the wire).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchPatchRequest {
+    /// Name of the fixtures; a trailing number is stripped to name the group and fixtures.
     pub name: String,
+    /// Fixture type definition (JSON), sanitized with `clean_fixture_type` before storing.
     pub fixture_type: serde_json::Value,
+    /// Selected DMX mode (JSON), sanitized with `clean_mode` before storing.
     pub mode: serde_json::Value,
+    /// Universe of the first fixture (1-based).
     pub universe: u32,
+    /// DMX address of the first fixture within `universe` (1-based, `1..=512`).
     pub start_address: u32,
+    /// Number of fixtures to create.
     pub count: u32,
+    /// Footprint of one fixture in DMX channels; values below 1 are treated as 1.
     pub channel_count: u32,
 }
 
+/// Returns `name` without its trailing numeric word, e.g. `"Par 12"` becomes `"Par"`.
+///
+/// Used to derive a base name that is then re-suffixed with a sequence number. A name made of a
+/// single word (even a number) is returned unchanged.
 pub fn extract_standard_name(name: &str) -> String {
     let parts: Vec<&str> = name.split_whitespace().collect();
     if parts.len() > 1 && parts.last().and_then(|p| p.parse::<u32>().ok()).is_some() {
@@ -26,6 +50,18 @@ pub fn extract_standard_name(name: &str) -> String {
     }
 }
 
+/// Tauri command: patches one fixture into the show and returns it.
+///
+/// The fixture gets the next free id (`max + 1`) and is assigned to `group_id`, which is not
+/// validated. Its footprint is the length of the mode's `channels` array (at least 1). Runs
+/// through `AppState::apply_mutation`: one undo step, live engine reset and a
+/// `show-state-changed` event on success.
+///
+/// # Errors
+///
+/// Returns an error if the universe is outside `1..=512`, the address range does not fit in
+/// `1..=512`, it overlaps a fixture already patched on the same universe, or the show/history
+/// locks are poisoned. On error the show is left unchanged.
 #[tauri::command]
 pub fn show_patch_fixture(
     state: State<'_, AppState>,
@@ -86,6 +122,15 @@ pub fn show_patch_fixture(
     })
 }
 
+/// Computes where each fixture of a batch lands and checks it against the existing patch.
+///
+/// Fixtures are laid out back to back from `universe`/`start_address`; a fixture that would
+/// straddle the end of a universe is moved to address 1 of the next one. Returns the planned
+/// `(universe, address)` pairs in order.
+///
+/// # Errors
+///
+/// Returns an error if a fixture would land beyond universe 512 or overlap an existing fixture.
 pub fn check_batch_patch_collision(
     fixtures: &[PatchedFixture],
     request: &BatchPatchRequest,
@@ -135,6 +180,17 @@ pub fn check_batch_patch_collision(
     Ok(planned_fixtures)
 }
 
+/// Tauri command: patches `request.count` identical fixtures and puts them in a new group.
+///
+/// A group is created (id `max + 1`) named after the base name; fixtures are named
+/// `"<base> <n>"` (1-based), or keep `request.name` verbatim when `count == 1`. The whole batch
+/// is a single undo step. Emits `show-state-changed` via `AppState::apply_mutation`.
+///
+/// # Errors
+///
+/// Returns an error if the batch exceeds the universe bounds, collides with an existing fixture
+/// (see `check_batch_patch_collision`) or the locks are poisoned. On error nothing is created,
+/// including the group.
 #[tauri::command]
 pub fn show_patch_batch(
     state: State<'_, AppState>,
@@ -188,6 +244,14 @@ pub fn show_patch_batch(
     })
 }
 
+/// Tauri command: removes the fixtures whose ids are in `ids`.
+///
+/// Unknown ids are ignored; groups are left as they are (even if they become empty). One undo
+/// step via `AppState::apply_mutation`.
+///
+/// # Errors
+///
+/// Returns an error only if the show/history locks are poisoned.
 #[tauri::command]
 pub fn show_patch_remove_fixtures(
     state: State<'_, AppState>,
@@ -200,6 +264,15 @@ pub fn show_patch_remove_fixtures(
     })
 }
 
+/// Tauri command: renames fixtures.
+///
+/// With a single id the fixture takes `name` verbatim. With several, they are named
+/// `"<base> <n>"` in `ids` order (`n` starts at 1 and only counts ids that exist), where
+/// `<base>` is `name` without its trailing number. One undo step via `AppState::apply_mutation`.
+///
+/// # Errors
+///
+/// Returns an error only if the show/history locks are poisoned.
 #[tauri::command]
 pub fn show_patch_update_name(
     state: State<'_, AppState>,
@@ -226,6 +299,7 @@ pub fn show_patch_update_name(
     })
 }
 
+/// Returns the DMX footprint of a patched fixture: the number of channels in its mode, at least 1.
 pub fn get_fixture_channel_count(fixture: &PatchedFixture) -> u64 {
     fixture
         .mode
@@ -236,6 +310,16 @@ pub fn get_fixture_channel_count(fixture: &PatchedFixture) -> u64 {
         .max(1)
 }
 
+/// Tauri command: moves fixtures to consecutive addresses starting at `address`.
+///
+/// The start universe is the one of the first id in `ids`. Fixtures are packed back to back in
+/// `ids` order; one that does not fit in the rest of a universe moves to address 1 of the next
+/// universe. Unknown ids are skipped and, unlike patching, no bounds or collision check is
+/// performed. An empty `ids` is a no-op. One undo step via `AppState::apply_mutation`.
+///
+/// # Errors
+///
+/// Returns an error only if the show/history locks are poisoned.
 #[tauri::command]
 pub fn show_patch_update_address(
     state: State<'_, AppState>,
@@ -274,6 +358,16 @@ pub fn show_patch_update_address(
     })
 }
 
+/// Tauri command: moves fixtures to `universe`, keeping the address of the first one as start.
+///
+/// Works like `show_patch_update_address`: fixtures are packed back to back in `ids` order
+/// starting at the first fixture's address, overflowing into the following universes; there is
+/// no bounds or collision check. An empty `ids` is a no-op. One undo step via
+/// `AppState::apply_mutation`.
+///
+/// # Errors
+///
+/// Returns an error only if the show/history locks are poisoned.
 #[tauri::command]
 pub fn show_patch_update_universe(
     state: State<'_, AppState>,
@@ -312,6 +406,15 @@ pub fn show_patch_update_universe(
     })
 }
 
+/// Tauri command: toggles membership of the fixtures in the group `group_id`.
+///
+/// If every listed fixture is already in the group they are all removed from it; otherwise
+/// the ones that are missing are added. `group_id == 0` or empty `ids` is a no-op. One undo step
+/// via `AppState::apply_mutation`.
+///
+/// # Errors
+///
+/// Returns an error only if the show/history locks are poisoned.
 #[tauri::command]
 pub fn show_patch_toggle_group(
     state: State<'_, AppState>,

@@ -1,3 +1,12 @@
+//! Read-only "configure" view model: group tree, per-group capabilities and clamped settings.
+//!
+//! The backend is the source of truth for what a group can do (pan/tilt, color modes, pixels):
+//! it inspects the channels of the patched fixtures, derives the available options and clamps
+//! the stored `GroupSettings` to them, so the frontend never has to duplicate that logic. The
+//! computation is pure (`compute_*`) and wrapped by two query commands that only lock the show.
+//!
+//! See `docs/contributing/architecture.md` (Configure section).
+
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tauri::State;
@@ -10,40 +19,69 @@ use crate::show::types::{
     PixelPreference, ShowData,
 };
 
+/// One node of the group tree displayed in the configure view (camelCase on the wire).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupRow {
+    /// Group id; `0` is the synthetic "All" root.
     pub id: u32,
+    /// Display name of the group.
     pub name: String,
+    /// Number of distinct fixtures belonging to the group.
     pub fixture_count: usize,
+    /// Groups nested under this one (see `compute_group_rows` for how nesting is inferred).
     pub children: Vec<GroupRow>,
 }
 
+/// Capabilities and effective settings of one group (camelCase on the wire).
+///
+/// The `has_*` flags and options are derived from the group's fixtures, and `settings` is
+/// already clamped to them.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupConfigureInfo {
+    /// Group id; `0` is the synthetic "All" group.
     pub id: u32,
+    /// Display name of the group.
     pub name: String,
+    /// Number of fixtures in the group.
     pub fixture_count: usize,
+    /// At least one fixture has a pan axis.
     pub has_pan: bool,
+    /// At least one fixture has a tilt axis.
     pub has_tilt: bool,
+    /// At least one fixture exposes a color channel (`color_options` is not empty).
     pub has_color: bool,
+    /// At least one fixture has more than one pixel.
     pub has_pixels: bool,
+    /// Allowed `[min, max]` pan range in degrees (`[-180, 180]` when unknown).
     pub pan_bounds: [i32; 2],
+    /// Allowed `[min, max]` tilt range in degrees (`[-110, 110]` when unknown).
     pub tilt_bounds: [i32; 2],
+    /// Color modes the group's fixtures support.
     pub color_options: Vec<ColorPreference>,
+    /// Pixel modes available; empty when the group has no multi-pixel fixture.
     pub pixel_options: Vec<PixelPreference>,
+    /// Largest pixel count among the group's fixtures (at least 1).
     pub max_pixels: usize,
+    /// Stored settings (or defaults) after clamping with `clamp_group_settings`.
     pub settings: GroupSettings,
 }
 
+/// Everything the configure view needs in one payload (camelCase on the wire).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigureOverview {
+    /// Group tree, rooted at the "All" row.
     pub rows: Vec<GroupRow>,
+    /// Configure info of every group (including `0` for "All"), keyed by group id.
     pub groups: HashMap<u32, GroupConfigureInfo>,
 }
 
+/// Tells whether a channel name designates the coarse pan axis.
+///
+/// Matches `pan` alone or followed by a space, `_` or `-` (case-insensitive); fine/LSB/16-bit
+/// channels are excluded so only one channel per axis counts.
 pub fn is_pan_channel(name: &str) -> bool {
     let lower = name.trim().to_lowercase();
     if lower.contains("fine")
@@ -60,6 +98,9 @@ pub fn is_pan_channel(name: &str) -> bool {
         || lower.starts_with("pan-")
 }
 
+/// Tells whether a channel name designates the coarse tilt axis.
+///
+/// Same rules as `is_pan_channel`, for `tilt`.
 pub fn is_tilt_channel(name: &str) -> bool {
     let lower = name.trim().to_lowercase();
     if lower.contains("fine")
@@ -76,6 +117,10 @@ pub fn is_tilt_channel(name: &str) -> bool {
         || lower.starts_with("tilt-")
 }
 
+/// Parses a JSON `[min, max]` array of integers (degrees) into ordered bounds.
+///
+/// Swapped values are reordered; returns `None` if the value is not a 2-element array of
+/// integers that fit in `i32`.
 fn parse_bounds_from_json(val: &serde_json::Value) -> Option<[i32; 2]> {
     let arr = val.as_array()?;
     if arr.len() == 2 {
@@ -89,6 +134,11 @@ fn parse_bounds_from_json(val: &serde_json::Value) -> Option<[i32; 2]> {
     None
 }
 
+/// Finds the pan range (degrees) of a patched fixture, if known.
+///
+/// Lookup order: `panBounds`/`pan_bounds` on the patched mode, then the embedded
+/// `definitions`, then the built-in generic fixtures. Fixture and mode names are matched
+/// case-insensitively against both `name` and `short_name`.
 pub fn get_fixture_pan_bounds(
     fixture: &PatchedFixture,
     definitions: &HashMap<String, EmbeddedGdtfDefinition>,
@@ -157,6 +207,9 @@ pub fn get_fixture_pan_bounds(
     None
 }
 
+/// Finds the tilt range (degrees) of a patched fixture, if known.
+///
+/// Uses the same lookup order as `get_fixture_pan_bounds`, with `tiltBounds`/`tilt_bounds`.
 pub fn get_fixture_tilt_bounds(
     fixture: &PatchedFixture,
     definitions: &HashMap<String, EmbeddedGdtfDefinition>,
@@ -225,6 +278,7 @@ pub fn get_fixture_tilt_bounds(
     None
 }
 
+/// Tells whether a fixture can pan: known pan bounds or a coarse pan channel in its mode.
 pub fn fixture_has_pan(
     fixture: &PatchedFixture,
     definitions: &HashMap<String, EmbeddedGdtfDefinition>,
@@ -243,6 +297,7 @@ pub fn fixture_has_pan(
     false
 }
 
+/// Tells whether a fixture can tilt: known tilt bounds or a coarse tilt channel in its mode.
 pub fn fixture_has_tilt(
     fixture: &PatchedFixture,
     definitions: &HashMap<String, EmbeddedGdtfDefinition>,
@@ -261,6 +316,9 @@ pub fn fixture_has_tilt(
     false
 }
 
+/// Returns the union (smallest min, largest max) of the pan ranges of `fixtures`.
+///
+/// Falls back to `[-180, 180]` degrees when no fixture declares pan bounds.
 pub fn get_group_pan_bounds(
     fixtures: &[&PatchedFixture],
     definitions: &HashMap<String, EmbeddedGdtfDefinition>,
@@ -281,6 +339,9 @@ pub fn get_group_pan_bounds(
     }
 }
 
+/// Returns the union (smallest min, largest max) of the tilt ranges of `fixtures`.
+///
+/// Falls back to `[-110, 110]` degrees when no fixture declares tilt bounds.
 pub fn get_group_tilt_bounds(
     fixtures: &[&PatchedFixture],
     definitions: &HashMap<String, EmbeddedGdtfDefinition>,
@@ -301,6 +362,10 @@ pub fn get_group_tilt_bounds(
     }
 }
 
+/// Lists the color modes available to `fixtures`, based on the type of their channels.
+///
+/// Emits `ColorMix` (any RGB/CMY/white/amber/UV channel), `ColorWheel`, `Cct` and `ColorPresets`
+/// (color macro), in that fixed order.
 pub fn get_group_color_options(fixtures: &[&PatchedFixture]) -> Vec<ColorPreference> {
     let mut has_mix = false;
     let mut has_wheel = false;
@@ -347,10 +412,15 @@ pub fn get_group_color_options(fixtures: &[&PatchedFixture]) -> Vec<ColorPrefere
     options
 }
 
+/// Returns the number of pixels of a fixture, as given by its compiled rendering profile.
 pub fn get_fixture_pixel_count(fixture: &PatchedFixture) -> usize {
     crate::output::profile::compile_from_patched_fixture(fixture).pixel_count
 }
 
+/// Derives the pixel options of `fixtures` as `(has_pixels, options, max_pixels)`.
+///
+/// With at most 1 pixel there are no options. Up to 3 pixels offer `Single`/`Individual`;
+/// beyond that `Grouped` is offered too.
 pub fn get_group_pixel_options(
     fixtures: &[&PatchedFixture],
 ) -> (bool, Vec<PixelPreference>, usize) {
@@ -383,6 +453,12 @@ pub fn get_group_pixel_options(
     }
 }
 
+/// Forces `settings` back inside what the group actually supports.
+///
+/// Pan/tilt ranges are clamped to the bounds (keeping `min <= max`), color and pixel
+/// preferences fall back to the first available option when the stored one is unavailable (or
+/// stay untouched when there are no options), `pixel_group_count` is clamped to `2..=max_pixels`
+/// (or reset to 2 when `max_pixels < 2`) and `max_power` is capped at 100 (percent).
 pub fn clamp_group_settings(
     settings: &mut GroupSettings,
     pan_bounds: [i32; 2],
@@ -419,6 +495,8 @@ pub fn clamp_group_settings(
     settings.max_power = settings.max_power.min(100);
 }
 
+/// Builds the settings of a group that has none stored yet: full pan/tilt range, no
+/// inversion, `Single` pixels, 2 pixels per pixel group and 100% max power.
 pub fn default_group_settings(
     pan_bounds: [i32; 2],
     tilt_bounds: [i32; 2],
@@ -438,6 +516,11 @@ pub fn default_group_settings(
     }
 }
 
+/// Builds the group tree shown in the configure view.
+///
+/// The result is a single "All" row (id `0`, counting every fixture) whose children are
+/// inferred, since groups carry no explicit parent: a group is nested under the smallest group
+/// whose fixture set strictly contains its own. Group `0` entries in `groups` are ignored.
 pub fn compute_group_rows(groups: &[FixtureGroup], fixtures: &[PatchedFixture]) -> Vec<GroupRow> {
     let non_zero_groups: Vec<&FixtureGroup> = groups.iter().filter(|g| g.id != 0).collect();
 
@@ -478,6 +561,7 @@ pub fn compute_group_rows(groups: &[FixtureGroup], fixtures: &[PatchedFixture]) 
         }
     }
 
+    /// Recursively builds the rows of the groups whose inferred parent is `parent_id`.
     fn create_children(
         parent_id: u32,
         non_zero_groups: &[&FixtureGroup],
@@ -508,6 +592,10 @@ pub fn compute_group_rows(groups: &[FixtureGroup], fixtures: &[PatchedFixture]) 
     }]
 }
 
+/// Computes the capabilities and clamped settings of one group.
+///
+/// `group_id == 0` means every fixture. `current_settings` are the stored settings, if any;
+/// otherwise defaults derived from the group's bounds and first color option are used.
 pub fn compute_group_configure_info(
     group_id: u32,
     group_name: &str,
@@ -572,6 +660,7 @@ pub fn compute_group_configure_info(
     }
 }
 
+/// Computes the full configure payload (tree plus info for "All" and every group) of a show.
 pub fn compute_configure_overview(show: &ShowData) -> ConfigureOverview {
     let rows = compute_group_rows(&show.groups.groups, &show.patch.fixtures);
     let mut groups = HashMap::new();
@@ -602,6 +691,13 @@ pub fn compute_configure_overview(show: &ShowData) -> ConfigureOverview {
     ConfigureOverview { rows, groups }
 }
 
+/// Tauri command: returns the configure overview of the current show.
+///
+/// Read-only: it neither mutates `AppState` nor emits events, and is not an undo step.
+///
+/// # Errors
+///
+/// Returns an error if the show lock is poisoned.
 #[tauri::command]
 pub fn show_configure_get_overview(
     state: State<'_, AppState>,
@@ -610,6 +706,14 @@ pub fn show_configure_get_overview(
     Ok(compute_configure_overview(&show))
 }
 
+/// Tauri command: returns the configure info of a single group.
+///
+/// Group `0` is always "All"; `Ok(None)` is returned for an unknown group id. Read-only: no
+/// event and no undo step.
+///
+/// # Errors
+///
+/// Returns an error if the show lock is poisoned.
 #[tauri::command]
 pub fn show_configure_get_group(
     state: State<'_, AppState>,
