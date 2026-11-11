@@ -87,6 +87,9 @@ jobs:
       - name: 🧹 Clippy
         run: bun run lint:back
 
+      - name: 📝 Docs
+        run: bun run docs:back
+
   back-test:
     name: 🦀 Backend tests
     runs-on: ubuntu-22.04

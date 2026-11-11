@@ -350,7 +350,8 @@ log lines can appear in the frontend console.
   rules, `tests/show/configure.rs` for capabilities and clamping,
   `tests/show/mvr.rs` for the import.
 - Run with `bun run test:back`; lint with `bun run lint:back` (clippy `-D
-warnings`); format with `bun run format:back`.
+warnings`, which also enforces docstring coverage); check rustdoc with
+  `bun run docs:back`; format with `bun run format:back`.
 
 ## Cross-cutting rules for backend changes
 
@@ -362,3 +363,41 @@ warnings`); format with `bun run format:back`.
   defaulted fields and keep the `clean_*` helpers intact.
 - Respect the workspace's clippy/strict-format bar (CI runs
   `cargo clippy -- -D warnings` and `cargo fmt -- --check` on push).
+- Document every Rust item, public or private (see
+  [Documentation coverage](#documentation-coverage-rust)).
+
+## Documentation coverage (Rust)
+
+Every Rust item in `src-tauri/src` and `src-tauri/build.rs` carries a doc
+comment, **including private ones**: private docs are not for API consumers,
+they explain execution flow, invariants and intent to contributors and AI
+agents. Coverage is enforced by lints in `src-tauri/Cargo.toml` (`deny`, run
+through `bun run lint:back`):
+
+- `missing_docs` — public items;
+- `clippy::missing_docs_in_private_items` — everything else (fields, enum
+  variants, constants, private helpers, …);
+- `clippy::missing_errors_doc` / `clippy::missing_panics_doc` — `# Errors` /
+  `# Panics` sections on public functions that return `Result` or may panic.
+
+Conventions:
+
+- English and concise. The first line is a short summary sentence; details
+  follow after a blank `///` line.
+- Explain the _why_: invariants, units and ranges (DMX `0-255`, 1-based
+  addresses, universe numbering), locking, side effects, serialization
+  meaning. Do not restate what the code already says.
+- Each module starts with a `//!` doc (purpose, main flow, the matching
+  `docs/contributing/*.md` page).
+- `#[tauri::command]` handlers document their effect on `AppState`, the events
+  they emit, undo/redo behavior and returned errors.
+- Never silence a lint with `#[allow(...)]` to skip a docstring. Trait-impl
+  methods (`Default::default`, `Display::fmt`, …) and `#[cfg(test)]` code are
+  not linted.
+
+`bun run docs:back` runs
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items` and
+fails on broken intra-doc links or malformed rustdoc (put identifiers, generics
+and square brackets in backticks). It runs in CI and in `bun run check`. Open
+the generated HTML locally with
+`cd src-tauri && cargo doc --no-deps --document-private-items --open`.

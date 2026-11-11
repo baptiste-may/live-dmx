@@ -16,6 +16,7 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "bun run docs:check && vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "docs:back": "cd src-tauri && RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps --document-private-items",
     "release:version": "node scripts/release.mjs",
     "lint:front": "eslint .",
     "lint:back": "cd src-tauri && cargo clippy -- -D warnings",
@@ -30,7 +31,7 @@
     "test:coverage": "vitest run --coverage",
     "test:back": "cd src-tauri && cargo test",
     "test": "bun run test:front && bun run test:back",
-    "check": "bun run typecheck && bun run lint && bun run format && bun run test && bun run build",
+    "check": "bun run typecheck && bun run lint && bun run docs:back && bun run format && bun run test && bun run build",
     "prepare": "husky"
   },
   "dependencies": {
