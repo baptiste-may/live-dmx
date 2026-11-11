@@ -38,7 +38,7 @@ runs:
       run: |
         # Recommends (gstreamer, ...) are not needed to compile and slow the install;
         # retries/timeouts keep a stalled Azure mirror from hanging the job.
-        for mirror in http://azure.archive.ubuntu.com/ubuntu http://archive.ubuntu.com/ubuntu http://mirrors.edge.kernel.org/ubuntu http://us.archive.ubuntu.com/ubuntu; do
+        for mirror in http://azure.archive.ubuntu.com/ubuntu http://archive.ubuntu.com/ubuntu http://us.archive.ubuntu.com/ubuntu; do
           if curl -fsS -4 -m 8 -o /dev/null "$mirror/dists/jammy/InRelease"; then
             echo "Using apt mirror $mirror"
             echo "$mirror/ priority:1" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
