@@ -61,6 +61,20 @@ fn test_build_enttec_pro_packet() {
 }
 
 #[test]
+fn test_build_enttec_pro_packet_pads_short_data() {
+    let packet = build_enttec_pro_packet(&[1, 2, 3]);
+
+    // Short data is still padded to the full 512-channel payload, and the
+    // length field covers that padded payload plus the start code.
+    assert_eq!(packet.len(), 518);
+    assert_eq!(packet[2], 0x01);
+    assert_eq!(packet[3], 0x02);
+    assert_eq!(&packet[5..8], &[1, 2, 3]);
+    assert!(packet[8..517].iter().all(|&b| b == 0));
+    assert_eq!(packet[517], 0xE7);
+}
+
+#[test]
 fn test_physical_sender_resolve_port() {
     let mut sender = PhysicalDmxSender::new();
     // Direct port names pass through directly on any platform

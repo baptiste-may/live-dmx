@@ -1,3 +1,9 @@
+//! GDTF (DIN SPEC 15800) parser: turns a `.gdtf` archive or its
+//! `description.xml` into fixture definitions with modes, channel names,
+//! defaults, shutter open values and pan/tilt bounds.
+//!
+//! See `docs/contributing/fixtures.md` (GDTF parser section).
+
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use serde::{Deserialize, Serialize};
@@ -6,33 +12,80 @@ use std::io::{Cursor, Read};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+/// A DMX mode extracted from a GDTF fixture type.
+///
+/// Serialized in camelCase for the frontend. `channelDefaults`,
+/// `shutterOpenValues`, `panBounds` and `tiltBounds` are omitted when absent;
+/// `shortName` is always present and is `null` when absent. DMX offsets are
+/// 1-based in the XML but 0-based in the vectors and maps below.
 pub struct ParsedGdtfMode {
+    /// Mode name (`DMXMode` `Name`), unique within the fixture.
     pub name: String,
+    /// Optional short mode name.
     pub short_name: Option<String>,
+    /// Footprint: the highest DMX offset used by the mode; gaps are filled.
     pub channel_count: usize,
+    /// Human-readable channel names, index 0 = DMX offset 1; holes are named
+    /// `"Channel N"`.
     pub channels: Vec<String>,
+    /// Default DMX value (0-255) per channel, parallel to `channels`. Parsed
+    /// files always fill it for every channel; built-in generics leave it unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_defaults: Option<Vec<u8>>,
+    /// DMX value (0-255) that opens the shutter, keyed by 0-based channel index.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shutter_open_values: Option<std::collections::HashMap<usize, u8>>,
+    /// Pan range in degrees (e.g. `[-270, 270]`), when declared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pan_bounds: Option<[i32; 2]>,
+    /// Tilt range in degrees (e.g. `[-135, 135]`), when declared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tilt_bounds: Option<[i32; 2]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+/// A fixture type extracted from a GDTF file, or a built-in generic.
+///
+/// Serialized in camelCase for the frontend.
 pub struct ParsedGdtfFixture {
+    /// Fixture name (`FixtureType` `Name`).
     pub name: String,
+    /// Optional short name.
     pub short_name: Option<String>,
+    /// Manufacturer name (`"Generic"` for built-ins).
     pub manufacturer: String,
+    /// Optional free-text description.
     pub description: Option<String>,
+    /// GDTF `FixtureTypeID` (a UUID), or a `generic-*` id for built-ins.
     pub fixture_type_id: Option<String>,
+    /// DIN SPEC 15800 categories (e.g. `"Moving Head"`), verbatim from the file
+    /// or inferred from the channel attributes when absent.
     pub categories: Option<Vec<String>>,
+    /// DMX modes of the fixture.
     pub modes: Vec<ParsedGdtfMode>,
 }
 
+/// Converts a GDTF DMX value (`"<num>/<bytes>"`) to a single DMX byte.
+///
+/// The value is rescaled from its declared resolution (1-4 bytes, default 1) to
+/// `total_bytes` (clamped to 1-4) and the byte at `byte_index` (0 = coarse,
+/// clamped to the last byte) is returned, in the range 0-255. Unparsable input
+/// yields 0.
+///
+/// # Examples
+///
+/// ```
+/// use live_dmx_lib::fixtures::parser::parse_gdtf_dmx_value;
+///
+/// // One byte: the coarse value is the DMX byte.
+/// assert_eq!(parse_gdtf_dmx_value("255/1", 0, 1), 255);
+/// // Two bytes rescaled into two output bytes: 0x8000 -> coarse 128, fine 0.
+/// assert_eq!(parse_gdtf_dmx_value("32768/2", 0, 2), 128);
+/// assert_eq!(parse_gdtf_dmx_value("32768/2", 1, 2), 0);
+/// // Unparsable input yields 0.
+/// assert_eq!(parse_gdtf_dmx_value("not-a-number", 0, 1), 0);
+/// ```
 pub fn parse_gdtf_dmx_value(val_str: &str, byte_index: usize, total_bytes: usize) -> u8 {
     let mut parts = val_str.split('/');
     let Ok(num) = parts.next().unwrap_or("0").trim().parse::<u64>() else {
@@ -53,6 +106,22 @@ pub fn parse_gdtf_dmx_value(val_str: &str, byte_index: usize, total_bytes: usize
     ((scaled >> (8 * (dst_bytes - 1 - idx))) & 0xFF) as u8
 }
 
+/// Maps a GDTF `Attribute` name to the human-readable channel name used in the app.
+///
+/// Colour attributes become `Red`, `Green`, `Lime`, `Blue`, `White`, `Amber`,
+/// `UV`, `Cyan`, `Magenta` or `Yellow`; shutter/strobe attributes become
+/// `Strobe`; anything else is kept as is. A `Fine` suffix or `is_fine` (a
+/// secondary byte of a multi-byte channel) appends `" Fine"`.
+///
+/// # Examples
+///
+/// ```
+/// use live_dmx_lib::fixtures::parser::map_gdtf_attribute_to_name;
+///
+/// assert_eq!(map_gdtf_attribute_to_name("ColorAdd_R", false), "Red");
+/// assert_eq!(map_gdtf_attribute_to_name("Dimmer", true), "Dimmer Fine");
+/// assert_eq!(map_gdtf_attribute_to_name("ColorAdd_RFine", false), "Red Fine");
+/// ```
 pub fn map_gdtf_attribute_to_name(attribute: &str, is_fine: bool) -> String {
     let (attr_name, has_fine_suffix) = if let Some(stripped) = attribute.strip_suffix("Fine") {
         (stripped, true)
@@ -82,6 +151,24 @@ pub fn map_gdtf_attribute_to_name(attribute: &str, is_fine: bool) -> String {
     }
 }
 
+/// Converts a `PhysicalFrom`/`PhysicalTo` pair into pan/tilt bounds in degrees.
+///
+/// Returns `None` for unparsable, non-finite or empty ranges. A range that is
+/// entirely positive is treated as a total span and centred (`[-span/2, span/2]`
+/// rounded); otherwise the rounded `[min, max]` is returned.
+///
+/// # Examples
+///
+/// ```
+/// use live_dmx_lib::fixtures::parser::parse_physical_bounds;
+///
+/// // A signed range is used as written.
+/// assert_eq!(parse_physical_bounds("-180", "180"), Some([-180, 180]));
+/// // A positive-only range is a total span, centred on zero.
+/// assert_eq!(parse_physical_bounds("0", "360"), Some([-180, 180]));
+/// // Empty or zero-width ranges are rejected.
+/// assert_eq!(parse_physical_bounds("10", "10"), None);
+/// ```
 pub fn parse_physical_bounds(from_str: &str, to_str: &str) -> Option<[i32; 2]> {
     let from: f64 = from_str.trim().parse().ok()?;
     let to: f64 = to_str.trim().parse().ok()?;
@@ -107,12 +194,23 @@ pub fn parse_physical_bounds(from_str: &str, to_str: &str) -> Option<[i32; 2]> {
     }
 }
 
+/// Pan/tilt bounds collected while parsing one `DMXMode`; the first value found wins.
 #[derive(Default, Debug, Clone)]
 struct ModeMovementBounds {
+    /// Pan range in degrees.
     pan: Option<[i32; 2]>,
+    /// Tilt range in degrees.
     tilt: Option<[i32; 2]>,
 }
 
+/// Handles a `LogicalChannel` element inside a `DMXChannel`.
+///
+/// Registers the channel name at every instance offset (`break_offsets` plus the
+/// relative `current_channel_offsets`, so multi-cell geometries are duplicated),
+/// records the attribute in `fixture_attributes` and picks up pan/tilt bounds.
+/// `NoFeature` channels on `RGBW`/`RGBA`/`RGB` geometries get colours assigned
+/// in order; `beam`/`plate` geometries rename `Dimmer`/`White`. Returns the
+/// attribute name, or `None` when absent.
 #[allow(clippy::too_many_arguments)]
 fn handle_logical_channel(
     e: &quick_xml::events::BytesStart,
@@ -218,6 +316,8 @@ fn handle_logical_channel(
     }
 }
 
+/// Returns whether a lowercase function name denotes an "open" shutter state
+/// (not a pulse, ramp, strobe, random, effect or close function).
 fn is_shutter_open_name(lname: &str) -> bool {
     let effects = ["pulse", "ramp", "strobe", "random", "effect", "close"];
     if effects.iter().any(|k| lname.contains(k)) {
@@ -229,6 +329,13 @@ fn is_shutter_open_name(lname: &str) -> bool {
         || lname.contains("led on")
 }
 
+/// Handles a `ChannelFunction` element.
+///
+/// Refines beam/plate dimmer and white names from the function name, stores the
+/// `Default` DMX value per instance offset (first value wins), records the
+/// shutter open value (0-based channel index) and picks up pan/tilt bounds.
+/// Returns the effective attribute and whether the function belongs to a
+/// shutter/strobe channel (so following `ChannelSet`s are inspected).
 #[allow(clippy::too_many_arguments)]
 fn handle_channel_function(
     e: &quick_xml::events::BytesStart,
@@ -394,6 +501,8 @@ fn handle_channel_function(
     func_attr.map(|a| (a, is_shutter))
 }
 
+/// Handles a `ChannelSet` of a shutter function: an "open"-like set overrides the
+/// shutter open value with its `DMXFrom` (0-based channel index).
 fn handle_channel_set(
     e: &quick_xml::events::BytesStart,
     is_shutter: bool,
@@ -425,6 +534,15 @@ fn handle_channel_set(
     }
 }
 
+/// Parses a `.gdtf` archive (ZIP) held in memory.
+///
+/// Reads `description.xml` from the root or a subdirectory (first match wins)
+/// and delegates to [`parse_gdtf_xml`].
+///
+/// # Errors
+///
+/// Returns an error when the data is not a valid ZIP, an entry cannot be read,
+/// `description.xml` is missing, or the XML fails to parse.
 pub fn parse_gdtf_archive(data: &[u8]) -> Result<ParsedGdtfFixture, String> {
     let cursor = Cursor::new(data);
     let mut archive = zip::ZipArchive::new(cursor)
@@ -449,6 +567,17 @@ pub fn parse_gdtf_archive(data: &[u8]) -> Result<ParsedGdtfFixture, String> {
     parse_gdtf_xml(&xml)
 }
 
+/// Parses the `description.xml` content of a GDTF file.
+///
+/// Builds each `DMXMode` into channel names, defaults, shutter open values and
+/// pan/tilt bounds, expanding multi-cell geometries referenced through
+/// `GeometryReference`/`Break` elements. Modes without a name are ignored.
+/// Categories come from the `FixtureType`, otherwise are inferred from the
+/// attributes.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed or the `FixtureType` has no `Name`.
 pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -985,6 +1114,10 @@ pub fn parse_gdtf_xml(xml: &str) -> Result<ParsedGdtfFixture, String> {
     })
 }
 
+/// Infers DIN categories from the channel attributes seen in the fixture.
+///
+/// Only used when the `FixtureType` declares none. Returns `None` when no
+/// attribute is recognised.
 fn infer_categories_from_attributes(attributes: &HashSet<String>) -> Option<Vec<String>> {
     let mut categories = Vec::new();
 
@@ -1019,6 +1152,10 @@ fn infer_categories_from_attributes(attributes: &HashSet<String>) -> Option<Vec<
     }
 }
 
+/// Copies the relevant `FixtureType` XML attributes into the output slots.
+///
+/// `Categories` is split on commas and trimmed but otherwise kept verbatim.
+/// Empty optional attributes are ignored.
 fn parse_fixture_type_attributes(
     e: &quick_xml::events::BytesStart,
     fixture_name: &mut String,

@@ -1,8 +1,21 @@
+//! Tauri commands editing the universe output routing of the show.
+//!
+//! Mutations are undoable (`AppState::apply_mutation`) and emit
+//! `show-state-changed`; they do not reset the live engine, which reads the new
+//! configuration on its next tick.
+
 use tauri::{AppHandle, State};
 
 use crate::show::state::AppState;
 use crate::show::types::UniverseOutputConfig;
 
+/// Tauri command: returns a copy of the configured universes.
+///
+/// Read-only.
+///
+/// # Errors
+///
+/// Returns an error if the show mutex is poisoned.
 #[tauri::command]
 pub fn show_output_get_universes(
     state: State<'_, AppState>,
@@ -11,6 +24,14 @@ pub fn show_output_get_universes(
     Ok(show.output.universes.clone())
 }
 
+/// Tauri command: sets the output target (`"none"`, protocol name or USB
+/// interface id) of `universe`.
+///
+/// Undoable; emits `show-state-changed`.
+///
+/// # Errors
+///
+/// Returns `Universe N not found` if `universe` is not configured, or an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_output_set_target(
     state: State<'_, AppState>,
@@ -33,6 +54,13 @@ pub fn show_output_set_target(
     })
 }
 
+/// Tauri command: enables or disables sending of `universe`.
+///
+/// Undoable; emits `show-state-changed`.
+///
+/// # Errors
+///
+/// Returns `Universe N not found` if `universe` is not configured, or an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_output_set_enabled(
     state: State<'_, AppState>,
@@ -55,6 +83,13 @@ pub fn show_output_set_enabled(
     })
 }
 
+/// Tauri command: appends a universe numbered `max + 1`, with target `"none"` and enabled.
+///
+/// Returns the new universe number. Undoable; emits `show-state-changed`.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_output_add_universe(state: State<'_, AppState>, app: AppHandle) -> Result<u32, String> {
     state.apply_mutation(&app, |show| {
@@ -75,6 +110,14 @@ pub fn show_output_add_universe(state: State<'_, AppState>, app: AppHandle) -> R
     })
 }
 
+/// Tauri command: removes `universe` from the output configuration.
+///
+/// The patch is not modified. Undoable; emits `show-state-changed`.
+///
+/// # Errors
+///
+/// Returns an error if it is the last remaining universe, if `universe` is not
+/// configured (`Universe N not found`), or if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_output_remove_universe(
     state: State<'_, AppState>,

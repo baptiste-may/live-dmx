@@ -9,12 +9,12 @@ Run the smallest correct set while iterating, then the full gate before handing 
 
 ## By changed files
 
-| Changed                                                | Commands                                                           |
-| ------------------------------------------------------ | ------------------------------------------------------------------ |
-| `src/**`                                               | `bun run lint:front`, `bun run format:front`, `bun run test:front` |
-| `src-tauri/**`                                         | `bun run lint:back`, `bun run format:back`, `bun run test:back`    |
-| Versions (`package.json`, `src-tauri/tauri.conf.json`) | `bun run release:version -- --check`                               |
-| Both sides                                             | both sets above                                                    |
+| Changed                                                | Commands                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `src/**`                                               | `bun run lint:front`, `bun run format:front`, `bun run test:front`                   |
+| `src-tauri/**`                                         | `bun run lint:back`, `bun run docs:back`, `bun run format:back`, `bun run test:back` |
+| Versions (`package.json`, `src-tauri/tauri.conf.json`) | `bun run release:version -- --check`                                                 |
+| Both sides                                             | both sets above                                                                      |
 
 - Targeted while iterating: `bunx vitest related --run <files>` (same as lint-staged).
 - Full gate before handoff: `bun run check` (typecheck + lint + format + tests + build).
@@ -25,6 +25,7 @@ Run the smallest correct set while iterating, then the full gate before handing 
 - Behaviour, structure, conventions, workflows → update `AGENTS.md` and/or the matching `docs/` file **in the same change**.
 - **Procedures live in `.agents/skills/`, reference material in `docs/`** — never duplicate a procedure into docs, link to the skill instead.
 - New or changed Vue component → the colocated test is mandatory (skill `add-vue-component`).
+- New or changed Rust item (public or private) → a `///` docstring is mandatory; new module → `//!` (enforced by `bun run lint:back`, rustdoc checked by `bun run docs:back`).
 - New or changed skill → update the Skills table in `AGENTS.md`.
 
 ## Finally

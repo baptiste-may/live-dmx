@@ -1,3 +1,12 @@
+//! Encrypted storage of the GDTF-Share credentials.
+//!
+//! Credentials live in an `iota_stronghold` snapshot (`vault.hold`) encrypted
+//! with a per-installation random key kept in the OS keyring, or in a fallback
+//! key file when no keyring is available. On Unix that file is created with mode
+//! `0o600`; the mode does not change an existing file's permissions, and the
+//! non-Unix implementation sets no permissions at all. See
+//! `docs/contributing/fixtures.md`.
+
 use std::fs;
 use std::path::Path;
 
@@ -6,21 +15,29 @@ use tauri_plugin_stronghold::stronghold::Stronghold;
 
 use super::types::GdtfShareCredentials;
 
-// The vault encryption key is a random 32-byte secret unique to each
-// installation. It is held in the OS credential store (Keychain on macOS,
-// Credential Manager on Windows, Secret Service on Linux) and, when no keyring
-// is available (for example on headless Linux), in a permission-restricted
-// file under the app's local data directory.
+/// Keyring service name under which the vault key is stored.
+///
+/// The vault encryption key is a random 32-byte secret unique to each
+/// installation. It is held in the OS credential store (Keychain on macOS,
+/// Credential Manager on Windows, Secret Service on Linux) and, when no keyring
+/// is available (for example on headless Linux), in a fallback file under the
+/// app's local data directory (owner-only on Unix only when newly created).
 const KEYRING_SERVICE: &str = "fr.baptiste-may.live-dmx";
+/// Keyring entry (user) name holding the vault key.
 const KEYRING_USER: &str = "gdtf-vault-key";
+/// File name of the fallback vault key, stored in the app local data dir.
 const KEY_FILE_NAME: &str = "vault.key";
+/// Name of the Stronghold client holding the GDTF-Share credentials.
 const CLIENT_NAME: &str = "gdtf";
+/// Store key under which the serialized credentials are kept in the client.
 const CREDENTIALS_KEY: &[u8] = b"gdtf_credentials";
 
+/// Path of the encrypted Stronghold snapshot inside the app data dir.
 fn vault_path(app_data_dir: &Path) -> std::path::PathBuf {
     app_data_dir.join("vault.hold")
 }
 
+/// Path of the fallback vault key file inside the app local data dir.
 fn key_file_path(local_dir: &Path) -> std::path::PathBuf {
     local_dir.join(KEY_FILE_NAME)
 }
@@ -52,10 +69,22 @@ fn get_vault_key_with_service(local_dir: &Path, keyring_service: &str) -> Result
     Ok(key)
 }
 
+/// Returns the installation's vault key using the production keyring service.
+///
+/// # Errors
+///
+/// Returns an error when the OS keyring or the fallback key file cannot be
+/// read, when random generation fails, or when the new key cannot be persisted
+/// in either location.
 pub fn get_vault_key(local_dir: &Path) -> Result<[u8; 32], String> {
     get_vault_key_with_service(local_dir, KEYRING_SERVICE)
 }
 
+/// Reads the vault key from the OS keyring.
+///
+/// Returns `Ok(None)` when no keyring exists, the entry is missing or its
+/// length is not 32 bytes (the invalid key is then replaced by the caller).
+/// Other keyring failures are returned as errors.
 fn read_keyring_key(keyring_service: &str) -> Result<Option<[u8; 32]>, String> {
     let entry = match keyring::Entry::new(keyring_service, KEYRING_USER) {
         Ok(entry) => entry,
@@ -81,6 +110,7 @@ fn read_keyring_key(keyring_service: &str) -> Result<Option<[u8; 32]>, String> {
     }
 }
 
+/// Stores the vault key in the OS keyring, failing if no keyring is available.
 fn write_keyring_key(keyring_service: &str, key: &[u8; 32]) -> Result<(), String> {
     let entry = keyring::Entry::new(keyring_service, KEYRING_USER)
         .map_err(|e| format!("OS keyring unavailable: {}", e))?;
@@ -89,6 +119,10 @@ fn write_keyring_key(keyring_service: &str, key: &[u8; 32]) -> Result<(), String
         .map_err(|e| format!("Failed to store vault key in OS keyring: {}", e))
 }
 
+/// Reads the fallback vault key file.
+///
+/// Returns `Ok(None)` when the file is missing or does not hold exactly 32
+/// bytes; other I/O failures are returned as errors.
 fn read_key_file(path: &Path) -> Result<Option<[u8; 32]>, String> {
     match fs::read(path) {
         Ok(bytes) if bytes.len() == 32 => {
@@ -109,6 +143,7 @@ fn read_key_file(path: &Path) -> Result<Option<[u8; 32]>, String> {
     }
 }
 
+/// Writes the fallback vault key file, creating its parent directory.
 fn write_key_file(path: &Path, key: &[u8; 32]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -118,6 +153,9 @@ fn write_key_file(path: &Path, key: &[u8; 32]) -> Result<(), String> {
         .map_err(|e| format!("Failed to write vault key file {}: {}", path.display(), e))
 }
 
+/// Writes the key bytes to `path`, creating it with owner-only (`0o600`)
+/// permissions. The mode applies only when the file is created; an existing file
+/// keeps its permissions.
 #[cfg(unix)]
 fn write_key_file_contents(path: &Path, key: &[u8; 32]) -> std::io::Result<()> {
     use std::io::Write;
@@ -128,11 +166,17 @@ fn write_key_file_contents(path: &Path, key: &[u8; 32]) -> std::io::Result<()> {
     file.write_all(key)
 }
 
+/// Writes the key bytes to `path` (no permission restriction on this platform).
 #[cfg(not(unix))]
 fn write_key_file_contents(path: &Path, key: &[u8; 32]) -> std::io::Result<()> {
     fs::write(path, key)
 }
 
+/// Opens the Stronghold vault, creating the app data dir if needed.
+///
+/// If the snapshot cannot be decrypted (lost key) or is corrupt, it is deleted
+/// and recreated empty: it only holds GDTF-Share credentials, which the user
+/// can re-enter.
 fn open_vault(app_data_dir: &Path, key: [u8; 32]) -> Result<Stronghold, String> {
     if !app_data_dir.exists() {
         fs::create_dir_all(app_data_dir)
@@ -157,6 +201,7 @@ fn open_vault(app_data_dir: &Path, key: [u8; 32]) -> Result<Stronghold, String> 
     }
 }
 
+/// Returns the credentials client of the vault, loading or creating it as needed.
 fn open_client(vault: &Stronghold) -> Result<Client, String> {
     if let Ok(client) = vault.get_client(CLIENT_NAME) {
         return Ok(client);
@@ -169,6 +214,14 @@ fn open_client(vault: &Stronghold) -> Result<Client, String> {
     }
 }
 
+/// Loads the saved GDTF-Share credentials as `(user, password)`.
+///
+/// Returns `Ok(None)` when nothing is stored (including after a vault reset).
+///
+/// # Errors
+///
+/// Returns an error when the vault key or the vault cannot be accessed, or when
+/// the stored payload cannot be read or parsed.
 pub fn load_stored_credentials(
     app_data_dir: &Path,
     local_dir: &Path,
@@ -177,6 +230,7 @@ pub fn load_stored_credentials(
     load_stored_credentials_with_key(app_data_dir, key)
 }
 
+/// Same as [`load_stored_credentials`] with an explicit vault key (testable).
 fn load_stored_credentials_with_key(
     app_data_dir: &Path,
     key: [u8; 32],
@@ -202,6 +256,13 @@ fn load_stored_credentials_with_key(
     }
 }
 
+/// Saves the GDTF-Share credentials in the encrypted vault, replacing any
+/// previous ones, and persists the snapshot to disk.
+///
+/// # Errors
+///
+/// Returns an error when the vault key or the vault cannot be accessed, or when
+/// the credentials cannot be serialized, stored or written to disk.
 pub fn save_stored_credentials(
     app_data_dir: &Path,
     local_dir: &Path,
@@ -212,6 +273,7 @@ pub fn save_stored_credentials(
     save_stored_credentials_with_key(app_data_dir, key, user, pass)
 }
 
+/// Same as [`save_stored_credentials`] with an explicit vault key (testable).
 fn save_stored_credentials_with_key(
     app_data_dir: &Path,
     key: [u8; 32],
@@ -238,11 +300,18 @@ fn save_stored_credentials_with_key(
     Ok(())
 }
 
+/// Removes the saved GDTF-Share credentials from the vault (no-op if none).
+///
+/// # Errors
+///
+/// Returns an error when the vault key or the vault cannot be accessed, or when
+/// the removal cannot be stored or persisted.
 pub fn delete_stored_credentials(app_data_dir: &Path, local_dir: &Path) -> Result<(), String> {
     let key = get_vault_key(local_dir)?;
     delete_stored_credentials_with_key(app_data_dir, key)
 }
 
+/// Same as [`delete_stored_credentials`] with an explicit vault key (testable).
 fn delete_stored_credentials_with_key(app_data_dir: &Path, key: [u8; 32]) -> Result<(), String> {
     let vault = open_vault(app_data_dir, key)?;
     if let Ok(client) = open_client(&vault) {

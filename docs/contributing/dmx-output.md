@@ -365,10 +365,12 @@ A **TCP client** to `127.0.0.1:7890` (no broadcast, no configurable IP).
 Universes are accepted in **1..=256**; the OPC channel is `universe - 1`
 (0–255). Frame: `[channel, 0x00, len_hi, len_lo, data...]`, where command `0x00`
 is "Set 8-bit pixel colors" and the length is the data length, capped at 65 535.
-Connection is lazy: first send, 20 ms connect timeout, `TCP_NODELAY`, 20 ms write
-timeout. After a connection failure, the next attempt is delayed by **1 second**
-(`last_reconnect_attempt`). A write error drops the stream (`None`) and returns
-`Err`; reconnection happens on a later tick. Without an OPC server,
+Connection is lazy: first send with a 20 ms connect timeout, then attempts to set
+`TCP_NODELAY` and a 20 ms write timeout (configuration failures are ignored, so
+the write is not guaranteed to be bounded by 20 ms). After a connection failure,
+the next attempt is delayed by **1 second** (`last_reconnect_attempt`). A write
+error drops the stream (`None`) and returns `Err`; reconnection happens on a
+later tick. Without an OPC server,
 `send_universe` returns `Err` — expected by the tests. The runner ignores it.
 
 ### Lifecycle and errors
@@ -429,8 +431,9 @@ filters:
    `cu.usbmodem*`, and Windows `COM1`…`COMn`.
 
 Each detected interface gets `id = physical-{n}`, `name = Physical {n}` (1-based
-position), `status = "connected"` and `fps = 44`. An `available_ports` error is
-returned as a `String`. An empty result is valid.
+position), `status = "connected"` and `fps = 44`. An id is based on scan position
+and can change between scans when devices are added or removed. An
+`available_ports` error is returned as a `String`. An empty result is valid.
 
 `default_physical_interfaces()` returns three fictional interfaces (Enttec DMX
 USB Pro, FTDI Open DMX, DMXking ultraDMX MAX) with OS-appropriate ports. It is
@@ -444,13 +447,13 @@ used by tests only; production always discovers real ports.
 | ------ | -------- | ------------------------------------------- |
 | 0      | `0x7E`   | Start of message                            |
 | 1      | `0x06`   | Label "Output Only Send DMX Packet Request" |
-| 2–3    | LSB, MSB | Length = `min(len, 512) + 1`                |
+| 2–3    | LSB, MSB | Length = 513 (`0x0201`)                     |
 | 4      | `0x00`   | DMX start code                              |
 | 5..517 | data     | 512 channels, zero-padded                   |
 | 517    | `0xE7`   | End of message                              |
 
-The length includes the start code: 513 for a full frame (`0x0201`). Short data
-is padded to 512 before the end byte; long data is truncated.
+The length always counts the start code plus the padded 512-channel payload.
+Short data is zero-padded to 512 before the end byte; long data is truncated.
 
 ### Sending and target resolution
 

@@ -1,3 +1,9 @@
+//! Deterministic effect math: SplitMix64 hashing, shuffled (`rng`) phase
+//! permutations, effect waveforms and the random strobe.
+//!
+//! Everything here is pure (no clock, no global RNG) so frames are reproducible.
+//! See `docs/contributing/rendering.md` for the effect and alignment rules.
+
 use crate::output::types::GroupEffectState;
 
 /// High-quality 64-bit mixer (SplitMix64) providing full bit avalanche.
@@ -262,6 +268,16 @@ pub fn calculate_effective_fract(
     Some(effective_fract)
 }
 
+/// Computes the 0.0-1.0 intensity factor of a group effect for one fixture or
+/// pixel at time `elapsed` (seconds).
+///
+/// Returns 0.0 when the effect is unset/`none`/`off`. `full` always returns 1.0,
+/// even when `bpm` is 0; for the other effects a `bpm` of 0 also yields 0.0.
+/// Otherwise the waveform (`pulse`, `chase`, `ramp_up`, `ramp_down`, `sine`;
+/// unknown names act as 1.0) is evaluated over the active part of the cycle,
+/// whose length is `width` percent; the remainder of the cycle is 0.0. Pure and
+/// deterministic: the same inputs give the same output, no RNG or clock is
+/// involved.
 pub fn calculate_effect_factor(
     effect_state: &GroupEffectState,
     elapsed: f32,
@@ -319,6 +335,8 @@ pub fn calculate_effect_factor(
     val.clamp(0.0, 1.0)
 }
 
+/// Same as [`calculate_effect_factor`] but scaled and rounded to a DMX byte
+/// (0-255).
 pub fn calculate_effect_intensity(
     effect_state: &GroupEffectState,
     elapsed: f32,
@@ -339,6 +357,12 @@ pub fn calculate_effect_intensity(
         .clamp(0.0, 255.0) as u8
 }
 
+/// Tells whether a fixture's random strobe is lit at time `elapsed` (seconds).
+///
+/// `rate` is 0-100 (clamped) and controls how short the evaluation slots are
+/// and how likely a slot is lit. Each slot gets a pseudo-random value hashed
+/// from `fixture_id` and the slot number with `splitmix64`, so the pattern is
+/// deterministic, differs per fixture, and needs no stored state.
 pub fn compute_random_strobe_active(fixture_id: u64, elapsed: f32, rate: u8) -> bool {
     let rate_norm = (rate as f32 / 100.0).clamp(0.0, 1.0);
     // Interval between random strobe evaluation slots (50ms at rate=100 up to 400ms at rate=0)

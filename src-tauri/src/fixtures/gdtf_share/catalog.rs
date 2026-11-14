@@ -1,3 +1,7 @@
+//! Local fixture cache, online GDTF-Share index and catalog search.
+//!
+//! See `docs/contributing/fixtures.md` (cache layout, preview cache and search).
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -7,19 +11,36 @@ use crate::fixtures::gdtf_share::types::{GdtfCatalogItem, GdtfCatalogMode};
 use crate::fixtures::generic::get_generic_fixtures;
 use crate::fixtures::parser::{parse_gdtf_archive, ParsedGdtfFixture};
 
+/// Maximum number of keys held in the in-memory preview cache.
 const MAX_PREVIEW_ENTRIES: usize = 30;
 
+/// A previewed fixture with its raw `.gdtf` bytes, shared between cache keys.
 type CachedPreviewEntry = (ParsedGdtfFixture, Arc<Vec<u8>>);
 
+/// Local fixture cache and online catalog index.
+///
+/// Created once per process (behind an `RwLock`, see `commands.rs`). Combines
+/// built-in generics, `.gdtf` files installed on disk, the persisted GDTF-Share
+/// index and a bounded in-memory preview cache. Cache keys are
+/// `"<manufacturer>@<fixture>"` in lowercase. Each inner `RwLock` failure
+/// (poisoning) is tolerated by skipping the update or returning empty data.
 pub struct GdtfCatalogManager {
+    /// Directory holding installed `.gdtf` archives (`<app_data_dir>/fixtures`).
     fixtures_dir: PathBuf,
+    /// Persisted online index (`<app_data_dir>/gdtf_catalog.json`).
     catalog_cache_file: PathBuf,
+    /// Online GDTF-Share listing, as last synced.
     online_catalog: RwLock<Vec<GdtfCatalogItem>>,
+    /// Parsed installed fixtures, keyed by `"<manufacturer>@<fixture>"` (lowercase).
     local_fixtures: RwLock<HashMap<String, ParsedGdtfFixture>>,
+    /// Downloaded-but-not-installed fixtures, memory only, bounded by
+    /// `MAX_PREVIEW_ENTRIES`.
     preview_cache: RwLock<HashMap<String, CachedPreviewEntry>>,
 }
 
 impl GdtfCatalogManager {
+    /// Creates a manager rooted at `app_data_dir` and loads the local fixtures
+    /// and the persisted online index, ignoring read errors.
     pub fn new(app_data_dir: &Path) -> Self {
         let fixtures_dir = app_data_dir.join("fixtures");
         let catalog_cache_file = app_data_dir.join("gdtf_catalog.json");
@@ -38,10 +59,20 @@ impl GdtfCatalogManager {
         manager
     }
 
+    /// Returns the directory where installed `.gdtf` archives are stored.
     pub fn fixtures_dir(&self) -> &Path {
         &self.fixtures_dir
     }
 
+    /// Rescans the fixtures directory (root and one level of subdirectories) and
+    /// replaces the installed fixture map.
+    ///
+    /// Unreadable or unparsable archives are skipped silently; a later file with
+    /// the same key overrides an earlier one.
+    ///
+    /// # Errors
+    ///
+    /// Currently never fails; scan problems are ignored.
     pub fn load_local_fixtures(&self) -> Result<(), String> {
         if !self.fixtures_dir.exists() {
             let _ = fs::create_dir_all(&self.fixtures_dir);
@@ -93,6 +124,11 @@ impl GdtfCatalogManager {
         Ok(())
     }
 
+    /// Loads the persisted online index into memory, if it exists and is valid.
+    ///
+    /// # Errors
+    ///
+    /// Currently never fails; a missing or corrupt file leaves the index unchanged.
     pub fn load_cached_online_catalog(&self) -> Result<(), String> {
         if self.catalog_cache_file.exists() {
             if let Ok(json_str) = fs::read_to_string(&self.catalog_cache_file) {
@@ -106,6 +142,11 @@ impl GdtfCatalogManager {
         Ok(())
     }
 
+    /// Persists the online index to disk and replaces the in-memory copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index cannot be serialized or written.
     pub fn save_online_catalog(&self, items: &[GdtfCatalogItem]) -> Result<(), String> {
         let json_str = serde_json::to_string_pretty(items)
             .map_err(|e| format!("Failed to serialize catalog: {}", e))?;
@@ -119,6 +160,16 @@ impl GdtfCatalogManager {
         Ok(())
     }
 
+    /// Parses a `.gdtf` archive and installs it in the local fixture cache.
+    ///
+    /// The file is written to `<manufacturer>/<fixture>[_<first 8 chars of the
+    /// fixture type id>].gdtf` with sanitized names, so two fixtures resolving to
+    /// the same path overwrite each other. Any matching preview entries are dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the archive cannot be parsed or the directory or
+    /// file cannot be written.
     pub fn save_downloaded_gdtf(
         &self,
         manufacturer: &str,
@@ -184,6 +235,10 @@ impl GdtfCatalogManager {
         Ok(parsed)
     }
 
+    /// Looks up a previewed fixture without removing it.
+    ///
+    /// Tries the exact key first, then a case-insensitive name match (any
+    /// manufacturer when `manufacturer` is empty).
     pub fn get_preview_fixture(
         &self,
         manufacturer: &str,
@@ -213,6 +268,14 @@ impl GdtfCatalogManager {
         None
     }
 
+    /// Parses a `.gdtf` archive and keeps it in the in-memory preview cache only.
+    ///
+    /// Stored under both the requested and the parsed manufacturer/name keys,
+    /// sharing the bytes. When full, arbitrary entries are evicted (not LRU).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the archive cannot be parsed.
     pub fn save_preview_gdtf(
         &self,
         manufacturer: &str,
@@ -248,6 +311,15 @@ impl GdtfCatalogManager {
         Ok(parsed)
     }
 
+    /// Promotes a previewed fixture to an installed one by writing its archive to disk.
+    ///
+    /// Returns `Ok(None)` when there is no matching preview entry. The entry is
+    /// removed from the cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when installing the cached archive fails (see
+    /// [`Self::save_downloaded_gdtf`]).
     pub fn persist_preview_fixture(
         &self,
         manufacturer: &str,
@@ -295,6 +367,14 @@ impl GdtfCatalogManager {
         }
     }
 
+    /// Searches generics, installed fixtures and the online index.
+    ///
+    /// All whitespace-separated tokens (case-insensitive substring) must match
+    /// the fixture name, manufacturer or a mode name. An empty query returns only
+    /// generics and installed fixtures; online entries are added only for a
+    /// non-empty query, capped at 100. Duplicates (same manufacturer and
+    /// fixture) are merged, keeping the best item per `is_better_item` and
+    /// completing missing fields from the other.
     pub fn search(&self, query: Option<&str>) -> Vec<GdtfCatalogItem> {
         let q = query.map(|s| s.trim().to_lowercase()).unwrap_or_default();
         let tokens: Vec<&str> = q.split_whitespace().collect();
@@ -620,6 +700,9 @@ impl GdtfCatalogManager {
         results
     }
 
+    /// Returns an installed or built-in fixture by manufacturer and name.
+    ///
+    /// Installed fixtures take precedence over generics.
     pub fn get_local_fixture(
         &self,
         manufacturer: &str,
@@ -644,10 +727,14 @@ impl GdtfCatalogManager {
     }
 }
 
-// Well-known moving-head fixture families whose model names carry no generic keyword
-// (e.g. Clay Paky "Sharpy"). Used only as a fallback when categories are absent.
+/// Well-known moving-head fixture families whose model names carry no generic keyword
+/// (e.g. Clay Paky "Sharpy"). Used only as a fallback when categories are absent.
 const FAMOUS_MOVING_HEAD_NAMES: &[&str] = &["sharpy"];
 
+/// Guesses categories from a fixture name using conservative keywords.
+///
+/// Used for online, non-installed items that lack categories. Returns `None`
+/// when no keyword matches.
 fn infer_categories_from_name(name: &str) -> Option<Vec<String>> {
     let lower = name.to_lowercase();
     let tokens: Vec<&str> = lower
@@ -721,6 +808,7 @@ fn infer_categories_from_name(name: &str) -> Option<Vec<String>> {
     }
 }
 
+/// Replaces every character that is not alphanumeric, `-` or `_` with `_`.
 fn sanitize_filename(name: &str) -> String {
     name.chars()
         .map(|c| {
@@ -733,6 +821,7 @@ fn sanitize_filename(name: &str) -> String {
         .collect()
 }
 
+/// Returns whether the uploader name starts with `manuf` (official manufacturer upload).
 fn is_uploader_manuf(uploader: Option<&str>) -> bool {
     if let Some(u) = uploader {
         let lower = u.to_lowercase();
@@ -742,6 +831,10 @@ fn is_uploader_manuf(uploader: Option<&str>) -> bool {
     }
 }
 
+/// Returns whether `candidate` should replace `existing` for the same fixture.
+///
+/// Priority: generic, installed, manufacturer upload, rating (difference above
+/// 0.05), then the larger `rid` (more recent revision).
 fn is_better_item(candidate: &GdtfCatalogItem, existing: &GdtfCatalogItem) -> bool {
     // 1. Generic fixtures always stay generic
     if existing.is_generic && !candidate.is_generic {

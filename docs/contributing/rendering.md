@@ -462,8 +462,9 @@ permutation is deterministic for a given seed and N.
 ## Invariants and pitfalls
 
 - Do not confuse the **footprint** (mode channel count) with the buffer size:
-  encoding is bounded by `min(footprint, buf.len())`. A mode wider than the
-  remaining slice is truncated.
+  encoding writes only the first `min(footprint, buf.len())` bytes; bytes at or
+  beyond the footprint are never touched, even if the slice is larger. A mode
+  wider than the remaining slice is truncated.
 - A mode with no channel names yields a footprint-0 profile: nothing is encoded.
 - `default_dmx` is the base: an unhandled channel keeps its default, it is not
   reset to 0.
@@ -481,7 +482,8 @@ permutation is deterministic for a given seed and N.
 - An absent secondary colour is **black**, not white.
 - A colour effect with no active effect (`none`/`off`) or BPM 0 yields a 0
   factor (current colour, no rainbow).
-- `full` ignores width; the other effects are null outside the width.
+- `full` ignores width and BPM 0 (it always returns 1.0); the other effects are
+  null outside the width or when BPM is 0.
 - `chase` is not a 50 % square: the threshold is `sin(t) > 0.5`.
 - Pixel steps are **global to the group**; never reset the effect per fixture.
 - `Grouped` is clamped to a minimum of **1** here (the Configure UI offers 2):

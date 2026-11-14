@@ -1,6 +1,17 @@
+//! Helpers to read channel metadata (names, defaults, shutter values,
+//! capabilities) from a patched fixture mode and to classify channel names.
+//!
+//! See `docs/contributing/rendering.md` for how this relates to profile
+//! compilation.
+
 use crate::output::types::ChannelType;
 use crate::show::PatchedFixture;
 
+/// Returns the name of the channel at `ch_index` in the fixture's patched mode.
+///
+/// Channels are stored either as plain strings or as objects with a `name`
+/// (preferred) or `channel` key. Returns `None` when the mode has no channel
+/// list, the index is out of range, or the entry has no usable name.
 pub fn get_fixture_channel_name(fixture: &PatchedFixture, ch_index: usize) -> Option<String> {
     let channels = fixture.mode.get("channels")?.as_array()?;
     let channel_val = channels.get(ch_index)?;
@@ -18,6 +29,14 @@ pub fn get_fixture_channel_name(fixture: &PatchedFixture, ch_index: usize) -> Op
     None
 }
 
+/// Classifies a channel name into a [`ChannelType`] by case-insensitive
+/// substring matching, used by the Configure capabilities/options UI.
+///
+/// The order of the checks is significant: pan/tilt/XYZ win first, any other
+/// "fine" channel becomes `Other`, `lime` is tested before `green`, and
+/// curve/mode/speed/time names are never treated as dimmers. DMX encoding uses
+/// the separate `LogicalAttribute` classification in `profile.rs`; keep both in
+/// sync when adding a naming rule.
 pub fn classify_channel(name: &str) -> ChannelType {
     let lower = name.to_lowercase();
     let is_fine = lower.contains("fine")
@@ -103,6 +122,10 @@ pub fn classify_channel(name: &str) -> ChannelType {
     }
 }
 
+/// Returns the default DMX value (0-255) declared for the channel at `ch_index`.
+///
+/// Looks in the mode's `channelDefaults` array first, then in a `default` key
+/// of the channel object. Returns `None` when no default is declared.
 pub fn get_fixture_channel_default(fixture: &PatchedFixture, ch_index: usize) -> Option<u8> {
     if let Some(arr) = fixture
         .mode
@@ -123,6 +146,10 @@ pub fn get_fixture_channel_default(fixture: &PatchedFixture, ch_index: usize) ->
     None
 }
 
+/// Returns the DMX value that opens the shutter on the channel at `ch_index`.
+///
+/// Resolution order: the mode's `shutterOpenValues` map (keyed by the stringified
+/// index), then a non-zero channel default, then 255 (fully open).
 pub fn get_fixture_shutter_open_value(fixture: &PatchedFixture, ch_index: usize) -> u8 {
     if let Some(obj) = fixture
         .mode
@@ -141,10 +168,13 @@ pub fn get_fixture_shutter_open_value(fixture: &PatchedFixture, ch_index: usize)
     255
 }
 
-/// Returns the capabilities array of a channel when it is stored as a
-/// `NamedChannel` object ({ name, channel?, capability?, capabilities? }).
-/// Capability data is currently only preserved when patched via the full GDTF
-/// pipeline; the rest of the time this returns an empty slice.
+/// Returns the capabilities of a channel when it is stored as a `NamedChannel`
+/// object (`{ name, channel?, capability?, capabilities? }`).
+///
+/// A `capabilities` array is cloned as-is; a lone `capability` object becomes a
+/// one-element vector. Capability data is currently only preserved when patched
+/// via the full GDTF pipeline; the rest of the time this returns an empty
+/// vector.
 pub fn get_fixture_channel_capabilities(
     fixture: &PatchedFixture,
     ch_index: usize,
@@ -169,6 +199,10 @@ pub fn get_fixture_channel_capabilities(
     Vec::new()
 }
 
+/// Returns the DMX footprint (number of channels) of the fixture's mode.
+///
+/// Always at least 1, even when the mode has no channel list, so a patched
+/// fixture never occupies zero addresses.
 pub fn extract_fixture_channel_count(fixture: &PatchedFixture) -> usize {
     if let Some(channels) = fixture.mode.get("channels").and_then(|c| c.as_array()) {
         return channels.len().max(1);

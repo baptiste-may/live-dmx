@@ -1,3 +1,10 @@
+//! Tauri commands for the fixture catalog: search, GDTF-Share login and sync,
+//! mode fetching and file import.
+//!
+//! They operate on process-wide statics (catalog manager, client, credential
+//! cache), never on `AppState`, so they emit no events and create no undo
+//! entries. See `docs/contributing/fixtures.md`.
+
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock, RwLock};
@@ -9,22 +16,33 @@ use super::gdtf_share::{
 };
 use super::parser::ParsedGdtfMode;
 
+/// Process-wide catalog manager, created lazily on first use.
 static GDTF_CATALOG: OnceLock<RwLock<GdtfCatalogManager>> = OnceLock::new();
+/// Process-wide GDTF-Share HTTP client.
 static GDTF_CLIENT: OnceLock<GdtfShareClient> = OnceLock::new();
+/// In-memory cache of the `(user, password)` credentials loaded from the vault
+/// or entered by the user; `None` until loaded or after logout.
 static GDTF_CREDS: Mutex<Option<(String, String)>> = Mutex::new(None);
 
+/// Resolves the Tauri app data directory (catalog index, fixtures, vault).
 fn get_app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {:?}", e))
 }
 
+/// Resolves the Tauri app local data directory (fallback vault key file).
 fn get_app_local_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_local_data_dir()
         .map_err(|e| format!("Failed to get app local data dir: {:?}", e))
 }
 
+/// Makes sure the client has a GDTF-Share session, logging in with the cached or
+/// vaulted credentials if needed.
+///
+/// Returns `false` when no valid session could be established. Recovers from a
+/// poisoned credentials mutex.
 fn ensure_logged_in(app: &AppHandle, client: &GdtfShareClient) -> bool {
     if client.is_logged_in() {
         return true;
@@ -59,6 +77,10 @@ fn ensure_logged_in(app: &AppHandle, client: &GdtfShareClient) -> bool {
     client.is_logged_in()
 }
 
+/// Returns the shared catalog manager, creating it (and loading the local cache)
+/// on first call.
+///
+/// Errors when the app data dir cannot be resolved.
 fn get_catalog_manager(app: &AppHandle) -> Result<&'static RwLock<GdtfCatalogManager>, String> {
     if let Some(mgr) = GDTF_CATALOG.get() {
         return Ok(mgr);
@@ -73,16 +95,35 @@ fn get_catalog_manager(app: &AppHandle) -> Result<&'static RwLock<GdtfCatalogMan
         .ok_or_else(|| "Failed to initialize GDTF catalog manager".to_string())
 }
 
+/// Returns the shared GDTF-Share client, creating it on first call.
 fn get_client() -> &'static GdtfShareClient {
     GDTF_CLIENT.get_or_init(GdtfShareClient::new)
 }
 
+/// Tauri command: reports whether fixtures are available.
+///
+/// Always `true` because the built-in generic fixtures need no download. Does
+/// not touch `AppState` or emit events.
+///
+/// # Errors
+///
+/// Never fails; the `Result` is part of the command signature.
 #[tauri::command]
 pub async fn check_fixtures_installed(_app: AppHandle) -> Result<bool, String> {
     // Built-in generic fixtures are always available immediately
     Ok(true)
 }
 
+/// Tauri command: searches the fixture catalog (generics, local files, online index).
+///
+/// A `None`/empty query lists only generics and installed fixtures. Read-only:
+/// does not touch `AppState`, emit events or create undo entries; runs on a
+/// blocking thread.
+///
+/// # Errors
+///
+/// Returns an error when the catalog cannot be initialised, its lock is
+/// poisoned, or the blocking task fails.
 #[tauri::command]
 pub async fn gdtf_search(
     app: AppHandle,
@@ -97,6 +138,16 @@ pub async fn gdtf_search(
     .map_err(|e| format!("Search task failed: {:?}", e))?
 }
 
+/// Tauri command: logs in to GDTF-Share and saves the credentials.
+///
+/// The credentials are validated with a real login first, then stored in the
+/// encrypted vault and cached in memory. Does not touch `AppState`, emit events
+/// or create undo entries.
+///
+/// # Errors
+///
+/// Returns an error when the login fails, the data dirs cannot be resolved, the
+/// vault write fails, or the blocking task fails.
 #[tauri::command]
 pub async fn gdtf_set_credentials(
     app: AppHandle,
@@ -123,6 +174,16 @@ pub async fn gdtf_set_credentials(
     .map_err(|e| format!("Login task failed: {:?}", e))?
 }
 
+/// Tauri command: reports whether GDTF-Share access is available.
+///
+/// Returns `true` if already logged in; otherwise loads vaulted credentials (if
+/// any) and tries to log in with them. `false` means no stored credentials or a
+/// failed login.
+///
+/// # Errors
+///
+/// Returns an error when the data dirs cannot be resolved or the blocking task
+/// fails. Vault read errors are ignored and yield `false`.
 #[tauri::command]
 pub async fn gdtf_get_credentials_status(app: AppHandle) -> Result<bool, String> {
     let client = get_client();
@@ -157,6 +218,15 @@ pub async fn gdtf_get_credentials_status(app: AppHandle) -> Result<bool, String>
     }
 }
 
+/// Tauri command: forgets the GDTF-Share account.
+///
+/// Deletes the vaulted credentials, clears the in-memory cache and logs the
+/// client out. Does not touch `AppState` or emit events.
+///
+/// # Errors
+///
+/// Returns an error when the data dirs cannot be resolved or the vault deletion
+/// fails.
 #[tauri::command]
 pub async fn gdtf_logout(app: AppHandle) -> Result<bool, String> {
     let app_data = get_app_data_dir(&app)?;
@@ -172,6 +242,17 @@ pub async fn gdtf_logout(app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Tauri command: refreshes the online catalog index from GDTF-Share.
+///
+/// Requires a session (re-using vaulted credentials if needed). Rescans local
+/// fixtures and persists the downloaded index to disk. Returns the number of
+/// online entries fetched. Does not touch `AppState` or emit events.
+///
+/// # Errors
+///
+/// Returns an error when authentication is unavailable, the list cannot be
+/// fetched, the catalog lock is poisoned, the index cannot be saved, or the
+/// blocking task fails.
 #[tauri::command]
 pub async fn gdtf_sync_catalog(app: AppHandle) -> Result<usize, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -197,6 +278,21 @@ pub async fn gdtf_sync_catalog(app: AppHandle) -> Result<usize, String> {
     .map_err(|e| format!("Catalog sync task failed: {:?}", e))?
 }
 
+/// Tauri command: returns the parsed DMX mode of a fixture, downloading it if needed.
+///
+/// Lookup order: installed fixture (including generics), then the in-memory
+/// preview cache, then a GDTF-Share download by `rid` (requires a session).
+/// Mode names are matched trimmed and case-insensitively. With `persist`
+/// (default `true`) the archive is saved to the local fixture cache; otherwise
+/// it is only kept in the preview cache. Does not touch `AppState`, emit events
+/// or create undo entries.
+///
+/// # Errors
+///
+/// Returns an error when the fixture is not local and has no `rid`, when
+/// authentication or the download fails, when the file cannot be parsed or
+/// saved, when the mode does not exist in a downloaded fixture, when a catalog
+/// lock is poisoned, or when the blocking task fails.
 #[tauri::command]
 pub async fn gdtf_fetch_mode(
     app: AppHandle,
@@ -292,6 +388,15 @@ pub async fn gdtf_fetch_mode(
     .map_err(|e| format!("Fetch mode task failed: {:?}", e))?
 }
 
+/// Tauri command: imports a `.gdtf` file from disk into the local fixture cache.
+///
+/// The returned item is marked installed, uploaded by `"Imported"` and has no
+/// `rid`. Does not touch `AppState`, emit events or create undo entries.
+///
+/// # Errors
+///
+/// Returns an error when the file cannot be read or parsed, cannot be saved in
+/// the cache, the catalog lock is poisoned, or the blocking task fails.
 #[tauri::command]
 pub async fn gdtf_import_file(app: AppHandle, path: String) -> Result<GdtfCatalogItem, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -332,6 +437,14 @@ pub async fn gdtf_import_file(app: AppHandle, path: String) -> Result<GdtfCatalo
     .map_err(|e| format!("Import task failed: {:?}", e))?
 }
 
+/// Tauri command: rescans the local fixture cache from disk.
+///
+/// Does not touch `AppState` or emit events.
+///
+/// # Errors
+///
+/// Returns an error when the catalog cannot be initialised, its lock is
+/// poisoned, the scan fails, or the blocking task fails.
 #[tauri::command]
 pub async fn reload_fixtures(app: AppHandle) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {

@@ -10,6 +10,7 @@ Reference: `docs/contributing/architecture.md` (module maps, state/history model
 ## Checklist
 
 1. **Rust — implement** the `#[tauri::command]` in the right module (thin handler → dedicated logic in a service/utility). Return `Result<T, String>`; never leak crate-specific error types. Heavy work (network, catalog, IO) goes through `tauri::async_runtime::spawn_blocking` (see `src-tauri/src/fixtures/commands.rs`).
+   **Document it** with a `///` doc: effect on `AppState`, events emitted, undo/redo behavior and a `# Errors` section (enforced by lint).
 2. **Register** it in `tauri::generate_handler![...]` in `src-tauri/src/lib.rs`. Forgetting this means `Command X not found` at runtime.
 3. **Permissions** — only for _plugin_ commands: if the command calls a plugin API, add the matching permission to `src-tauri/capabilities/default.json`. Custom app commands registered in step 2 need no entry.
 4. **Frontend — call it**: `invoke("command_name", { camelCaseArgs })` from `@tauri-apps/api/core`. Wire state through a Pinia store (see `docs/contributing/frontend.md`) instead of calling `invoke` ad hoc from deep components.
@@ -25,4 +26,4 @@ Reference: `docs/contributing/architecture.md` (module maps, state/history model
 
 ## Verify
 
-`bun run lint:back && bun run test:back`, plus `bun run test:front` when the frontend was touched (or the `verify-changes` skill).
+`bun run lint:back && bun run docs:back && bun run test:back`, plus `bun run test:front` when the frontend was touched (or the `verify-changes` skill).

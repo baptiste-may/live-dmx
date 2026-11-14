@@ -1,13 +1,28 @@
+//! sACN (ANSI E1.31 / Streaming ACN) output: packet builder and a UDP multicast sender.
+//!
+//! Each universe is sent to its multicast group `239.255.{hi}.{lo}` and mirrored
+//! to loopback. See `docs/contributing/dmx-output.md` for the protocol overview.
+
 use std::collections::HashMap;
 use std::net::UdpSocket;
 use std::time::SystemTime;
 
+/// Standard sACN UDP port (`0x15C0`).
 pub const SACN_PORT: u16 = 5568;
+/// ACN packet identifier `"ASC-E1.17"` padded with NULs to 12 bytes, found in the root layer.
 const ACN_PACKET_IDENTIFIER: &[u8; 12] = b"ASC-E1.17\0\0\0";
+/// Fallback Component Identifier (CID) used when the caller supplies none.
+///
+/// The first bytes spell `"LiveDMX"` in ASCII, followed by zeros and a final `0x01`.
 pub const DEFAULT_CID: [u8; 16] = [
     0x4c, 0x69, 0x76, 0x65, 0x44, 0x4d, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
 ];
 
+/// Generates a 16-byte identifier shaped like an RFC 4122 version-4 UUID.
+///
+/// It is derived from the current time in nanoseconds, the process id and a
+/// fixed constant rather than from a random source, so it is unique enough to
+/// tell this application instance apart but not cryptographically random.
 pub fn generate_uuid_v4() -> [u8; 16] {
     let mut bytes = [0u8; 16];
     let time_nanos = SystemTime::now()
@@ -25,6 +40,18 @@ pub fn generate_uuid_v4() -> [u8; 16] {
     bytes
 }
 
+/// Builds an E1.31 data packet (root, framing and DMP layers) for one universe.
+///
+/// The frame is always 638 bytes: 38-byte root layer, 77-byte framing layer
+/// and 523-byte DMP layer carrying the DMX start code (0) and 512 channels.
+/// The source name is `Live-DMX Controller`, the priority is 100 and no
+/// synchronization address is used. `data` is truncated to 512 channels and
+/// shorter input leaves the remaining channels at 0. `cid` defaults to
+/// [`DEFAULT_CID`] when `None`.
+///
+/// # Errors
+///
+/// Returns `Err` if `universe` is outside `1..=63999`, the valid sACN range.
 pub fn build_sacn_packet(
     universe: u16,
     data: &[u8],
@@ -96,13 +123,22 @@ pub fn build_sacn_packet(
     Ok(packet)
 }
 
+/// sACN transmitter with a per-universe sequence counter.
 pub struct SacnSender {
+    /// UDP socket used for both multicast and loopback sends.
     socket: UdpSocket,
+    /// Next sequence number for each universe; starts at 0 and wraps at 255.
     sequences: HashMap<u16, u8>,
+    /// Component Identifier sent in every packet, generated once per sender.
     cid: [u8; 16],
 }
 
 impl SacnSender {
+    /// Binds a UDP socket on `0.0.0.0:0` and generates this sender's CID.
+    ///
+    /// # Errors
+    ///
+    /// Returns the I/O error if the socket cannot be bound.
     pub fn new() -> std::io::Result<Self> {
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         let _ = socket.set_broadcast(true);
@@ -115,6 +151,17 @@ impl SacnSender {
         })
     }
 
+    /// Sends one universe to its multicast group and to `127.0.0.1:5568`.
+    ///
+    /// The multicast address is `239.255.{universe >> 8}.{universe & 0xFF}` on
+    /// port 5568. The universe's sequence counter advances before the send, so
+    /// a failed send still consumes a number.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ErrorKind::InvalidInput` if `universe` is outside `1..=63999`,
+    /// or the underlying I/O error if either `send_to` fails (the loopback
+    /// copy is skipped when the multicast send fails).
     pub fn send_universe(&mut self, universe: u16, data: &[u8]) -> std::io::Result<()> {
         if !(1..=63999).contains(&universe) {
             return Err(std::io::Error::new(
