@@ -383,11 +383,12 @@ Stronghold` — no JS bindings; Rust stays the sole owner of credentials).
 - **Vault snapshot:** `<app_data_dir>/vault.hold`
 - **Encryption key:** a random 32-byte secret unique per installation, stored in
   the OS credential store first (`keyring` crate, service
-  `fr.baptiste-may.live-dmx`, user `gdtf-vault-key`), with a
-  permission-restricted fallback file `vault.key` (mode `0o600`) in
-  `<app_local_data_dir>` when no keyring is available (e.g. headless Linux).
-  The key is only generated when both sources are empty; genuine access errors
-  abort instead of silently replacing a valid key.
+  `fr.baptiste-may.live-dmx`, user `gdtf-vault-key`), with a fallback file
+  `vault.key` in `<app_local_data_dir>` when no keyring is available (e.g.
+  headless Linux). On Unix the file is created with mode `0o600`; that mode does
+  not change an existing file's permissions, and no permissions are set on
+  non-Unix platforms. The key is only generated when both sources are empty;
+  genuine access errors abort instead of silently replacing a valid key.
 - **Client/record keys:** Stronghold client `gdtf`, store key `gdtf_credentials`
   (JSON `{ user, password }`).
 - **Self-healing:** an unopenable snapshot (lost key, corruption) is discarded and

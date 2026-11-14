@@ -14,9 +14,10 @@ use std::io::{Cursor, Read};
 #[serde(rename_all = "camelCase")]
 /// A DMX mode extracted from a GDTF fixture type.
 ///
-/// Serialized in camelCase for the frontend; optional fields are omitted when
-/// absent. DMX offsets are 1-based in the XML but 0-based in the vectors and
-/// maps below.
+/// Serialized in camelCase for the frontend. `channelDefaults`,
+/// `shutterOpenValues`, `panBounds` and `tiltBounds` are omitted when absent;
+/// `shortName` is always present and is `null` when absent. DMX offsets are
+/// 1-based in the XML but 0-based in the vectors and maps below.
 pub struct ParsedGdtfMode {
     /// Mode name (`DMXMode` `Name`), unique within the fixture.
     pub name: String,
@@ -71,6 +72,20 @@ pub struct ParsedGdtfFixture {
 /// `total_bytes` (clamped to 1-4) and the byte at `byte_index` (0 = coarse,
 /// clamped to the last byte) is returned, in the range 0-255. Unparsable input
 /// yields 0.
+///
+/// # Examples
+///
+/// ```
+/// use live_dmx_lib::fixtures::parser::parse_gdtf_dmx_value;
+///
+/// // One byte: the coarse value is the DMX byte.
+/// assert_eq!(parse_gdtf_dmx_value("255/1", 0, 1), 255);
+/// // Two bytes rescaled into two output bytes: 0x8000 -> coarse 128, fine 0.
+/// assert_eq!(parse_gdtf_dmx_value("32768/2", 0, 2), 128);
+/// assert_eq!(parse_gdtf_dmx_value("32768/2", 1, 2), 0);
+/// // Unparsable input yields 0.
+/// assert_eq!(parse_gdtf_dmx_value("not-a-number", 0, 1), 0);
+/// ```
 pub fn parse_gdtf_dmx_value(val_str: &str, byte_index: usize, total_bytes: usize) -> u8 {
     let mut parts = val_str.split('/');
     let Ok(num) = parts.next().unwrap_or("0").trim().parse::<u64>() else {
@@ -97,6 +112,16 @@ pub fn parse_gdtf_dmx_value(val_str: &str, byte_index: usize, total_bytes: usize
 /// `UV`, `Cyan`, `Magenta` or `Yellow`; shutter/strobe attributes become
 /// `Strobe`; anything else is kept as is. A `Fine` suffix or `is_fine` (a
 /// secondary byte of a multi-byte channel) appends `" Fine"`.
+///
+/// # Examples
+///
+/// ```
+/// use live_dmx_lib::fixtures::parser::map_gdtf_attribute_to_name;
+///
+/// assert_eq!(map_gdtf_attribute_to_name("ColorAdd_R", false), "Red");
+/// assert_eq!(map_gdtf_attribute_to_name("Dimmer", true), "Dimmer Fine");
+/// assert_eq!(map_gdtf_attribute_to_name("ColorAdd_RFine", false), "Red Fine");
+/// ```
 pub fn map_gdtf_attribute_to_name(attribute: &str, is_fine: bool) -> String {
     let (attr_name, has_fine_suffix) = if let Some(stripped) = attribute.strip_suffix("Fine") {
         (stripped, true)
@@ -131,6 +156,19 @@ pub fn map_gdtf_attribute_to_name(attribute: &str, is_fine: bool) -> String {
 /// Returns `None` for unparsable, non-finite or empty ranges. A range that is
 /// entirely positive is treated as a total span and centred (`[-span/2, span/2]`
 /// rounded); otherwise the rounded `[min, max]` is returned.
+///
+/// # Examples
+///
+/// ```
+/// use live_dmx_lib::fixtures::parser::parse_physical_bounds;
+///
+/// // A signed range is used as written.
+/// assert_eq!(parse_physical_bounds("-180", "180"), Some([-180, 180]));
+/// // A positive-only range is a total span, centred on zero.
+/// assert_eq!(parse_physical_bounds("0", "360"), Some([-180, 180]));
+/// // Empty or zero-width ranges are rejected.
+/// assert_eq!(parse_physical_bounds("10", "10"), None);
+/// ```
 pub fn parse_physical_bounds(from_str: &str, to_str: &str) -> Option<[i32; 2]> {
     let from: f64 = from_str.trim().parse().ok()?;
     let to: f64 = to_str.trim().parse().ok()?;

@@ -17,7 +17,7 @@ use crate::show::types::{ShowData, ShowStatus};
 /// When locking several fields, take `show` before `history`; the engine lock
 /// is taken last and never held across network or serial I/O.
 pub struct AppState {
-    /// Current show, shared with the output loop (which clones it each tick).
+    /// Current show, shared with the output loop (which locks and borrows it each tick).
     pub show: Arc<Mutex<ShowData>>,
     /// Undo/redo stacks and saved snapshot of the current show.
     pub history: Mutex<ShowHistory>,
@@ -58,11 +58,12 @@ impl AppState {
 
     /// Runs `f` on the show as an undoable mutation, without emitting any event.
     ///
-    /// The show is snapshotted first. If `f` fails, the snapshot is restored and
-    /// neither history nor dirty flags change. If `f` changes the snapshot, the
-    /// live engine is reset when the patch or the group list differ, the previous
-    /// snapshot is pushed on the undo stack (clearing redo) and `file.is_dirty`,
-    /// `can_undo` and `can_redo` are recomputed.
+    /// The show is snapshotted first. If `f` fails, the snapshot-tracked fields are
+    /// restored; changes `f` made to `show.file` or `show.status` (including dirty
+    /// flags) are not rolled back. If `f` changes the snapshot, the live engine is
+    /// reset when the patch or the group list differ, the previous snapshot is
+    /// pushed on the undo stack (clearing redo) and `file.is_dirty`, `can_undo` and
+    /// `can_redo` are recomputed.
     ///
     /// Returns the closure result and whether the show actually changed. Locks
     /// `show` then `history`.

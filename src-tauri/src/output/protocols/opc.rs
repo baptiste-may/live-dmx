@@ -54,9 +54,11 @@ impl OpcSender {
     /// Sends one universe as OPC channel `universe - 1`.
     ///
     /// When disconnected, tries to connect to `127.0.0.1:7890` (20 ms connect
-    /// timeout, at most once per second) and enables `TCP_NODELAY` plus a 20 ms
-    /// write timeout. The calling thread may block for up to those timeouts. On
-    /// a write failure the connection is dropped so a later call reconnects.
+    /// timeout, at most once per second) and attempts to enable `TCP_NODELAY` plus
+    /// a 20 ms write timeout. The connect timeout bounds the connection attempt,
+    /// but a failed write-timeout configuration is ignored, so the write is not
+    /// guaranteed to return within 20 ms. On a write failure the connection is
+    /// dropped so a later call reconnects.
     ///
     /// # Errors
     ///

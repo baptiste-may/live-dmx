@@ -455,10 +455,17 @@ pub fn get_group_pixel_options(
 
 /// Forces `settings` back inside what the group actually supports.
 ///
-/// Pan/tilt ranges are clamped to the bounds (keeping `min <= max`), color and pixel
-/// preferences fall back to the first available option when the stored one is unavailable (or
-/// stay untouched when there are no options), `pixel_group_count` is clamped to `2..=max_pixels`
-/// (or reset to 2 when `max_pixels < 2`) and `max_power` is capped at 100 (percent).
+/// `pan_bounds` and `tilt_bounds` are `[min, max]` pairs and each must have its minimum no
+/// greater than its maximum. Pan/tilt ranges are clamped to those bounds (keeping
+/// `min <= max`), color and pixel preferences fall back to the first available option when the
+/// stored one is unavailable (or stay untouched when there are no options), `pixel_group_count`
+/// is clamped to `2..=max_pixels` (or reset to 2 when `max_pixels < 2`) and `max_power` is
+/// capped at 100 (percent).
+///
+/// # Panics
+///
+/// Panics when a bounds array has its minimum greater than its maximum, because the inner
+/// `clamp` calls require an ordered range.
 pub fn clamp_group_settings(
     settings: &mut GroupSettings,
     pan_bounds: [i32; 2],

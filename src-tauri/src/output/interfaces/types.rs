@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PhysicalInterface {
-    /// Stable identifier of the form `physical-{n}` (1-based position in the scan),
-    /// used as a universe output target.
+    /// Identifier of the form `physical-{n}` (1-based position in the scan), used
+    /// as a universe output target. It is based on scan position, so it can change
+    /// between scans when devices are added or removed.
     pub id: String,
     /// Display name of the form `Physical {n}`.
     pub name: String,

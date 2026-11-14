@@ -271,12 +271,13 @@ pub fn calculate_effective_fract(
 /// Computes the 0.0-1.0 intensity factor of a group effect for one fixture or
 /// pixel at time `elapsed` (seconds).
 ///
-/// Returns 0.0 when the effect is unset/`none`/`off` or `bpm` is 0, and 1.0
-/// for `full`. Otherwise the waveform (`pulse`, `chase`, `ramp_up`,
-/// `ramp_down`, `sine`; unknown names act as 1.0) is evaluated over the
-/// active part of the cycle, whose length is `width` percent; the remainder of
-/// the cycle is 0.0. Pure and deterministic: the same inputs give the same
-/// output, no RNG or clock is involved.
+/// Returns 0.0 when the effect is unset/`none`/`off`. `full` always returns 1.0,
+/// even when `bpm` is 0; for the other effects a `bpm` of 0 also yields 0.0.
+/// Otherwise the waveform (`pulse`, `chase`, `ramp_up`, `ramp_down`, `sine`;
+/// unknown names act as 1.0) is evaluated over the active part of the cycle,
+/// whose length is `width` percent; the remainder of the cycle is 0.0. Pure and
+/// deterministic: the same inputs give the same output, no RNG or clock is
+/// involved.
 pub fn calculate_effect_factor(
     effect_state: &GroupEffectState,
     elapsed: f32,

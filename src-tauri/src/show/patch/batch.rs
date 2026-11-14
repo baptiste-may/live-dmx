@@ -189,8 +189,10 @@ pub fn check_batch_patch_collision(
 /// # Errors
 ///
 /// Returns an error if the batch exceeds the universe bounds, collides with an existing fixture
-/// (see `check_batch_patch_collision`) or the locks are poisoned. On error nothing is created,
-/// including the group.
+/// (see `check_batch_patch_collision`) or the show/history locks are poisoned before the closure
+/// runs, in which case nothing is created. If the engine mutex is poisoned after the closure has
+/// created the group and fixtures, the error is returned without restoring the snapshot or
+/// recording an undo entry, so those changes remain applied but are not undoable.
 #[tauri::command]
 pub fn show_patch_batch(
     state: State<'_, AppState>,

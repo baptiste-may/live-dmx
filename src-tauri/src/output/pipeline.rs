@@ -100,8 +100,9 @@ fn effective_dimmer(state: &LogicalFixtureState, fixture_ceiling: f32) -> f32 {
 /// according to the fixture's compiled profile.
 ///
 /// `buf` is the fixture's slice of the universe buffer; it is first filled with
-/// the profile's per-channel defaults, so only `min(footprint, buf.len())` bytes
-/// are written and an empty `buf` or zero footprint is a no-op. `pixel_states`
+/// the profile's per-channel defaults. Only `min(footprint, buf.len())` bytes are
+/// written, and bytes at or beyond the footprint stay untouched even when `buf`
+/// is larger; an empty `buf` or zero footprint is a no-op. `pixel_states`
 /// carries one state per pixel for multi-pixel fixtures and is ignored when
 /// `None` or empty. `profile.default_dmx` must cover the whole footprint (the
 /// profile compiler guarantees it). Reads no clock, lock or `ShowData`.
@@ -117,6 +118,9 @@ pub fn encode_fixture_dmx(
     }
 
     let footprint = profile.footprint.min(buf.len());
+    // Restrict every write to the footprint: callers may pass a larger slice
+    // (for example the rest of the universe).
+    let buf = &mut buf[..footprint];
 
     // 1. Initialize entire fixture slice with compiled defaults.
     // This immediately satisfies all Gobos, Zoom, Focus, Prism, Iris, and Control channels!
@@ -888,5 +892,25 @@ mod tests {
         assert_eq!(buf[1], 128);
         assert_eq!(buf[2], 0);
         assert_eq!(buf[3], 64);
+    }
+
+    #[test]
+    fn test_encode_fixture_does_not_write_beyond_footprint() {
+        let channel_names = vec!["Dimmer".to_string(), "Shutter".to_string()];
+        let profile = compile_fixture_profile(&channel_names, None, None, None, None, None);
+        assert_eq!(profile.footprint, 2);
+
+        // A larger caller buffer must keep its bytes beyond the footprint intact.
+        let mut buf = vec![0xAAu8; 6];
+        let state = LogicalFixtureState {
+            intensity: 1.0,
+            ..Default::default()
+        };
+
+        encode_fixture_dmx(&profile, &state, None, ColorPreference::ColorMix, &mut buf);
+
+        assert_eq!(buf[0], 255);
+        assert_eq!(buf[1], 255);
+        assert_eq!(&buf[2..], &[0xAA; 4]);
     }
 }

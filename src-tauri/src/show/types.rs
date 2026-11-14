@@ -2,9 +2,11 @@
 //!
 //! `ShowData` is the full runtime state sent to the frontend, `ShowSnapshot` is the
 //! subset tracked by undo/redo, and `ShowFileContent` is what is written to disk.
-//! All types serialize in camelCase. The `clean_*` helpers strip fixture JSON down
-//! to the fields that must survive serialization. See `docs/contributing/architecture.md`
-//! and `docs/contributing/fixtures.md`.
+//! Struct fields serialize in camelCase; enums define their own wire values
+//! (`ShowStatus` uses `SCREAMING_SNAKE_CASE`, `ColorPreference` its UI labels and
+//! `PixelPreference` its variant names). The `clean_*` helpers strip fixture JSON
+//! down to the fields that must survive serialization. See
+//! `docs/contributing/architecture.md` and `docs/contributing/fixtures.md`.
 
 use serde::{Deserialize, Serialize};
 
@@ -421,8 +423,9 @@ impl ShowData {
         }
     }
 
-    /// Overwrites the undo-tracked part of the show with `snapshot`, leaving
-    /// `status` and `file` untouched.
+    /// Overwrites the undo-tracked part of the show with `snapshot`. `status` and
+    /// `file` are runtime-only and not part of [`ShowSnapshot`], so they keep
+    /// whatever values they currently hold (including dirty flags).
     pub fn restore_snapshot(&mut self, snapshot: ShowSnapshot) {
         self.identity = snapshot.identity;
         self.patch = snapshot.patch;

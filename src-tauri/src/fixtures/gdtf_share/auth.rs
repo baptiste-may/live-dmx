@@ -1,8 +1,11 @@
 //! Encrypted storage of the GDTF-Share credentials.
 //!
 //! Credentials live in an `iota_stronghold` snapshot (`vault.hold`) encrypted
-//! with a per-installation random key kept in the OS keyring, or in a
-//! permission-restricted key file as a fallback. See `docs/contributing/fixtures.md`.
+//! with a per-installation random key kept in the OS keyring, or in a fallback
+//! key file when no keyring is available. On Unix that file is created with mode
+//! `0o600`; the mode does not change an existing file's permissions, and the
+//! non-Unix implementation sets no permissions at all. See
+//! `docs/contributing/fixtures.md`.
 
 use std::fs;
 use std::path::Path;
@@ -17,8 +20,8 @@ use super::types::GdtfShareCredentials;
 /// The vault encryption key is a random 32-byte secret unique to each
 /// installation. It is held in the OS credential store (Keychain on macOS,
 /// Credential Manager on Windows, Secret Service on Linux) and, when no keyring
-/// is available (for example on headless Linux), in a permission-restricted
-/// file under the app's local data directory.
+/// is available (for example on headless Linux), in a fallback file under the
+/// app's local data directory (owner-only on Unix only when newly created).
 const KEYRING_SERVICE: &str = "fr.baptiste-may.live-dmx";
 /// Keyring entry (user) name holding the vault key.
 const KEYRING_USER: &str = "gdtf-vault-key";
@@ -150,7 +153,9 @@ fn write_key_file(path: &Path, key: &[u8; 32]) -> Result<(), String> {
         .map_err(|e| format!("Failed to write vault key file {}: {}", path.display(), e))
 }
 
-/// Writes the key bytes to `path`, restricting the file to its owner (`0o600`).
+/// Writes the key bytes to `path`, creating it with owner-only (`0o600`)
+/// permissions. The mode applies only when the file is created; an existing file
+/// keeps its permissions.
 #[cfg(unix)]
 fn write_key_file_contents(path: &Path, key: &[u8; 32]) -> std::io::Result<()> {
     use std::io::Write;
