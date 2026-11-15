@@ -13,17 +13,16 @@ use super::types::PhysicalInterface;
 /// Builds an Enttec DMX USB Pro "Output Only Send DMX Packet" frame.
 ///
 /// Layout: `0x7E` start byte, label `0x06`, 16-bit little-endian length
-/// (`0x0201`, counting the start code and the padded 512-byte payload), DMX
-/// start code `0x00`, the channels, then `0xE7` end byte. `dmx_data` is
-/// truncated or zero-padded to 512 channels, so the frame is always 518 bytes.
+/// (`min(len, 512) + 1`, counting the start code), DMX start code `0x00`, the
+/// channels, then `0xE7` end byte. `dmx_data` is truncated or zero-padded to
+/// 512 channels, so the frame is always 518 bytes; the length field counts the
+/// supplied data plus the start code, not the padding.
 pub fn build_enttec_pro_packet(dmx_data: &[u8]) -> Vec<u8> {
     let mut packet = Vec::with_capacity(518);
     packet.push(0x7E); // Start of message
     packet.push(0x06); // Label: Output Only Send DMX Packet Request
 
-    // The payload is always padded to 512 channels, so the length field always
-    // counts the start code plus that full payload.
-    let length: u16 = 512 + 1;
+    let length = (dmx_data.len().min(512) + 1) as u16;
     packet.push((length & 0xFF) as u8); // Length LSB
     packet.push(((length >> 8) & 0xFF) as u8); // Length MSB
 

@@ -462,9 +462,8 @@ permutation is deterministic for a given seed and N.
 ## Invariants and pitfalls
 
 - Do not confuse the **footprint** (mode channel count) with the buffer size:
-  encoding writes only the first `min(footprint, buf.len())` bytes; bytes at or
-  beyond the footprint are never touched, even if the slice is larger. A mode
-  wider than the remaining slice is truncated.
+  encoding is bounded by `min(footprint, buf.len())`. A mode wider than the
+  remaining slice is truncated.
 - A mode with no channel names yields a footprint-0 profile: nothing is encoded.
 - `default_dmx` is the base: an unhandled channel keeps its default, it is not
   reset to 0.

@@ -392,8 +392,15 @@ Conventions:
 - `#[tauri::command]` handlers document their effect on `AppState`, the events
   they emit, undo/redo behavior and returned errors.
 - Never silence a lint with `#[allow(...)]` to skip a docstring. Trait-impl
-  methods (`Default::default`, `Display::fmt`, …) and `#[cfg(test)]` code are
-  not linted.
+  methods (`Default::default`, `Display::fmt`, …) inherit their docs and are
+  exempt.
+- Test code follows the same documentation rule even though the lint cannot
+  enforce it: `#[cfg(test)]` modules (and integration test modules) start with
+  a `//!` doc, and new or changed test helpers and `#[test]` functions get a
+  `///` doc stating the invariant or regression they guard.
+  `clippy::missing_docs_in_private_items` skips test modules and test crates,
+  and `cargo test` does not run clippy, so `bun run lint:back` does not catch a
+  missing test docstring; reviewers must.
 
 `bun run docs:back` runs
 `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items` and

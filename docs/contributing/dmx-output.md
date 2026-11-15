@@ -447,13 +447,14 @@ used by tests only; production always discovers real ports.
 | ------ | -------- | ------------------------------------------- |
 | 0      | `0x7E`   | Start of message                            |
 | 1      | `0x06`   | Label "Output Only Send DMX Packet Request" |
-| 2–3    | LSB, MSB | Length = 513 (`0x0201`)                     |
+| 2–3    | LSB, MSB | Length = `min(len, 512) + 1`                |
 | 4      | `0x00`   | DMX start code                              |
 | 5..517 | data     | 512 channels, zero-padded                   |
 | 517    | `0xE7`   | End of message                              |
 
-The length always counts the start code plus the padded 512-channel payload.
-Short data is zero-padded to 512 before the end byte; long data is truncated.
+The length counts the start code plus the supplied data, not the 512-byte
+padding: 513 for a full frame (`0x0201`). Short data is zero-padded to 512
+before the end byte; long data is truncated.
 
 ### Sending and target resolution
 
