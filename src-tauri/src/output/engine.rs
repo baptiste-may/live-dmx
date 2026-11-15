@@ -1,3 +1,15 @@
+//! The live DMX engine: turns the show state plus live inputs (flashes, masters,
+//! effects, colors) into one 512-byte frame per universe.
+//!
+//! [`LiveEngine::compute_dmx`] is called once per tick (44 Hz) by the runner. It
+//! refreshes a fixture cache, evaluates each fixture into a `LogicalFixtureState`
+//! and hands it to the pure encoder in `pipeline.rs`; manual channel overlays are
+//! applied last. The engine has no thread and no locking of its own: callers
+//! (see `runner.rs`) wrap it in a `Mutex`.
+//!
+//! See `docs/contributing/dmx-output.md` for the tick order and
+//! `docs/contributing/rendering.md` for the rendering rules.
+
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -21,45 +33,83 @@ use crate::show::{
     ColorPreference, EmbeddedGdtfMode, GroupSettings, PatchedFixture, PixelPreference, ShowData,
 };
 
+/// How a fixture's pixels map onto the effect steps of one group.
+///
+/// Effects are evaluated per step; a fixture occupies `step_count` consecutive
+/// steps starting at `step_offset` out of `total_steps` in the whole group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FixturePixelStepInfo {
+    /// Index of the fixture's first step within the group's steps.
     pub step_offset: usize,
+    /// Number of steps the fixture occupies (1 unless pixels are addressed
+    /// individually or in groups).
     pub step_count: usize,
+    /// Total number of steps across all fixtures of the group.
     pub total_steps: usize,
 }
 
+/// The patch inputs a [`CachedFixture`] was built from.
+///
+/// Compared against the current patch every tick to decide whether the fixture
+/// cache is still valid.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FixtureCacheKey {
+    /// Fixture id.
     id: u32,
+    /// Ids of the groups the fixture belongs to.
     groups: Vec<u32>,
+    /// Universe number the fixture is patched on.
     universe: u32,
+    /// 1-based DMX start address.
     address: u32,
+    /// Patched mode definition (channel names, defaults, shutter values).
     mode: serde_json::Value,
 }
 
+/// A patched fixture with everything needed to render it, precomputed so the
+/// 44 Hz tick does no parsing or compilation.
 #[derive(Clone, Debug)]
 pub struct CachedFixture {
+    /// Fixture id.
     pub id: u32,
+    /// Universe number (starting at 1) the fixture is patched on.
     pub universe: u16,
+    /// 0-based offset of the fixture's first channel in the universe buffer
+    /// (the 1-based patch address minus one).
     pub start_addr: usize,
+    /// Compiled channel layout used to encode the DMX bytes.
     pub profile: CompiledFixtureProfile,
+    /// Ids of the groups the fixture belongs to (group 0, "All", is implicit
+    /// and not listed).
     pub groups: Vec<u32>,
+    /// First group of the fixture, or 0 when it has none. Drives masters,
+    /// max power and which effect applies.
     pub primary_group_id: u32,
+    /// Per group id (including 0): `(position of the fixture, fixture count)`.
     pub group_positions: HashMap<u32, (usize, usize)>,
+    /// Per group id: the pixel steps the fixture occupies in that group.
     pub group_pixel_steps: HashMap<u32, FixturePixelStepInfo>,
 }
 
+/// The kinds of live flash/strobe actions that can be toggled on a group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum FlashType {
+    /// Raises the intensity of the group's fixtures.
     Simple,
+    /// Drives a white flash with the white emitters.
     White,
+    /// Master flash; behaves like [`FlashType::White`] for the dimmer factor.
     Master,
+    /// Regular periodic strobe.
     Strobe,
+    /// Per-fixture pseudo-random strobe (`randomStrobe` spelling).
     RandomStrobe,
+    /// Alias spelling of [`FlashType::RandomStrobe`] (`random_strobe`).
     RandomStrobeAlt,
 }
 
 impl FlashType {
+    /// Parses the flash identifier sent by the frontend; `None` when unknown.
     fn from_str(s: &str) -> Option<FlashType> {
         match s {
             "simple" => Some(FlashType::Simple),
@@ -72,6 +122,9 @@ impl FlashType {
         }
     }
 
+    /// Release fade duration in seconds for this flash type.
+    ///
+    /// Only simple and white/master flashes fade; strobes cut immediately.
     fn fade_duration(self, simple_fade: f32, white_fade: f32) -> f32 {
         match self {
             FlashType::Simple => simple_fade,
@@ -81,33 +134,66 @@ impl FlashType {
     }
 }
 
+/// Holds all live state (flashes, masters, effects, colors, overlays) and the
+/// computed universe buffers.
+///
+/// Not thread-safe by itself; the runner and the commands share it behind
+/// `Arc<Mutex<LiveEngine>>`. Setters only record state; nothing is rendered
+/// until the next [`LiveEngine::compute_dmx`].
 pub struct LiveEngine {
+    /// Active flashes: group id -> flash type name -> pressed. Group 0 applies to all fixtures.
     pub flash_states: HashMap<u32, HashMap<String, bool>>,
+    /// Generic UI button states. Stored and reset but has no effect on DMX.
     pub button_states: HashMap<String, bool>,
+    /// Intensity effect per group id.
     pub group_effects: HashMap<u32, GroupEffectState>,
+    /// Color effect per group id.
     pub group_color_effects: HashMap<u32, GroupEffectState>,
+    /// Memoized shuffled step order for `rng` intensity effects, per group id.
     pub group_rng_permutations: HashMap<u32, Vec<usize>>,
+    /// Memoized shuffled step order for `rng` color effects, per group id.
     pub group_color_rng_permutations: HashMap<u32, Vec<usize>>,
+    /// Seed for the shuffled permutations; advanced whenever an `rng` alignment is set so each selection reshuffles. Fully deterministic: no system RNG is used.
     pub rng_shuffle_seed: u64,
+    /// Master level (0-100) per group id; missing groups default to 100.
     pub group_masters: HashMap<u32, u8>,
+    /// Primary color (name or `#RRGGBB`) per group id; group 0 is initialized to white.
     pub group_colors: HashMap<u32, Option<String>>,
+    /// Secondary color per group id, blended in by color effects.
     pub group_secondary_colors: HashMap<u32, Option<String>>,
+    /// Regular strobe speed, 0-100 (maps to 1-20 Hz).
     pub strobe_rate: u8,
+    /// Random strobe speed, 0-100.
     pub random_strobe_rate: u8,
+    /// Release fade of simple flashes, in seconds (0 = instant).
     pub simple_flash_fade: f32,
+    /// Release fade of white and master flashes, in seconds (0 = instant).
     pub white_flash_fade: f32,
+    /// Running flash release fades, keyed by (group id, flash type). Purged once finished.
     flash_fade_transitions: HashMap<(u32, FlashType), FlashFadeTransition>,
+    /// Tempo of intensity effects in beats per minute (0 disables them).
     pub effect_bpm: u16,
+    /// Tempo of color effects in beats per minute (0 disables them).
     pub color_effect_bpm: u16,
+    /// Duration in seconds of color changes (0 = instant).
     pub color_fade_speed: f32,
+    /// Spread of color fades across a group's fixtures (`left`, `right`, `wing`, `center`); `None` fades all fixtures together.
     pub color_fade_order: Option<String>,
+    /// Running color fades per fixture id. Purged once finished.
     pub fixture_color_transitions: HashMap<u32, FixtureColorTransition>,
+    /// Last RGB (0-255) emitted per fixture id, used as the start of the next fade.
     pub fixture_last_colors: HashMap<u32, (u8, u8, u8)>,
+    /// Raw overlays keyed by (universe, 1-based channel); written over the computed frame every tick.
     pub manual_channels: HashMap<(u16, u16), u8>,
+    /// Computed 512-byte frame per universe number. Zeroed and recomputed every tick.
     pub universe_buffers: HashMap<u16, Vec<u8>>,
+    /// Engine creation time; effect time is measured from it.
     start_time: Instant,
+    /// Fixtures with compiled profiles, in patch order.
     pub cached_fixtures: Vec<CachedFixture>,
+    /// Patch inputs `cached_fixtures` was built from, used for invalidation.
     cached_keys: Vec<FixtureCacheKey>,
+    /// Group settings snapshot the cache was built with; a change rebuilds the cache.
     cached_group_settings: HashMap<u32, GroupSettings>,
 }
 
@@ -118,6 +204,7 @@ impl Default for LiveEngine {
 }
 
 impl LiveEngine {
+    /// Creates an engine with universes 1-4 pre-allocated and group 0 ("All") set to white.
     pub fn new() -> Self {
         let mut universe_buffers = HashMap::new();
         for u in 1..=4 {
@@ -158,6 +245,10 @@ impl LiveEngine {
         }
     }
 
+    /// Presses or releases a flash/strobe of `flash_type` on a group (0 = all).
+    ///
+    /// Unknown types are stored but have no effect. On release, a fade-out is
+    /// started when the type's fade duration is above zero.
     pub fn set_flash(&mut self, group_id: u32, flash_type: String, active: bool) {
         let group_flash = self.flash_states.entry(group_id).or_default();
         let was_active = *group_flash.get(&flash_type).unwrap_or(&false);
@@ -182,14 +273,21 @@ impl LiveEngine {
         }
     }
 
+    /// Sets the release fade of simple flashes in seconds; negative values become 0.
     pub fn set_simple_flash_fade(&mut self, fade: f32) {
         self.simple_flash_fade = fade.max(0.0);
     }
 
+    /// Sets the release fade of white/master flashes in seconds; negative values become 0.
     pub fn set_white_flash_fade(&mut self, fade: f32) {
         self.white_flash_fade = fade.max(0.0);
     }
 
+    /// Returns the current strength (0.0-1.0) of a flash on a group.
+    ///
+    /// 1.0 while pressed (on the group or on group 0), otherwise the remaining
+    /// part of a running release fade (the group's own fade first, then group
+    /// 0's), otherwise 0.0.
     pub fn get_flash_factor(&self, group_id: u32, flash_type: &str) -> f32 {
         if self.is_flash_active(group_id, flash_type) {
             return 1.0;
@@ -214,10 +312,15 @@ impl LiveEngine {
         0.0
     }
 
+    /// Records the state of a generic UI button; it does not affect DMX output.
     pub fn set_button(&mut self, button_id: String, active: bool) {
         self.button_states.insert(button_id, active);
     }
 
+    /// Sets the intensity effect, alignment and bounce flag of a group.
+    ///
+    /// Selecting the `rng` alignment advances the shuffle seed and drops the
+    /// group's memoized permutation so it is reshuffled.
     pub fn set_group_effect(
         &mut self,
         group_id: u32,
@@ -235,35 +338,47 @@ impl LiveEngine {
         entry.bounce = bounce;
     }
 
+    /// Sets the active portion of the effect cycle in percent (clamped to 100).
     pub fn set_group_effect_width(&mut self, group_id: u32, width: u8) {
         let entry = self.group_effects.entry(group_id).or_default();
         entry.width = width.min(100);
     }
 
+    /// Sets a group's master level (0-100).
     pub fn set_group_master(&mut self, group_id: u32, level: u8) {
         self.group_masters.insert(group_id, level);
     }
 
+    /// Returns a group's master level (0-100), 100 when never set.
     pub fn get_group_master(&self, group_id: u32) -> u8 {
         *self.group_masters.get(&group_id).unwrap_or(&100)
     }
 
+    /// Sets the tempo of intensity effects in BPM.
     pub fn set_effect_bpm(&mut self, bpm: u16) {
         self.effect_bpm = bpm;
     }
 
+    /// Sets the tempo of color effects in BPM.
     pub fn set_color_effect_bpm(&mut self, bpm: u16) {
         self.color_effect_bpm = bpm;
     }
 
+    /// Sets the color fade duration in seconds; negative values become 0.
     pub fn set_color_fade_speed(&mut self, speed: f32) {
         self.color_fade_speed = speed.max(0.0);
     }
 
+    /// Sets how color fades are staggered across a group's fixtures; `None` fades all at once.
     pub fn set_color_fade_order(&mut self, order: Option<String>) {
         self.color_fade_order = order;
     }
 
+    /// Returns a fixture's color right now as RGB on a 0.0-255.0 scale,
+    /// interpolating any running fade.
+    ///
+    /// Falls back to the last emitted color, then to `fallback_str` (a color
+    /// name or hex), then to white.
     pub fn get_fixture_current_rgb_f32(
         &self,
         fixture_id: u32,
@@ -296,6 +411,13 @@ impl LiveEngine {
         }
     }
 
+    /// Sets a group's primary color (`None` resets to white) and starts the
+    /// per-fixture fades towards it.
+    ///
+    /// Group 0 targets every fixture. Without `show` only the stored group color
+    /// changes. With a fade speed of 0 or `color` set to `None` the change is
+    /// immediate; otherwise each fixture fades from its current color, delayed
+    /// according to `color_fade_order`.
     pub fn set_group_color(
         &mut self,
         group_id: u32,
@@ -396,6 +518,8 @@ impl LiveEngine {
         }
     }
 
+    /// Sets the same color on every group, or resets every group to white when
+    /// `color` is `None`.
     pub fn set_all_groups_color(&mut self, color: Option<String>, show: Option<&ShowData>) {
         if let Some(c) = color {
             self.group_colors.insert(0, Some(c.clone()));
@@ -410,6 +534,7 @@ impl LiveEngine {
         }
     }
 
+    /// Returns the group's own primary color, without falling back to group 0.
     pub fn get_group_color(&self, group_id: u32) -> Option<&str> {
         if let Some(Some(c)) = self.group_colors.get(&group_id) {
             return Some(c.as_str());
@@ -417,6 +542,7 @@ impl LiveEngine {
         None
     }
 
+    /// Sets or clears (`None`) a group's secondary color used by color effects.
     pub fn set_group_secondary_color(&mut self, group_id: u32, color: Option<String>) {
         if let Some(c) = color {
             self.group_secondary_colors.insert(group_id, Some(c));
@@ -425,6 +551,7 @@ impl LiveEngine {
         }
     }
 
+    /// Returns the group's secondary color, falling back to group 0's.
     pub fn get_group_secondary_color(&self, group_id: u32) -> Option<&str> {
         if let Some(Some(c)) = self.group_secondary_colors.get(&group_id) {
             return Some(c.as_str());
@@ -437,6 +564,9 @@ impl LiveEngine {
         None
     }
 
+    /// Sets the color effect, alignment and bounce flag of a group.
+    ///
+    /// Selecting the `rng` alignment reshuffles the group's color permutation.
     pub fn set_group_color_effect(
         &mut self,
         group_id: u32,
@@ -454,11 +584,13 @@ impl LiveEngine {
         entry.bounce = bounce;
     }
 
+    /// Sets the active portion of the color effect cycle in percent (clamped to 100).
     pub fn set_group_color_effect_width(&mut self, group_id: u32, width: u8) {
         let entry = self.group_color_effects.entry(group_id).or_default();
         entry.width = width.min(100);
     }
 
+    /// Returns the group's color effect state, or the default (no effect).
     pub fn get_group_color_effect(&self, group_id: u32) -> GroupEffectState {
         self.group_color_effects
             .get(&group_id)
@@ -466,18 +598,25 @@ impl LiveEngine {
             .unwrap_or_default()
     }
 
+    /// Clears the group's color effect and its memoized permutation.
     pub fn reset_group_color_effect(&mut self, group_id: u32) {
         self.group_color_effects
             .insert(group_id, GroupEffectState::default());
         self.group_color_rng_permutations.remove(&group_id);
     }
 
+    /// Clears the group's intensity effect and its memoized permutation.
     pub fn reset_group_effect(&mut self, group_id: u32) {
         self.group_effects
             .insert(group_id, GroupEffectState::default());
         self.group_rng_permutations.remove(&group_id);
     }
 
+    /// Maps `step` to its slot in the group's shuffled intensity permutation.
+    ///
+    /// The permutation is generated lazily from `rng_shuffle_seed` and the group
+    /// id, and regenerated when `total_steps` changes. Returns 0 when there is at
+    /// most one step and `step` itself when it is out of range.
     pub fn get_rng_step(&mut self, group_id: u32, step: usize, total_steps: usize) -> usize {
         if total_steps <= 1 {
             return 0;
@@ -493,6 +632,8 @@ impl LiveEngine {
         perm.get(step).copied().unwrap_or(step)
     }
 
+    /// Same as [`LiveEngine::get_rng_step`] for color effects, using an
+    /// independent permutation (the seed is offset by one).
     pub fn get_color_rng_step(&mut self, group_id: u32, step: usize, total_steps: usize) -> usize {
         if total_steps <= 1 {
             return 0;
@@ -508,6 +649,10 @@ impl LiveEngine {
         perm.get(step).copied().unwrap_or(step)
     }
 
+    /// Returns the engine to its construction state, keeping `start_time`.
+    ///
+    /// Clears flashes, effects, masters, colors, transitions, overlays, caches
+    /// and zeroes every universe buffer.
     pub fn reset_all(&mut self) {
         self.flash_states.clear();
         self.button_states.clear();
@@ -539,6 +684,7 @@ impl LiveEngine {
         }
     }
 
+    /// Tells whether a flash is pressed on the group or on group 0.
     pub fn is_flash_active(&self, group_id: u32, flash_type: &str) -> bool {
         if let Some(types) = self.flash_states.get(&group_id) {
             if *types.get(flash_type).unwrap_or(&false) {
@@ -555,6 +701,7 @@ impl LiveEngine {
         false
     }
 
+    /// Returns the group's intensity effect state, or the default (no effect).
     pub fn get_group_effect(&self, group_id: u32) -> GroupEffectState {
         self.group_effects
             .get(&group_id)
@@ -562,6 +709,13 @@ impl LiveEngine {
             .unwrap_or_default()
     }
 
+    /// Builds the cache entry of one fixture, compiling its profile.
+    ///
+    /// Prefers a matching embedded GDTF definition from the show (looked up by
+    /// `manufacturer@type` key, then by name/spec/key, sorted for determinism)
+    /// merged with the patched mode's defaults and shutter values; otherwise
+    /// compiles from the patched mode. `group_pixel_steps` is left empty and
+    /// filled by [`LiveEngine::ensure_fixtures_cache`].
     fn build_cached_fixture(
         f: &PatchedFixture,
         start_addr: usize,
@@ -670,6 +824,10 @@ impl LiveEngine {
         }
     }
 
+    /// Rebuilds `cached_fixtures` unless the patch and group settings are unchanged.
+    ///
+    /// Also computes each fixture's position in every group and its pixel steps
+    /// according to the group's pixel preference.
     fn ensure_fixtures_cache(&mut self, show_data: &ShowData) {
         let fixtures = &show_data.patch.fixtures;
         let is_cache_valid = self.cached_keys.len() == fixtures.len()
@@ -778,6 +936,12 @@ impl LiveEngine {
         self.cached_group_settings = show_data.groups.settings.clone();
     }
 
+    /// Renders one frame into `universe_buffers`.
+    ///
+    /// Allocates buffers for every configured or patched universe, zeroes them,
+    /// renders each fixture, then writes `manual_channels` over the result and
+    /// purges finished fades. Nothing but the manual overlay persists between
+    /// ticks. `show_data` is only read.
     pub fn compute_dmx(&mut self, show_data: &ShowData) {
         for u_cfg in &show_data.output.universes {
             self.universe_buffers
@@ -886,6 +1050,8 @@ impl LiveEngine {
             .retain(|_, trans| trans.start_time.elapsed().as_secs_f32() < trans.duration_secs);
     }
 
+    /// Returns the color routing preference of a fixture: the first of its
+    /// groups (then group 0) that has settings, or the default.
     fn resolve_color_preference(
         &self,
         fixture: &CachedFixture,
@@ -899,6 +1065,16 @@ impl LiveEngine {
             .unwrap_or_default()
     }
 
+    /// Evaluates one fixture for the current tick and encodes it into its
+    /// universe buffer.
+    ///
+    /// Combines flashes, strobes, masters and max power, the intensity effect and
+    /// the color (fade, secondary color, color effect) into a
+    /// `LogicalFixtureState`, plus one state per pixel when the fixture has
+    /// several pixels spread over several steps. Fixtures whose start address is
+    /// beyond channel 512 or whose universe has no buffer are skipped, and
+    /// encoding is clamped to the 512-byte frame. Records the emitted color in
+    /// `fixture_last_colors`.
     #[allow(clippy::too_many_arguments)]
     fn compute_fixture_dmx(
         &mut self,

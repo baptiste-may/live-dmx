@@ -1,3 +1,11 @@
+//! Show lifecycle commands: create, load, save, unload, MVR import, undo/redo
+//! and fixture definition registration.
+//!
+//! Handlers lock `show` then `history`, replace or restore the show and
+//! emit `show-state-changed` (full `ShowData`, or partial progress snapshots
+//! during load). `.ldmx` files are pretty JSON written atomically. See
+//! `docs/contributing/architecture.md` ("Serialization & events").
+
 use std::io::Write;
 
 use tauri::{AppHandle, State};
@@ -9,6 +17,13 @@ use crate::show::types::{
     ShowPatchState, ShowStatus,
 };
 
+/// Fills in missing `panBounds`/`tiltBounds` (degrees) on each fixture's mode.
+///
+/// Fixtures whose mode already has both are skipped. Otherwise the bounds are
+/// looked up by case-insensitive fixture and mode name (or short name), first in
+/// `fixture_definitions`, then in the built-in generic fixtures, which only fill
+/// whichever bound is still missing. Mutates the in-memory fixtures only; fixtures
+/// with no match are left unchanged.
 pub fn enrich_fixture_modes_bounds(
     fixtures: &mut [PatchedFixture],
     fixture_definitions: &std::collections::HashMap<String, EmbeddedGdtfDefinition>,
@@ -89,6 +104,14 @@ pub fn enrich_fixture_modes_bounds(
     }
 }
 
+/// Tauri command: returns a copy of the current show, with missing pan/tilt
+/// bounds enriched (see [`enrich_fixture_modes_bounds`]).
+///
+/// Read-only: the stored show is not modified and no event is emitted.
+///
+/// # Errors
+///
+/// Returns an error if the show mutex is poisoned.
 #[tauri::command]
 pub fn show_get_data(state: State<'_, AppState>) -> Result<ShowData, String> {
     let show = state.show.lock().map_err(|e| e.to_string())?;
@@ -97,6 +120,15 @@ pub fn show_get_data(state: State<'_, AppState>) -> Result<ShowData, String> {
     Ok(response)
 }
 
+/// Tauri command: replaces the show with a new, empty one in the `Loaded` state.
+///
+/// History restarts with the new show as the saved (clean) state, the live
+/// engine is reset and the full show is emitted as `show-state-changed`.
+/// Not undoable.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned (including the engine's).
 #[tauri::command]
 pub fn show_create(state: State<'_, AppState>, app: AppHandle) -> Result<ShowData, String> {
     log::info!(target: "live-dmx::show", "creating new show");
@@ -120,6 +152,17 @@ pub fn show_create(state: State<'_, AppState>, app: AppHandle) -> Result<ShowDat
     Ok(show.clone())
 }
 
+/// Serializes `show` as a [`ShowFileContent`] to `path`, atomically.
+///
+/// Fixtures are cleaned with `clean_patched_fixture` so only persistent fields
+/// are written. The JSON goes to a uniquely named `<path>.tmp.<random hex>` file
+/// (created exclusively) that is then renamed over `path`, so a failure never
+/// leaves a partial `.ldmx`; the temp file is removed on error.
+///
+/// # Errors
+///
+/// Returns the stringified error from serialization, random suffix generation,
+/// creating/writing the temp file or renaming it.
 fn write_show_file(show: &ShowData, path: &str) -> Result<(), String> {
     let clean_fixtures: Vec<_> = show
         .patch
@@ -165,6 +208,16 @@ fn write_show_file(show: &ShowData, path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Tauri command: saves the show to the `.ldmx` file at `path`.
+///
+/// Sets `ShowStatus::Saving` (emitted) during the write, then back to `Loaded`,
+/// also on error. On success the file path is stored, the history's saved
+/// snapshot is updated (clearing the dirty flag, keeping undo/redo) and the full
+/// show is emitted. Holds the `show` and `history` locks during the disk write.
+///
+/// # Errors
+///
+/// Returns the file write error, or an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_save(
     state: State<'_, AppState>,
@@ -195,6 +248,18 @@ pub fn show_save(
     Ok(show.clone())
 }
 
+/// Tauri command: loads the `.ldmx` file at `path`, replacing the show.
+///
+/// Emits partial `{ status, progress, statusMessage }` snapshots while reading,
+/// parsing, cleaning and enriching fixtures, then the full show. History
+/// restarts with the loaded show as the saved (clean) state and the live engine
+/// is reset. Not undoable. On a read or parse error the current show is left
+/// untouched.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, is not valid show JSON, or a
+/// state mutex is poisoned.
 #[tauri::command]
 pub fn show_load(
     state: State<'_, AppState>,
@@ -252,6 +317,15 @@ pub fn show_load(
     Ok(show.clone())
 }
 
+/// Tauri command: imports an MVR file at `path`, replacing the whole show.
+///
+/// The import runs before the show lock is taken and reports its own progress
+/// events. History is reset empty (no saved snapshot, so the show is dirty), the
+/// live engine is reset and the full show is emitted. Not undoable.
+///
+/// # Errors
+///
+/// Returns the MVR import error, or an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_import_mvr(
     state: State<'_, AppState>,
@@ -270,6 +344,14 @@ pub fn show_import_mvr(
     Ok(show.clone())
 }
 
+/// Tauri command: closes the show, resetting to a default `NotLoaded` show.
+///
+/// History is reset empty, the live engine is reset and the full show is
+/// emitted. Not undoable.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned (including the engine's).
 #[tauri::command]
 pub fn show_unload(state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
@@ -281,6 +363,16 @@ pub fn show_unload(state: State<'_, AppState>, app: AppHandle) -> Result<(), Str
     Ok(())
 }
 
+/// Tauri command: undoes the last mutation and returns the resulting show.
+///
+/// Pops the undo stack, pushes the current snapshot onto redo and restores the
+/// popped one, then recomputes dirty/undo/redo flags. The live engine is reset
+/// only if the patch or group list changed. Emits `show-state-changed` when
+/// something was undone; with an empty undo stack it only returns the show.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_undo(state: State<'_, AppState>, app: AppHandle) -> Result<ShowData, String> {
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
@@ -309,6 +401,14 @@ pub fn show_undo(state: State<'_, AppState>, app: AppHandle) -> Result<ShowData,
     Ok(show.clone())
 }
 
+/// Tauri command: redoes the last undone mutation and returns the resulting show.
+///
+/// Inverse of [`show_undo`]: pops the redo stack and pushes the current snapshot
+/// onto undo. With an empty redo stack it only returns the show.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_redo(state: State<'_, AppState>, app: AppHandle) -> Result<ShowData, String> {
     let mut show = state.show.lock().map_err(|e| e.to_string())?;
@@ -337,6 +437,14 @@ pub fn show_redo(state: State<'_, AppState>, app: AppHandle) -> Result<ShowData,
     Ok(show.clone())
 }
 
+/// Tauri command: embeds a GDTF `definition` in the show so it is saved in the `.ldmx`.
+///
+/// Stored under the lowercase key `manufacturer@name`, replacing any previous
+/// definition with that key. Undoable; emits `show-state-changed`.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_register_fixture_definition(
     state: State<'_, AppState>,

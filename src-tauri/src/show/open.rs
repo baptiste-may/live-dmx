@@ -1,10 +1,19 @@
+//! Opening `.ldmx` shows from outside the app: file associations, deep links
+//! and command-line arguments.
+//!
+//! A request is parsed into a path, kept in [`PendingOpenStore`] until the
+//! frontend can read it, and forwarded live with the `open-show-request` event.
+//! See `docs/contributing/show-openers.md`.
+
 use std::path::Path;
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Emitter, Manager};
 use url::Url;
 
+/// Tauri-managed store for an open request received before the frontend was ready.
 pub struct PendingOpenStore {
+    /// Path waiting to be consumed by `get_pending_open_path`.
     pub path: Mutex<Option<String>>,
 }
 
@@ -16,10 +25,13 @@ impl Default for PendingOpenStore {
     }
 }
 
+/// Whether a raw string looks like a `.ldmx` path: ends in `.ldmx` (any case)
+/// and is not a command-line flag (does not start with `-`).
 fn is_ldmx_str(candidate: &str) -> bool {
     !candidate.starts_with('-') && candidate.to_ascii_lowercase().ends_with(".ldmx")
 }
 
+/// Whether `path` has a `.ldmx` extension (case-insensitive).
 fn is_ldmx_path(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
@@ -27,6 +39,9 @@ fn is_ldmx_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// Whether `candidate` starts with a Windows drive prefix such as `C:\` or `C:/`.
+///
+/// Such paths would otherwise parse as URLs with a one-letter scheme.
 fn is_windows_drive_path(candidate: &str) -> bool {
     let bytes = candidate.as_bytes();
     bytes.len() >= 3
@@ -69,6 +84,9 @@ pub fn extract_show_path(candidate: &str) -> Option<String> {
 
 /// Stores a pending open request (read once by the frontend at startup) and
 /// forwards it to the running frontend through the `open-show-request` event.
+///
+/// Uses the first candidate that [`extract_show_path`] accepts; does nothing if
+/// there is none. The pending path is kept only if [`PendingOpenStore`] is managed.
 pub fn handle_open_request(app: &AppHandle, candidates: &[String]) {
     let Some(path) = candidates.iter().find_map(|c| extract_show_path(c)) else {
         return;
@@ -85,6 +103,10 @@ pub fn handle_open_request(app: &AppHandle, candidates: &[String]) {
     let _ = app.emit("open-show-request", path);
 }
 
+/// Tauri command: takes the pending open path, if any.
+///
+/// Reading consumes it, so a later call returns `None`. The frontend calls it on
+/// mount to catch requests that arrived before it could listen to `open-show-request`.
 #[tauri::command]
 pub fn get_pending_open_path(state: tauri::State<PendingOpenStore>) -> Option<String> {
     state

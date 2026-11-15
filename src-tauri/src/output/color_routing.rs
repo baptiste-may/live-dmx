@@ -1,3 +1,9 @@
+//! Color routing helpers: which color channel class a fixture should be driven
+//! through, nearest wheel/preset slot lookup and RGB to color-temperature
+//! conversion.
+//!
+//! See `docs/contributing/rendering.md` for the routing rules.
+
 use serde::{Deserialize, Serialize};
 
 use crate::output::types::ChannelType;
@@ -7,13 +13,18 @@ use crate::show::ColorPreference;
 /// stable channel list once instead of scanned on every frame.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ColorChannelSummary {
+    /// At least one additive/subtractive emitter channel (RGB, W, A, CMY, UV).
     pub has_mix: bool,
+    /// At least one color wheel channel.
     pub has_wheel: bool,
+    /// At least one color macro/preset channel.
     pub has_macro: bool,
+    /// At least one color temperature (CCT/CTO/CTB) channel.
     pub has_temp: bool,
 }
 
 impl ColorChannelSummary {
+    /// Builds the summary by scanning a fixture's classified channels once.
     pub fn from_channels(channels: &[ChannelType]) -> Self {
         let mut summary = ColorChannelSummary::default();
         for c in channels {
@@ -121,6 +132,7 @@ const FALLBACK_SLOTS: [(u8, u8, u8); 8] = [
     (255, 0, 255),   // magenta
 ];
 
+/// Squared Euclidean distance between two RGB colors; used only for ranking.
 fn squared_distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
     let dr = a.0 as f64 - b.0 as f64;
     let dg = a.1 as f64 - b.1 as f64;
@@ -143,12 +155,16 @@ fn fallback_slot_position(r: u8, g: u8, b: u8) -> u8 {
     (((best_idx as f32 + 0.5) / FALLBACK_SLOTS.len() as f32) * 255.0).round() as u8
 }
 
+/// Returns the midpoint of a capability's `dmxFrom`..`dmxTo` range, clamped to
+/// 0-255, or `None` when either bound is missing.
 fn capability_dmx_value(cap: &serde_json::Value) -> Option<u8> {
     let from = cap.get("dmxFrom").and_then(|v| v.as_u64())?;
     let to = cap.get("dmxTo").and_then(|v| v.as_u64())?;
     Some((((from + to) / 2).clamp(0, 255)) as u8)
 }
 
+/// Collects the RGB colors of a capability from its `color` string and/or
+/// `colors` array, ignoring entries that are not valid hex colors.
 fn capability_colors(cap: &serde_json::Value) -> Vec<(u8, u8, u8)> {
     let mut out = Vec::new();
     if let Some(color) = cap.get("color").and_then(|c| c.as_str()) {
@@ -168,6 +184,8 @@ fn capability_colors(cap: &serde_json::Value) -> Vec<(u8, u8, u8)> {
     out
 }
 
+/// Parses a `#RRGGBB` (the `#` is optional) string, returning `None` unless it
+/// is exactly six ASCII hex digits.
 fn parse_hex_color(hex: &str) -> Option<(u8, u8, u8)> {
     let hex = hex.trim_start_matches('#');
     if hex.len() != 6 || !hex.is_ascii() {
@@ -209,6 +227,7 @@ pub fn closest_color_position(r: u8, g: u8, b: u8, capabilities: &[serde_json::V
     best_position.unwrap_or_else(|| fallback_slot_position(r, g, b))
 }
 
+/// Converts an sRGB byte to linear light (inverse sRGB gamma), 0.0-1.0.
 fn linearize(c: u8) -> f64 {
     let v = c as f64 / 255.0;
     if v <= 0.04045 {

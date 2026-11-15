@@ -481,7 +481,8 @@ permutation is deterministic for a given seed and N.
 - An absent secondary colour is **black**, not white.
 - A colour effect with no active effect (`none`/`off`) or BPM 0 yields a 0
   factor (current colour, no rainbow).
-- `full` ignores width; the other effects are null outside the width.
+- `full` ignores width and BPM 0 (it always returns 1.0); the other effects are
+  null outside the width or when BPM is 0.
 - `chase` is not a 50 % square: the threshold is `sin(t) > 0.5`.
 - Pixel steps are **global to the group**; never reset the effect per fixture.
 - `Grouped` is clamped to a minimum of **1** here (the Configure UI offers 2):

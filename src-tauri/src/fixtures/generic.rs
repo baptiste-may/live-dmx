@@ -1,13 +1,28 @@
+//! Built-in generic fixtures (dimmer, RGB/RGBW/RGBAW+UV PARs, strobe, moving
+//! heads) that work offline without any GDTF download.
+//!
+//! See `docs/contributing/fixtures.md` (built-in generic fixtures section).
+
 use std::sync::OnceLock;
 
 use super::parser::{ParsedGdtfFixture, ParsedGdtfMode};
 
+/// Lazily built list of built-in fixtures, shared for the process lifetime.
 static GENERIC_FIXTURES: OnceLock<Vec<ParsedGdtfFixture>> = OnceLock::new();
 
+/// Returns the built-in generic fixtures (manufacturer `"Generic"`).
+///
+/// Always available offline; they are injected at the head of catalog search
+/// results rather than stored in the local fixture cache.
 pub fn get_generic_fixtures() -> &'static [ParsedGdtfFixture] {
     GENERIC_FIXTURES.get_or_init(build_generic_fixtures)
 }
 
+/// Builds the generic fixture definitions.
+///
+/// Each has a `generic-*` `fixture_type_id` and DIN SPEC 15800 categories; only
+/// the moving heads declare pan/tilt bounds (degrees), the others leave them
+/// and the channel defaults unset.
 fn build_generic_fixtures() -> Vec<ParsedGdtfFixture> {
     vec![
         ParsedGdtfFixture {

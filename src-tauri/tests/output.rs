@@ -1,3 +1,5 @@
+//! Integration test harness for the `output` module (engine, effects, colors, protocols, interfaces).
+
 mod output {
     mod artnet;
     mod channels;

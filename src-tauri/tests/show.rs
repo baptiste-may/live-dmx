@@ -1,3 +1,5 @@
+//! Integration test harness for the `show` module (state, history, patch, configure, MVR, serialization).
+
 mod show {
     mod configure;
     mod history;

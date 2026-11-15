@@ -1,3 +1,20 @@
+//! Backend library of the live-dmx Tauri application.
+//!
+//! The crate is split into three domains:
+//!
+//! - [`fixtures`]: fixture definitions (built-in generics, GDTF parsing, GDTF-Share catalog).
+//! - [`show`]: the show model held in `AppState`, undo/redo history, `.ldmx` persistence,
+//!   MVR import and the Tauri commands that mutate it.
+//! - [`output`]: the live DMX engine, universe routing, network protocols and USB interfaces.
+//!
+//! [`run`] is the entry point shared by the desktop binary (`main.rs`) and the mobile entry
+//! point. It registers the Tauri plugins (single-instance, log, deep-link, updater, ...),
+//! manages the shared state (`AppState`, `PendingOpenStore`) and exposes every command to the
+//! frontend through a single `generate_handler!` list. The logging helpers in this file render
+//! the stdout (colored) and file/webview (plain) log formats.
+//!
+//! See `docs/contributing/architecture.md` and `docs/contributing/show-openers.md`.
+
 pub mod fixtures;
 pub mod output;
 pub mod show;
@@ -34,8 +51,10 @@ use tauri::RunEvent;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::fern;
 
+/// ANSI escape sequence that resets every text attribute.
 const ANSI_RESET: &str = "\x1b[0m";
 
+/// Builds the ANSI escape sequence selecting `color` as foreground, optionally bold.
 fn ansi(bold: bool, color: fern::colors::Color) -> String {
     if bold {
         format!("\x1b[1;{}m", color.to_fg_str())
@@ -44,6 +63,7 @@ fn ansi(bold: bool, color: fern::colors::Color) -> String {
     }
 }
 
+/// Returns the `(bold, color)` used to render the level label of a log record.
 fn level_style(level: log::Level) -> (bool, fern::colors::Color) {
     match level {
         log::Level::Error => (true, fern::colors::Color::BrightRed),
@@ -54,6 +74,9 @@ fn level_style(level: log::Level) -> (bool, fern::colors::Color) {
     }
 }
 
+/// Returns the color tinting the whole message, or `None` when the message stays uncolored.
+///
+/// Only errors and warnings are tinted so they stand out in the terminal.
 fn message_style(level: log::Level) -> Option<fern::colors::Color> {
     match level {
         log::Level::Error => Some(fern::colors::Color::BrightRed),
@@ -62,6 +85,11 @@ fn message_style(level: log::Level) -> Option<fern::colors::Color> {
     }
 }
 
+/// Renders one log record as a single line.
+///
+/// With `colored == false` the output is plain (`{timestamp}[{target}][{level}] {message}`), as
+/// written to the log file and the webview. With `colored == true` ANSI escapes dim the
+/// timestamp and target, color the level and tint error/warn messages (stdout only).
 fn render_record(
     timestamp: &str,
     target: &str,
@@ -83,6 +111,10 @@ fn render_record(
     }
 }
 
+/// Builds the `fern` format callback used by every `tauri-plugin-log` target.
+///
+/// Timestamps are UTC, formatted as `[YYYY-MM-DD][HH:MM:SS]`; `colored` selects the ANSI or
+/// plain rendering (see `render_record`).
 fn log_formatter(
     colored: bool,
 ) -> impl Fn(fern::FormatCallback, &std::fmt::Arguments, &log::Record) + Send + Sync + 'static {
@@ -103,6 +135,17 @@ fn log_formatter(
     }
 }
 
+/// Builds and runs the Tauri application. Blocks until the app exits.
+///
+/// Plugin order matters: on desktop the single-instance plugin must be registered first so a
+/// second launch forwards its arguments (resolved against the caller's working directory) to
+/// the running instance before anything else starts. The MCP bridge is debug-only and bound to
+/// loopback. Open requests (CLI arguments, deep links, macOS `RunEvent::Opened`) are all routed
+/// to `handle_open_request`.
+///
+/// # Panics
+///
+/// Panics if the Tauri application cannot be built from the generated context.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();

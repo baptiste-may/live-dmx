@@ -1,3 +1,9 @@
+//! Show state, undo/redo history, patch, groups, output routing and file handling.
+//!
+//! The submodules are re-exported flat so the rest of the crate can use
+//! `crate::show::*`. See `docs/contributing/architecture.md` for the state and
+//! mutation model and `docs/contributing/show-openers.md` for how shows are opened.
+
 pub mod commands;
 pub mod configure;
 pub mod history;

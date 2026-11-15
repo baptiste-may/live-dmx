@@ -1,3 +1,8 @@
+//! Fixture group commands: create, rename, remove and update group settings.
+//!
+//! Group `0` is the built-in "All" group and cannot be removed or renamed.
+//! Mutations are undoable (`AppState::apply_mutation`) and emit `show-state-changed`.
+
 use tauri::{AppHandle, State};
 
 use crate::show::configure::{
@@ -6,6 +11,14 @@ use crate::show::configure::{
 };
 use crate::show::{AppState, FixtureGroup, GroupSettings, PatchedFixture};
 
+/// Tauri command: creates an empty group named `name`.
+///
+/// The id is `max existing id + 1`. Returns the new id. Undoable; emits
+/// `show-state-changed`. Group list changes reset the live engine.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_group_create(
     state: State<'_, AppState>,
@@ -20,6 +33,16 @@ pub fn show_group_create(
     })
 }
 
+/// Tauri command: stores the settings of `group_id` (`0` targets the "All" group).
+///
+/// `settings` is first clamped to what the group's fixtures support (pan/tilt
+/// bounds, available colour and pixel options, pixel group count, max power).
+/// Undoable; emits `show-state-changed`. Settings changes do not reset the live engine.
+///
+/// # Errors
+///
+/// Returns `Group not found` if `group_id` is neither `0` nor an existing
+/// group, or an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_group_update_settings(
     state: State<'_, AppState>,
@@ -59,6 +82,14 @@ pub fn show_group_update_settings(
     })
 }
 
+/// Tauri command: deletes group `id`, its settings and its membership on every fixture.
+///
+/// Fixtures themselves are kept. Removing group `0` or an unknown id is a
+/// no-op. Undoable; emits `show-state-changed` when something changed.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_group_remove(
     state: State<'_, AppState>,
@@ -78,6 +109,14 @@ pub fn show_group_remove(
     })
 }
 
+/// Tauri command: renames group `id` to `new_name`.
+///
+/// Renaming group `0` ("All") or an unknown id is a silent no-op. Undoable;
+/// emits `show-state-changed` when something changed.
+///
+/// # Errors
+///
+/// Returns an error if a state mutex is poisoned.
 #[tauri::command]
 pub fn show_group_rename(
     state: State<'_, AppState>,

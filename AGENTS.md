@@ -105,6 +105,11 @@ Details per domain (file-level maps, data flows, conventions) are in the docs.
 - **Notifications:** `useToastStore()` — not `alert()`/Tauri `message()`.
 - **Backend:** `Result<_, String>` for fallible Tauri commands, `Result` in
   internal logic; undo/redo via `AppState::apply_mutation` (never hand-rolled).
+- **Rust docs:** every item — public **and private** — has a `///` doc (and
+  every module a `//!`), in English, explaining the why/invariants/units rather
+  than restating the code. Enforced by `missing_docs` and clippy's
+  `missing_docs_in_private_items` (see `docs/contributing/architecture.md`,
+  "Documentation coverage"); never `#[allow]` them away.
 
 ## Key flows at a glance
 
@@ -153,8 +158,10 @@ Frontend:
 
 Backend:
 
-- Lint `bun run lint:back` (clippy `-D warnings`) · Format `bun run format:back`
-  (rustfmt) · Tests `bun run test:back` (cargo test, `src-tauri/tests/`).
+- Lint `bun run lint:back` (clippy `-D warnings`, includes docstring coverage) ·
+  Rustdoc `bun run docs:back` (broken intra-doc links) · Format
+  `bun run format:back` (rustfmt) · Tests `bun run test:back` (cargo test,
+  `src-tauri/tests/`).
 
 Automation: Husky + lint-staged on commit · CI runs
 `bun run check` (typecheck, lint, format, tests, build) · Review requests:

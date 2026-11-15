@@ -1,3 +1,11 @@
+//! Small color-conversion helpers shared by the live engine.
+//!
+//! See `docs/contributing/rendering.md` for how colors flow through the pipeline.
+
+/// Resolves a color name or `#RRGGBB` hex string to an RGB triple (0-255 each).
+///
+/// Input is trimmed and names are case-insensitive. Unknown names and malformed
+/// hex strings fall back to white so a bad value never blacks out a fixture.
 pub fn resolve_color_rgb(color_name_or_hex: &str) -> (u8, u8, u8) {
     let s = color_name_or_hex.trim();
     if let Some(hex) = s.strip_prefix('#') {
@@ -31,6 +39,11 @@ pub fn resolve_color_rgb(color_name_or_hex: &str) -> (u8, u8, u8) {
     }
 }
 
+/// Converts HSV to RGB, returning each component on a 0.0-255.0 scale.
+///
+/// `h` is a hue in turns (1.0 = full circle) and wraps, so negative or
+/// greater-than-1 values are valid. `s` and `v` are clamped to 0.0-1.0. The
+/// result is not rounded so callers can keep float precision until encoding.
 pub fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
     let s = s.clamp(0.0, 1.0);
     let v = v.clamp(0.0, 1.0);

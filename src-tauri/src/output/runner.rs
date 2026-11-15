@@ -1,3 +1,8 @@
+//! Background runner that drives the live engine at 44 Hz and streams the
+//! computed universes to their configured outputs.
+//!
+//! See `docs/contributing/dmx-output.md` for the locking rules and protocols.
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -6,8 +11,11 @@ use std::time::{Duration, Instant};
 use crate::output::engine::LiveEngine;
 use crate::show::ShowData;
 
+/// Owns the shared [`LiveEngine`] and the lifecycle of the 44 Hz output thread.
 pub struct LiveEngineRunner {
+    /// Engine shared with the Tauri commands that mutate live state.
     pub engine: Arc<Mutex<LiveEngine>>,
+    /// `true` while the output thread should keep running; cleared to stop it.
     pub running: Arc<AtomicBool>,
 }
 
@@ -18,6 +26,7 @@ impl Default for LiveEngineRunner {
 }
 
 impl LiveEngineRunner {
+    /// Creates a stopped runner with a fresh engine.
     pub fn new() -> Self {
         Self {
             engine: Arc::new(Mutex::new(LiveEngine::new())),
@@ -25,6 +34,15 @@ impl LiveEngineRunner {
         }
     }
 
+    /// Spawns the output thread unless it is already running.
+    ///
+    /// Each tick (about 22.7 ms, 44 Hz) it locks `show_state` then the engine to
+    /// compute the frames and copies the enabled universes into private send
+    /// buffers; both locks are released before any network or serial I/O. Output
+    /// routing follows each universe's `output` target (`artnet`, `sacn`, `osc`,
+    /// `kinet`, `opc`, otherwise a physical interface name). Send errors are
+    /// ignored. A poisoned show lock stops the loop. The thread is detached and
+    /// is not joined.
     pub fn start_loop(&self, show_state: Arc<Mutex<ShowData>>) {
         if self.running.swap(true, Ordering::SeqCst) {
             return;
@@ -115,6 +133,7 @@ impl LiveEngineRunner {
         });
     }
 
+    /// Asks the output thread to exit after its current tick; does not wait for it.
     pub fn stop_loop(&self) {
         self.running.store(false, Ordering::SeqCst);
     }

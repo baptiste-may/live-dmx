@@ -1,7 +1,16 @@
+//! Serial port discovery for physical DMX interfaces.
+//!
+//! Filters the OS serial ports down to likely USB DMX adapters. See
+//! `docs/contributing/dmx-output.md` for the accepted name patterns.
+
 use serialport::{available_ports, SerialPortType};
 
 use super::types::PhysicalInterface;
 
+/// Returns three fictional interfaces with OS-appropriate port names.
+///
+/// Used by tests only; production code always calls
+/// [`discover_physical_interfaces`].
 pub fn default_physical_interfaces() -> Vec<PhysicalInterface> {
     #[cfg(target_os = "windows")]
     let ports = ["COM3", "COM4", "COM5"];
@@ -42,6 +51,17 @@ pub fn default_physical_interfaces() -> Vec<PhysicalInterface> {
     ]
 }
 
+/// Scans the OS serial ports and returns those that look like USB DMX adapters.
+///
+/// Bluetooth ports are skipped, as are `/dev/tty.*` ports on macOS (only the
+/// `/dev/cu.*` callout devices are kept). A port is kept when it is a USB port
+/// or its lowercased name contains `usb`, `acm` or `cu.`, or starts with `com`
+/// or `\\.\com`. Kept ports get `id = physical-{n}` and `name = Physical {n}`
+/// with `n` the 1-based position among kept ports, status `connected` and 44 fps.
+///
+/// # Errors
+///
+/// Returns `Err` with the message when the OS port enumeration fails.
 pub fn discover_physical_interfaces() -> Result<Vec<PhysicalInterface>, String> {
     let ports = available_ports().map_err(|e| e.to_string())?;
     let mut detected = Vec::new();

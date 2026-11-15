@@ -1,3 +1,11 @@
+//! Pure fixture encoder: turns a normalized `LogicalFixtureState` and a compiled
+//! profile into the DMX bytes of one fixture's footprint.
+//!
+//! The pipeline is deterministic and side-effect free, which keeps it easy to
+//! test; the live engine (`engine.rs`) builds the state and calls
+//! `encode_fixture_dmx`. Flash and strobe boosts are always clamped to the max
+//! power ceiling carried by the state. See `docs/contributing/rendering.md`.
+
 use crate::output::profile::{ChannelResolution, CompiledFixtureProfile, LogicalAttribute};
 use crate::show::ColorPreference;
 
@@ -90,6 +98,13 @@ fn effective_dimmer(state: &LogicalFixtureState, fixture_ceiling: f32) -> f32 {
 
 /// Pure DMX encoding function: translates `LogicalFixtureState` into DMX bytes
 /// according to the fixture's compiled profile.
+///
+/// `buf` is the fixture's slice of the universe buffer; it is first filled with
+/// the profile's per-channel defaults, so only `min(footprint, buf.len())` bytes
+/// are written and an empty `buf` or zero footprint is a no-op. `pixel_states`
+/// carries one state per pixel for multi-pixel fixtures and is ignored when
+/// `None` or empty. `profile.default_dmx` must cover the whole footprint (the
+/// profile compiler guarantees it). Reads no clock, lock or `ShowData`.
 pub fn encode_fixture_dmx(
     profile: &CompiledFixtureProfile,
     state: &LogicalFixtureState,
