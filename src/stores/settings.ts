@@ -98,6 +98,11 @@ function resolveSystemTheme(): "forest" | "cupcake" {
 
 let mediaQueryListenerAttached = false;
 
+// Serializes native zoom requests so that rapid scale changes are applied in
+// order; without it, overlapping async `setZoom` calls can settle out of order
+// and leave the webview on an earlier scale than the one currently selected.
+let zoomChain: Promise<void> = Promise.resolve();
+
 export const useSettings = defineStore("settings", {
   state: (): SettingsState => {
     const stored = getStoredSettings();
@@ -155,15 +160,18 @@ export const useSettings = defineStore("settings", {
       // CSS `zoom` on the root element would only shrink the rendered page box
       // and leave the rest of the window empty, keeping `vh`/`vw` and fixed
       // overlays unscaled.
-      try {
-        void getCurrentWebview()
-          .setZoom(this.scale / 100)
-          .catch(() => {
-            // Zoom is best-effort; the UI stays usable if the webview refuses it.
-          });
-      } catch {
-        // `getCurrentWebview()` throws outside a Tauri webview (browser preview, tests).
-      }
+      const scale = this.scale / 100;
+      zoomChain = zoomChain
+        .then(() => {
+          try {
+            return getCurrentWebview().setZoom(scale);
+          } catch {
+            // `getCurrentWebview()` throws outside a Tauri webview (browser preview, tests).
+          }
+        })
+        .catch(() => {
+          // Zoom is best-effort; a refused call must not block later scale updates.
+        });
     },
     initTheme() {
       this.applyTheme();

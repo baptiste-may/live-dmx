@@ -98,6 +98,11 @@ scale. It requires the `core:webview:allow-set-webview-zoom` capability; the
 call is ignored outside Tauri (browser preview, unit tests), and
 `src/test-setup.ts` mocks `getCurrentWebview`.
 
+`applyScale()` chains `setZoom` calls through a module-level promise so rapid
+changes (dragging the scale slider) are applied in order — otherwise overlapping
+IPC calls could settle out of order and leave the webview on an older scale.
+Every link swallows errors, so a rejected zoom never blocks later updates.
+
 ### Configuration store exception (`show-configuration.ts`)
 
 The Configure view does **not** duplicate business logic on the frontend:
