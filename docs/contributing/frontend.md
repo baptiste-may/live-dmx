@@ -103,6 +103,12 @@ changes (dragging the scale slider) are applied in order — otherwise overlappi
 IPC calls could settle out of order and leave the webview on an older scale.
 Every link swallows errors, so a rejected zoom never blocks later updates.
 
+On macOS, native zoom relies on `WKWebView.pageZoom`, which exists only on
+macOS 11+. `bundle.macOS.minimumSystemVersion` is therefore pinned to `11.0` in
+`tauri.conf.json`: older macOS releases would otherwise be treated as supported
+while silently ignoring a saved scale. Changing that minimum must keep the
+requirement of the webview zoom API in mind.
+
 ### Configuration store exception (`show-configuration.ts`)
 
 The Configure view does **not** duplicate business logic on the frontend:
