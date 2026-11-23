@@ -50,7 +50,9 @@ between them.
 
 ## Bottom of the bar
 
-- **Settings** opens the general settings modal.
+- **Settings** opens the general settings modal: dark/light/system theme,
+  interface scale (50–150%, remembered across restarts), and live-display
+  options.
 - **Hide** collapses the bar to icons only. Category titles and labels disappear
   and separators take their place; hovering an icon shows its name in a tooltip.
   The show title and the `(unsaved)` marker are hidden while collapsed, and

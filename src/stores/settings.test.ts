@@ -1,3 +1,4 @@
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SETTINGS_STORAGE_KEY, useSettings } from "./settings.ts";
@@ -19,12 +20,13 @@ describe("settings store", () => {
     expect(settings.live.showSectionTitles).toBe(true);
   });
 
-  it("updates scale, persists to localStorage, and sets documentElement zoom", () => {
+  it("updates scale, persists to localStorage, and applies the webview zoom", () => {
+    const setZoom = vi.mocked(getCurrentWebview().setZoom);
     const settings = useSettings();
 
     settings.setScale(120);
     expect(settings.scale).toBe(120);
-    expect(document.documentElement.style.zoom).toBe("1.2");
+    expect(setZoom).toHaveBeenLastCalledWith(1.2);
 
     const saved = JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) || "{}");
     expect(saved.scale).toBe(120);
@@ -32,11 +34,20 @@ describe("settings store", () => {
     // Clamps between min (50) and max (150)
     settings.setScale(20);
     expect(settings.scale).toBe(50);
-    expect(document.documentElement.style.zoom).toBe("0.5");
+    expect(setZoom).toHaveBeenLastCalledWith(0.5);
 
     settings.setScale(200);
     expect(settings.scale).toBe(150);
-    expect(document.documentElement.style.zoom).toBe("1.5");
+    expect(setZoom).toHaveBeenLastCalledWith(1.5);
+  });
+
+  it("applies the stored scale when settings initialize", () => {
+    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ scale: 75 }));
+    const settings = useSettings();
+
+    settings.initTheme();
+
+    expect(vi.mocked(getCurrentWebview().setZoom)).toHaveBeenLastCalledWith(0.75);
   });
 
   it("opens and closes the settings modal", () => {

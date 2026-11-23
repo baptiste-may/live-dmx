@@ -87,6 +87,17 @@ composables, or frontend tests.
 - `recent-shows.ts`, `settings.ts`, `toast.ts`, `confirmation.ts`,
   `updates.ts`, `navigation.ts` — supporting UI state
 
+### UI scale (`settings.ts`)
+
+The interface scale is applied with the **webview's native page zoom**
+(`getCurrentWebview().setZoom(scale / 100)`), not CSS `zoom` on the root
+element: CSS `zoom` only shrinks the rendered page box and leaves part of the
+window empty, while keeping `vh`/`vw` units and fixed overlays unscaled. Native
+page zoom reflows the layout viewport, so the app fills the whole window at any
+scale. It requires the `core:webview:allow-set-webview-zoom` capability; the
+call is ignored outside Tauri (browser preview, unit tests), and
+`src/test-setup.ts` mocks `getCurrentWebview`.
+
 ### Configuration store exception (`show-configuration.ts`)
 
 The Configure view does **not** duplicate business logic on the frontend:

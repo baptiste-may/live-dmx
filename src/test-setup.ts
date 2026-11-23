@@ -14,6 +14,10 @@ const mockWindow = {
   show: vi.fn(),
 };
 
+const mockWebview = {
+  setZoom: vi.fn().mockResolvedValue(undefined),
+};
+
 // Global Tauri API mocks for Vitest
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue({}),
@@ -21,6 +25,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => mockWindow,
+}));
+
+vi.mock("@tauri-apps/api/webview", () => ({
+  getCurrentWebview: () => mockWebview,
 }));
 
 vi.mock("@tauri-apps/plugin-global-shortcut", () => ({

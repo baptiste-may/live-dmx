@@ -1,3 +1,4 @@
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { defineStore } from "pinia";
 
 export type ThemeMode = "dark" | "light" | "system";
@@ -150,8 +151,18 @@ export const useSettings = defineStore("settings", {
       }
     },
     applyScale() {
-      if (typeof document !== "undefined" && document.documentElement) {
-        document.documentElement.style.zoom = `${this.scale / 100}`;
+      // Native page zoom reflows the layout viewport into the whole window.
+      // CSS `zoom` on the root element would only shrink the rendered page box
+      // and leave the rest of the window empty, keeping `vh`/`vw` and fixed
+      // overlays unscaled.
+      try {
+        void getCurrentWebview()
+          .setZoom(this.scale / 100)
+          .catch(() => {
+            // Zoom is best-effort; the UI stays usable if the webview refuses it.
+          });
+      } catch {
+        // `getCurrentWebview()` throws outside a Tauri webview (browser preview, tests).
       }
     },
     initTheme() {

@@ -216,7 +216,8 @@ Tauri v2 gates every `invoke` behind a capability. Frontend calls fail with
 ```json
 "permissions": [ "core:default", "opener:default", "dialog:default",
   "core:path:default", "core:window:allow-close", "core:window:allow-destroy",
-  "core:event:default", "global-shortcut:default", "log:default",
+  "core:event:default", "core:webview:allow-set-webview-zoom",
+  "global-shortcut:default", "log:default",
   "mcp-bridge:default", "updater:default", "process:default" ]
 ```
 
