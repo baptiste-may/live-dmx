@@ -1,4 +1,5 @@
 import { getTauriVersion, getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +22,7 @@ vi.mock("@tauri-apps/plugin-process", () => ({
 
 const mockGetVersion = vi.mocked(getVersion);
 const mockGetTauriVersion = vi.mocked(getTauriVersion);
+const mockInvoke = vi.mocked(invoke);
 const mockCheck = vi.mocked(check);
 const mockRelaunch = vi.mocked(relaunch);
 
@@ -46,6 +48,7 @@ function emitProgress(update: Update, chunkLength: number) {
 describe("updates store", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(false);
   });
 
   it("loads app and tauri versions on init", async () => {
@@ -127,6 +130,81 @@ describe("updates store", () => {
     expect(mockRelaunch).toHaveBeenCalledTimes(1);
   });
 
+  it("refuses to install on macOS older than 11.0 and reports the requirement", async () => {
+    mockInvoke.mockResolvedValueOnce(true);
+    const update = mockUpdate();
+    mockCheck.mockResolvedValue(update);
+
+    const updates = useUpdates();
+    await updates.checkForUpdates();
+    const toast = useToastStore();
+    const addToast = vi.spyOn(toast, "addToast");
+
+    await updates.downloadAndInstall();
+
+    expect(mockInvoke).toHaveBeenCalledWith("is_macos_below_minimum");
+    expect(update.downloadAndInstall).not.toHaveBeenCalled();
+    expect(mockRelaunch).not.toHaveBeenCalled();
+    expect(updates.status).toBe("error");
+    expect(updates.error).toBe("This update requires macOS 11.0 or later.");
+    expect(addToast).toHaveBeenCalledWith(
+      "This update requires macOS 11.0 or later.",
+      ToastType.ERROR,
+    );
+  });
+
+  it("installs normally when macOS meets the minimum version", async () => {
+    mockInvoke.mockResolvedValueOnce(false);
+    const update = mockUpdate();
+    mockCheck.mockResolvedValue(update);
+
+    const updates = useUpdates();
+    await updates.checkForUpdates();
+    await updates.downloadAndInstall();
+
+    expect(update.downloadAndInstall).toHaveBeenCalled();
+    expect(mockRelaunch).toHaveBeenCalledTimes(1);
+    expect(updates.status).toBe("installing");
+  });
+
+  it("installs normally when the OS version probe is unavailable", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("probe unavailable"));
+    const update = mockUpdate();
+    mockCheck.mockResolvedValue(update);
+
+    const updates = useUpdates();
+    await updates.checkForUpdates();
+    await updates.downloadAndInstall();
+
+    expect(update.downloadAndInstall).toHaveBeenCalled();
+    expect(mockRelaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a second install attempt while the OS probe is in flight", async () => {
+    let releaseProbe: () => void = () => {};
+    const probeGate = new Promise<void>((resolve) => {
+      releaseProbe = resolve;
+    });
+    mockInvoke.mockImplementationOnce(async () => {
+      await probeGate;
+      return false;
+    });
+    const update = mockUpdate();
+    mockCheck.mockResolvedValue(update);
+
+    const updates = useUpdates();
+    await updates.checkForUpdates();
+
+    const first = updates.downloadAndInstall();
+    await vi.waitFor(() => expect(updates.status).toBe("downloading"));
+    await updates.downloadAndInstall();
+    releaseProbe();
+    await first;
+
+    expect(update.downloadAndInstall).toHaveBeenCalledTimes(1);
+    expect(mockRelaunch).toHaveBeenCalledTimes(1);
+  });
+
   it("tracks download progress from events", async () => {
     const update = mockUpdate();
     mockCheck.mockResolvedValue(update);
@@ -134,6 +212,7 @@ describe("updates store", () => {
     const updates = useUpdates();
     await updates.checkForUpdates();
     const promise = updates.downloadAndInstall();
+    await vi.waitFor(() => expect(update.downloadAndInstall).toHaveBeenCalled());
 
     emitStarted(update, 100);
     emitProgress(update, 25);

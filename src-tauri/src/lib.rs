@@ -18,6 +18,7 @@
 pub mod fixtures;
 pub mod output;
 pub mod show;
+pub mod system;
 
 use fixtures::{
     check_fixtures_installed, gdtf_fetch_mode, gdtf_get_credentials_status, gdtf_import_file,
@@ -45,6 +46,7 @@ use show::{
     show_register_fixture_definition, show_save, show_undo, show_unload, AppState,
     PendingOpenStore,
 };
+use system::is_macos_below_minimum;
 use tauri::Manager;
 #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
 use tauri::RunEvent;
@@ -219,6 +221,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(PendingOpenStore::default())
         .invoke_handler(tauri::generate_handler![
+            is_macos_below_minimum,
             check_fixtures_installed,
             gdtf_search,
             gdtf_set_credentials,
