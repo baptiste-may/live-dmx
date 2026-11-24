@@ -57,12 +57,7 @@ manual builds.
 
 - **Linux:** only the **AppImage** is auto-updatable (deb/rpm need manual install).
 - **Windows:** the app closes itself before installing the new version.
-- **macOS:** unsigned builds trigger Gatekeeper warnings for end users. Bundles
-  require macOS 11+ (native UI zoom), so `downloadAndInstall()` claims the busy
-  state, then probes `is_macos_below_minimum` and reports the requirement
-  instead of installing an app that cannot launch. The probe disables
-  compatibility-version reporting so macOS 11 reads as 11, not 10.16. A failed
-  probe leaves supported systems on the normal update path.
+- **macOS:** unsigned builds trigger Gatekeeper warnings for end users.
 
 ## CI (`.github/workflows/ci.yml`)
 

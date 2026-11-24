@@ -1,5 +1,4 @@
 import { getTauriVersion, getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { defineStore } from "pinia";
@@ -110,35 +109,13 @@ export const useUpdates = defineStore("updates", {
 
     async downloadAndInstall() {
       const toast = useToastStore();
-      if (!this.pendingUpdate || this.isBusy) return;
+      if (!this.pendingUpdate) return;
 
       const update = this.pendingUpdate;
-      // Claim the busy state before awaiting the probe: the update buttons rely
-      // on isBusy to reject a second click that would start a duplicate install
-      // writing the same progress fields.
       this.status = "downloading";
       this.downloaded = 0;
       this.contentLength = 0;
       this.error = null;
-
-      // Current releases require macOS 11+ for native UI zoom. Installing on
-      // an older system would produce an app that cannot launch, so refuse the
-      // update there. WebKit's user agent is frozen at 10.15 on newer macOS
-      // versions, hence the native probe; an unavailable probe does not block
-      // updates on supported systems.
-      let incompatibleMacOS = false;
-      try {
-        incompatibleMacOS = (await invoke<boolean>("is_macos_below_minimum")) === true;
-      } catch {
-        // Unknown OS version: keep the regular update flow.
-      }
-      if (incompatibleMacOS) {
-        const reason = "This update requires macOS 11.0 or later.";
-        this.status = "error";
-        this.error = reason;
-        toast.addToast(reason, ToastType.ERROR);
-        return;
-      }
 
       const onEvent = (event: DownloadEvent) => {
         switch (event.event) {

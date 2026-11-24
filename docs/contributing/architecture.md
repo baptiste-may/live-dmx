@@ -12,7 +12,6 @@ patch, groups, configure, serialization, or backend tests.
 | `fixtures/` | GDTF parsing/catalog/generics + credentials vault (see `docs/contributing/fixtures.md`)          |
 | `output/`   | DMX engine, runner, protocols, interfaces, live commands (see `docs/contributing/dmx-output.md`) |
 | `show/`     | Show state, history/undo, patch, groups, configure, MVR, open routing, output config             |
-| `system.rs` | OS version probe gating auto-updates on macOS (see `docs/contributing/releasing.md`)             |
 
 Submodules:
 
@@ -180,7 +179,6 @@ that is not listed there is not callable from the frontend. Handlers must be
 | Interfaces | `get_output_interfaces`, `scan_output_interfaces`                                                           | `output/interfaces/`                  |
 | Opening    | `get_pending_open_path`, `get_recent_shows`, `save_recent_show`, `remove_recent_show`, `clean_recent_shows` | `show/open.rs`, `show/recent.rs`      |
 | Import     | `show_import_mvr`, `gdtf_import_file`                                                                       | `show/mvr.rs`, `fixtures/commands.rs` |
-| System     | `is_macos_below_minimum`                                                                                    | `system.rs`                           |
 
 Recent shows (`show/recent.rs`) are capped at five entries (`MAX_RECENT_SHOWS`):
 reads return the five newest without rewriting storage, and a successful open
