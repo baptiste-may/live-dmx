@@ -1,3 +1,4 @@
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { defineStore } from "pinia";
 
 export type ThemeMode = "dark" | "light" | "system";
@@ -97,6 +98,11 @@ function resolveSystemTheme(): "forest" | "cupcake" {
 
 let mediaQueryListenerAttached = false;
 
+// Serializes native zoom requests so that rapid scale changes are applied in
+// order; without it, overlapping async `setZoom` calls can settle out of order
+// and leave the webview on an earlier scale than the one currently selected.
+let zoomChain: Promise<void> = Promise.resolve();
+
 export const useSettings = defineStore("settings", {
   state: (): SettingsState => {
     const stored = getStoredSettings();
@@ -150,9 +156,22 @@ export const useSettings = defineStore("settings", {
       }
     },
     applyScale() {
-      if (typeof document !== "undefined" && document.documentElement) {
-        document.documentElement.style.zoom = `${this.scale / 100}`;
-      }
+      // Native page zoom reflows the layout viewport into the whole window.
+      // CSS `zoom` on the root element would only shrink the rendered page box
+      // and leave the rest of the window empty, keeping `vh`/`vw` and fixed
+      // overlays unscaled.
+      const scale = this.scale / 100;
+      zoomChain = zoomChain
+        .then(() => {
+          try {
+            return getCurrentWebview().setZoom(scale);
+          } catch {
+            // `getCurrentWebview()` throws outside a Tauri webview (browser preview, tests).
+          }
+        })
+        .catch(() => {
+          // Zoom is best-effort; a refused call must not block later scale updates.
+        });
     },
     initTheme() {
       this.applyTheme();

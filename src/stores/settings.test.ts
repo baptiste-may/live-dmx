@@ -1,6 +1,9 @@
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SETTINGS_STORAGE_KEY, useSettings } from "./settings.ts";
+
+const mockSetZoom = vi.mocked(getCurrentWebview().setZoom);
 
 describe("settings store", () => {
   beforeEach(() => {
@@ -19,12 +22,12 @@ describe("settings store", () => {
     expect(settings.live.showSectionTitles).toBe(true);
   });
 
-  it("updates scale, persists to localStorage, and sets documentElement zoom", () => {
+  it("updates scale, persists to localStorage, and applies the webview zoom", async () => {
     const settings = useSettings();
 
     settings.setScale(120);
     expect(settings.scale).toBe(120);
-    expect(document.documentElement.style.zoom).toBe("1.2");
+    await vi.waitFor(() => expect(mockSetZoom).toHaveBeenLastCalledWith(1.2));
 
     const saved = JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) || "{}");
     expect(saved.scale).toBe(120);
@@ -32,11 +35,54 @@ describe("settings store", () => {
     // Clamps between min (50) and max (150)
     settings.setScale(20);
     expect(settings.scale).toBe(50);
-    expect(document.documentElement.style.zoom).toBe("0.5");
+    await vi.waitFor(() => expect(mockSetZoom).toHaveBeenLastCalledWith(0.5));
 
     settings.setScale(200);
     expect(settings.scale).toBe(150);
-    expect(document.documentElement.style.zoom).toBe("1.5");
+    await vi.waitFor(() => expect(mockSetZoom).toHaveBeenLastCalledWith(1.5));
+  });
+
+  it("applies the stored scale when settings initialize", async () => {
+    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ scale: 75 }));
+    const settings = useSettings();
+
+    settings.initTheme();
+
+    await vi.waitFor(() => expect(mockSetZoom).toHaveBeenLastCalledWith(0.75));
+  });
+
+  it("serializes zoom updates so the most recent scale is applied last", async () => {
+    const settings = useSettings();
+
+    let finishFirstZoom!: () => void;
+    mockSetZoom.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFirstZoom = resolve;
+        }),
+    );
+
+    settings.setScale(120);
+    settings.setScale(150);
+
+    await vi.waitFor(() => expect(mockSetZoom).toHaveBeenCalledTimes(1));
+    expect(mockSetZoom).toHaveBeenLastCalledWith(1.2);
+
+    finishFirstZoom();
+    await vi.waitFor(() => expect(mockSetZoom).toHaveBeenCalledTimes(2));
+    expect(mockSetZoom).toHaveBeenLastCalledWith(1.5);
+  });
+
+  it("keeps applying zoom after a rejected update", async () => {
+    const settings = useSettings();
+
+    mockSetZoom.mockRejectedValueOnce(new Error("zoom refused"));
+
+    settings.setScale(120);
+    settings.setScale(150);
+
+    await vi.waitFor(() => expect(mockSetZoom).toHaveBeenCalledTimes(2));
+    expect(mockSetZoom).toHaveBeenLastCalledWith(1.5);
   });
 
   it("opens and closes the settings modal", () => {

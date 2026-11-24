@@ -87,6 +87,28 @@ composables, or frontend tests.
 - `recent-shows.ts`, `settings.ts`, `toast.ts`, `confirmation.ts`,
   `updates.ts`, `navigation.ts` — supporting UI state
 
+### UI scale (`settings.ts`)
+
+The interface scale is applied with the **webview's native page zoom**
+(`getCurrentWebview().setZoom(scale / 100)`), not CSS `zoom` on the root
+element: CSS `zoom` only shrinks the rendered page box and leaves part of the
+window empty, while keeping `vh`/`vw` units and fixed overlays unscaled. Native
+page zoom reflows the layout viewport, so the app fills the whole window at any
+scale. It requires the `core:webview:allow-set-webview-zoom` capability; the
+call is ignored outside Tauri (browser preview, unit tests), and
+`src/test-setup.ts` mocks `getCurrentWebview`.
+
+`applyScale()` chains `setZoom` calls through a module-level promise so rapid
+changes (dragging the scale slider) are applied in order — otherwise overlapping
+IPC calls could settle out of order and leave the webview on an older scale.
+Every link swallows errors, so a rejected zoom never blocks later updates.
+
+On macOS, native zoom relies on `WKWebView.pageZoom`, which exists only on
+macOS 11+. `bundle.macOS.minimumSystemVersion` is therefore pinned to `11.0` in
+`tauri.conf.json`: older macOS releases would otherwise be treated as supported
+while silently ignoring a saved scale. Changing that minimum must keep the
+requirement of the webview zoom API in mind.
+
 ### Configuration store exception (`show-configuration.ts`)
 
 The Configure view does **not** duplicate business logic on the frontend:
